@@ -1,6 +1,6 @@
-# 更新紀錄
+# CHANGELOG
 
-本檔依照 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/) 格式記錄專案變更。
+This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/) format to track version updates.
 
 ## [Unreleased]
 
@@ -16,4 +16,6 @@
 
 ### Changed
 
+- 改善手機與平板版面：調整頁首、工作區欄數、上傳區及觸控操作尺寸。
+- 將應用程式依頁面外殼、合併與拆分功能、共用元件及 PDF 處理分層整理。
 - 合併與拆分現在可處理能以空使用者密碼開啟、但受擁有者密碼限制的 PDF；檔案會在瀏覽器內解鎖，輸出不保留原加密設定。真正需要開啟密碼的 PDF 仍會提示無法處理。

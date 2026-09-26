@@ -1,4 +1,4 @@
-# Folio — PDF 工作台
+# PDF Forge — PDF 工作台
 
 純前端 PDF 工具，以 Vite、React、TypeScript 製作。檔案在瀏覽器中處理，不會上傳至伺服器。
 
@@ -8,6 +8,24 @@
 - **拆分 PDF**：點選縮圖或輸入頁碼範圍，建立多個頁面群組；也可每頁輸出一個檔案。多個結果打包成 ZIP。
 
 壓縮 PDF 尚未實作。
+
+## 專案結構
+
+```text
+src/
+├── main.tsx              # 應用程式入口
+├── app/                  # 頁面外殼與全域樣式
+├── features/
+│   ├── merge/            # 合併流程、檔案排序元件與型別
+│   └── split/            # 拆分流程與頁面縮圖元件
+└── shared/
+    ├── components/       # 跨功能共用的介面元件
+    └── pdf/              # PDF 處理、預覽、解鎖及其測試資料
+public/                   # 靜態資源
+docs/                     # 專案文件
+```
+
+`app` 組合各項功能；`features` 可使用 `shared`，但 `shared` 不依賴功能畫面。新增功能時，先放在對應的 `features` 目錄；只有實際跨功能使用的程式才放入 `shared`。
 
 ## 開發
 

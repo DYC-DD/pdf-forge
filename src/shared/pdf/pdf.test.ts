@@ -61,7 +61,7 @@ describe('PDF output', () => {
     const restricted = new File([bytes], 'restricted.pdf', { type: 'application/pdf' })
     await unlockPdfWithEmptyPassword(
       restricted,
-      new URL('../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm', import.meta.url).pathname,
+      new URL('../../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm', import.meta.url).pathname,
     )
     const output = await splitPdf(restricted, [{ id: 'a', name: 'page-1', pages: [1] }])
     const result = await PDFDocument.load(await output.blob.arrayBuffer())
