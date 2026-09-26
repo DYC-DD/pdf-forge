@@ -13,19 +13,26 @@
 
 ```text
 src/
-├── main.tsx              # 應用程式入口
-├── app/                  # 頁面外殼與全域樣式
+├── main.tsx                  # React 入口
+├── app/
+│   ├── App.tsx               # 組合首頁、工具切換與工作區
+│   ├── components/           # 獨立的頁首與頁尾元件
+│   ├── styles.css            # 依序載入各層樣式
+│   └── styles/              # 基礎、外殼、頁首、頁尾與工作區樣式
 ├── features/
-│   ├── merge/            # 合併流程、檔案排序元件與型別
-│   └── split/            # 拆分流程與頁面縮圖元件
-└── shared/
-    ├── components/       # 跨功能共用的介面元件
-    └── pdf/              # PDF 處理、預覽、解鎖及其測試資料
-public/                   # 靜態資源
-docs/                     # 專案文件
+│   ├── landing/             # 首頁展示、工具選擇及其視覺元件
+│   ├── merge/               # 合併介面、排序元件及合併邏輯
+│   └── split/               # 拆分介面、頁面縮圖及拆分邏輯
+├── shared/
+│   ├── files/               # 檔名、大小顯示與下載工具
+│   ├── pdf/                 # PDF 載入、預覽、解鎖與錯誤訊息
+│   └── ui/                  # 跨功能共用的介面元件
+└── tests/                   # 跨功能 PDF 整合測試與測試資料
+public/                       # 靜態資源
+docs/                         # 專案文件
 ```
 
-`app` 組合各項功能；`features` 可使用 `shared`，但 `shared` 不依賴功能畫面。新增功能時，先放在對應的 `features` 目錄；只有實際跨功能使用的程式才放入 `shared`。
+`app` 負責組合與全域樣式載入；`features` 各自擁有畫面、專用元件、處理邏輯與樣式；`shared` 只放跨功能使用的能力。依賴方向為 `app → features → shared`，`shared` 不反向引用功能。新增功能時先放入對應的 `features` 目錄，確定重複使用後再提升至 `shared`。
 
 ## 開發
 
@@ -39,6 +46,13 @@ npm run dev
 ```bash
 npm test
 npm run build
+```
+
+程式碼使用專案固定版本的 Prettier 排版，並由匯入排序外掛統一 `import` 順序。VS Code 會提示安裝 Prettier 擴充套件，並在儲存時依 `.prettierrc.json` 自動格式化。其他編輯器也可執行：
+
+```bash
+npm run format
+npm run format:check
 ```
 
 ## GitHub Pages

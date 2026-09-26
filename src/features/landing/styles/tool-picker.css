@@ -1,0 +1,120 @@
+.tool-section {
+  margin-top: 47px;
+}
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.section-kicker {
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+.section-heading h2 {
+  margin: 7px 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+}
+.section-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.section-aside {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 4px;
+  color: #597269;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.section-aside .public-icon {
+  color: #4f9a70;
+}
+.tool-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.tool-tab {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 18px;
+  min-height: 116px;
+  padding: 19px 21px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  box-shadow: 0 6px 18px #1c2b5508;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+.tool-tab:hover {
+  transform: translateY(-2px);
+  border-color: #aebafc;
+  box-shadow: 0 10px 25px #344ba91c;
+}
+.tool-tab.active {
+  border-color: var(--blue);
+  box-shadow:
+    0 0 0 2px #425ce928,
+    0 12px 28px #3147ac15;
+}
+.tool-tab-icon {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  border-radius: 14px;
+  background: #f0f2fe;
+  color: var(--blue);
+}
+.tool-tab.active .tool-tab-icon {
+  background: var(--blue);
+  color: #fff;
+}
+.tool-tab-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+.tool-tab-copy small {
+  color: #8d99b0;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+.tool-tab.active .tool-tab-copy small {
+  color: var(--blue);
+}
+.tool-tab-copy strong {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.tool-tab-copy > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.tool-tab-arrow {
+  margin-left: auto;
+  flex: none;
+  color: #a5b0c5;
+}
+.tool-tab.active .tool-tab-arrow {
+  color: var(--blue);
+}

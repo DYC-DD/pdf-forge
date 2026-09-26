@@ -1,99 +1,133 @@
-import { useState } from 'react'
-import { ArrowRight, Download, LockKeyhole } from 'lucide-react'
 import {
+  closestCenter,
   DndContext,
   KeyboardSensor,
   PointerSensor,
-  closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
-} from '@dnd-kit/core'
+} from "@dnd-kit/core";
 import {
-  SortableContext,
   arrayMove,
+  SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import DropZone from '../../shared/components/DropZone'
-import { fileError } from '../../shared/pdf/errors'
-import { fileStem, formatBytes, mergePdfs, saveBlob } from '../../shared/pdf/pdf'
-import { inspectPdf } from '../../shared/pdf/preview'
-import SortableFileRow from './SortableFileRow'
-import type { MergeItem } from './types'
+} from "@dnd-kit/sortable";
+import { useState } from "react";
+
+import { fileStem, formatBytes, saveBlob } from "../../shared/files/file";
+import { fileError } from "../../shared/pdf/errors";
+import { inspectPdf } from "../../shared/pdf/preview";
+import DropZone from "../../shared/ui/DropZone";
+import PublicIcon from "../../shared/ui/PublicIcon";
+import SortableFileRow from "./components/SortableFileRow";
+import { mergePdfs } from "./lib/mergePdfs";
+import type { MergeItem } from "./types";
 
 export default function MergeWorkspace() {
-  const [items, setItems] = useState<MergeItem[]>([])
-  const [outputName, setOutputName] = useState('merged.pdf')
-  const [message, setMessage] = useState('')
-  const [processing, setProcessing] = useState(false)
-  const [progress, setProgress] = useState(0)
+  const [items, setItems] = useState<MergeItem[]>([]);
+  const [outputName, setOutputName] = useState("merged.pdf");
+  const [message, setMessage] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   async function addFiles(files: File[]) {
-    if (processing || files.length === 0) return
-    const valid = files.filter((file) => /\.pdf$/i.test(file.name))
-    if (valid.length !== files.length) setMessage('已略過非 PDF 檔案。')
-    else setMessage('')
-    const added = valid.map((file): MergeItem => ({ id: crypto.randomUUID(), file, loading: true }))
-    setItems((current) => [...current, ...added])
+    if (processing || files.length === 0) return;
+    const valid = files.filter((file) => /\.pdf$/i.test(file.name));
+    if (valid.length !== files.length) setMessage("已略過非 PDF 檔案。");
+    else setMessage("");
+    const added = valid.map((file): MergeItem => ({
+      id: crypto.randomUUID(),
+      file,
+      loading: true,
+    }));
+    setItems((current) => [...current, ...added]);
     for (const item of added) {
       try {
-        const info = await inspectPdf(item.file)
-        setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, ...info, loading: false } : entry))
+        const info = await inspectPdf(item.file);
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id ? { ...entry, ...info, loading: false } : entry
+          )
+        );
       } catch (error) {
-        setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, error: fileError(error), loading: false } : entry))
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id
+              ? { ...entry, error: fileError(error), loading: false }
+              : entry
+          )
+        );
       }
     }
   }
 
   function moveItem(index: number, direction: -1 | 1) {
-    setItems((current) => arrayMove(current, index, index + direction))
+    setItems((current) => arrayMove(current, index, index + direction));
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
     setItems((current) => {
-      const from = current.findIndex((item) => item.id === active.id)
-      const to = current.findIndex((item) => item.id === over.id)
-      return from < 0 || to < 0 ? current : arrayMove(current, from, to)
-    })
+      const from = current.findIndex((item) => item.id === active.id);
+      const to = current.findIndex((item) => item.id === over.id);
+      return from < 0 || to < 0 ? current : arrayMove(current, from, to);
+    });
   }
 
   async function handleMerge() {
-    if (processing || items.length < 2 || items.some((item) => item.loading || item.error)) return
-    setMessage('')
-    setProgress(0)
-    setProcessing(true)
+    if (
+      processing ||
+      items.length < 2 ||
+      items.some((item) => item.loading || item.error)
+    )
+      return;
+    setMessage("");
+    setProgress(0);
+    setProcessing(true);
     try {
-      const blob = await mergePdfs(items.map((item) => item.file), setProgress)
-      saveBlob(blob, `${fileStem(outputName)}.pdf`)
-      setMessage(`合併完成，已下載 ${formatBytes(blob.size)} 的 PDF。`)
+      const blob = await mergePdfs(
+        items.map((item) => item.file),
+        setProgress
+      );
+      saveBlob(blob, `${fileStem(outputName)}.pdf`);
+      setMessage(`合併完成，已下載 ${formatBytes(blob.size)} 的 PDF。`);
     } catch (error) {
-      setMessage(fileError(error))
+      setMessage(fileError(error));
     } finally {
-      setProcessing(false)
+      setProcessing(false);
     }
   }
 
-  const totalPages = items.reduce((sum, item) => sum + (item.pageCount ?? 0), 0)
-  const canMerge = items.length >= 2 && items.every((item) => !item.loading && !item.error)
-  const fileLabel = (id: string | number) => items.find((item) => item.id === id)?.file.name ?? '檔案'
+  const totalPages = items.reduce(
+    (sum, item) => sum + (item.pageCount ?? 0),
+    0
+  );
+  const canMerge =
+    items.length >= 2 && items.every((item) => !item.loading && !item.error);
+  const fileLabel = (id: string | number) =>
+    items.find((item) => item.id === id)?.file.name ?? "檔案";
 
   return (
     <div className="workspace-grid">
-      <section className="workspace-card workspace-main" aria-labelledby="merge-heading">
+      <section
+        className="workspace-card workspace-main"
+        aria-labelledby="merge-heading"
+      >
         <div className="card-header">
           <div>
             <div className="eyebrow">01 / 排列檔案</div>
             <h2 id="merge-heading">依你想要的順序合併</h2>
             <p>拖曳右側把手，或用上下按鈕調整 PDF 順序。</p>
           </div>
-          {items.length > 0 && <span className="count-badge">{items.length} 份檔案</span>}
+          {items.length > 0 && (
+            <span className="count-badge">{items.length} 份檔案</span>
+          )}
         </div>
         {items.length === 0 ? (
           <DropZone multiple onFiles={addFiles} />
@@ -104,16 +138,33 @@ export default function MergeWorkspace() {
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
               accessibility={{
-                screenReaderInstructions: { draggable: '按空白鍵開始排序，使用方向鍵移動，再按空白鍵放下。' },
+                screenReaderInstructions: {
+                  draggable:
+                    "按空白鍵開始排序，使用方向鍵移動，再按空白鍵放下。",
+                },
                 announcements: {
-                  onDragStart: ({ active }) => `開始移動 ${fileLabel(active.id)}。`,
-                  onDragOver: ({ active, over }) => over ? `${fileLabel(active.id)} 移到 ${fileLabel(over.id)} 的位置。` : undefined,
-                  onDragEnd: ({ active, over }) => over ? `${fileLabel(active.id)} 已放到 ${fileLabel(over.id)} 的位置。` : '已取消排序。',
-                  onDragCancel: () => '已取消排序。',
+                  onDragStart: ({ active }) =>
+                    `開始移動 ${fileLabel(active.id)}。`,
+                  onDragOver: ({ active, over }) =>
+                    over
+                      ? `${fileLabel(active.id)} 移到 ${fileLabel(
+                          over.id
+                        )} 的位置。`
+                      : undefined,
+                  onDragEnd: ({ active, over }) =>
+                    over
+                      ? `${fileLabel(active.id)} 已放到 ${fileLabel(
+                          over.id
+                        )} 的位置。`
+                      : "已取消排序。",
+                  onDragCancel: () => "已取消排序。",
                 },
               }}
             >
-              <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext
+                items={items.map((item) => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
                 <div className="file-list">
                   {items.map((item, index) => (
                     <SortableFileRow
@@ -123,7 +174,11 @@ export default function MergeWorkspace() {
                       total={items.length}
                       disabled={processing}
                       onMove={(direction) => moveItem(index, direction)}
-                      onRemove={() => setItems((current) => current.filter((entry) => entry.id !== item.id))}
+                      onRemove={() =>
+                        setItems((current) =>
+                          current.filter((entry) => entry.id !== item.id)
+                        )
+                      }
                     />
                   ))}
                 </div>
@@ -132,32 +187,75 @@ export default function MergeWorkspace() {
             {!processing && <DropZone multiple compact onFiles={addFiles} />}
           </>
         )}
-        <div className="privacy-note"><LockKeyhole size={16} /> 檔案只在你的瀏覽器中處理，不會上傳。</div>
+        <div className="privacy-note">
+          <PublicIcon name="lock" size={16} />{" "}
+          檔案只在你的瀏覽器中處理，不會上傳。
+        </div>
       </section>
 
-      <aside className="workspace-card output-card" aria-labelledby="merge-output-heading">
+      <aside
+        className="workspace-card output-card"
+        aria-labelledby="merge-output-heading"
+      >
         <div className="eyebrow">02 / 匯出結果</div>
         <h2 id="merge-output-heading">準備好輸出？</h2>
         <p>合併後會得到一份 PDF，頁面依左側檔案順序排列。</p>
         <div className="output-stats">
-          <div><span>PDF 檔案</span><strong>{items.length} 份</strong></div>
-          <div><span>合計頁數</span><strong>{totalPages} 頁</strong></div>
-          <div><span>原始大小</span><strong>{formatBytes(items.reduce((sum, item) => sum + item.file.size, 0))}</strong></div>
+          <div>
+            <span>PDF 檔案</span>
+            <strong>{items.length} 份</strong>
+          </div>
+          <div>
+            <span>合計頁數</span>
+            <strong>{totalPages} 頁</strong>
+          </div>
+          <div>
+            <span>原始大小</span>
+            <strong>
+              {formatBytes(
+                items.reduce((sum, item) => sum + item.file.size, 0)
+              )}
+            </strong>
+          </div>
         </div>
-        <label className="field-label" htmlFor="merge-name">輸出檔名</label>
+        <label className="field-label" htmlFor="merge-name">
+          輸出檔名
+        </label>
         <div className="filename-field">
-          <input id="merge-name" value={outputName.replace(/\.pdf$/i, '')} onChange={(event) => setOutputName(event.target.value)} placeholder="merged" />
+          <input
+            id="merge-name"
+            value={outputName.replace(/\.pdf$/i, "")}
+            onChange={(event) => setOutputName(event.target.value)}
+            placeholder="merged"
+          />
           <span>.pdf</span>
         </div>
-        <button className="button button--accent button--full" disabled={!canMerge || processing} onClick={handleMerge}>
-          <Download size={18} />
-          {processing ? `處理中 ${progress}/${items.length}` : '合併並下載 PDF'}
-          {!processing && <ArrowRight size={17} />}
+        <button
+          className="button button--accent button--full"
+          disabled={!canMerge || processing}
+          onClick={handleMerge}
+        >
+          <PublicIcon name="download" size={18} />
+          {processing ? `處理中 ${progress}/${items.length}` : "合併並下載 PDF"}
+          {!processing && (
+            <PublicIcon name="arrow-narrow-up-dashed" size={17} rotate={90} />
+          )}
         </button>
-        <p className="encryption-note">若原檔只有編輯權限限制，輸出檔不會保留原加密設定。</p>
+        <p className="encryption-note">
+          若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
+        </p>
         {!canMerge && <p className="helper-text">請加入至少兩份有效的 PDF。</p>}
-        {message && <p className={`status-message ${message.includes('完成') ? 'status-message--success' : ''}`} role="status">{message}</p>}
+        {message && (
+          <p
+            className={`status-message ${
+              message.includes("完成") ? "status-message--success" : ""
+            }`}
+            role="status"
+          >
+            {message}
+          </p>
+        )}
       </aside>
     </div>
-  )
+  );
 }

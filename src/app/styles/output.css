@@ -1,0 +1,93 @@
+.output-card {
+  padding: 30px 25px 27px;
+  border-color: #d9e2fc;
+  background: #f1f4ff;
+}
+.output-card > p {
+  margin-bottom: 23px;
+}
+.output-stats {
+  margin-bottom: 23px;
+  padding: 5px 0;
+  border-top: 1px solid #d9e1f5;
+  border-bottom: 1px solid #d9e1f5;
+}
+.output-stats div,
+.output-count {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.output-stats span,
+.output-count span {
+  color: #65738d;
+}
+.output-stats strong,
+.output-count strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+.field-label {
+  display: block;
+  margin-bottom: 9px;
+  color: #354565;
+  font-size: 12px;
+  font-weight: 750;
+}
+.filename-field {
+  display: flex;
+  align-items: center;
+  height: 45px;
+  margin-bottom: 17px;
+  border: 1px solid #cbd5f0;
+  border-radius: 9px;
+  background: #fff;
+}
+.filename-field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px #425ce91a;
+}
+.filename-field input {
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+.filename-field span {
+  padding-right: 13px;
+  color: #7f8da5;
+  font-size: 13px;
+}
+.output-card .button--accent {
+  min-height: 48px;
+}
+.helper-text {
+  margin: 11px 0 0 !important;
+  text-align: center;
+  font-size: 12px !important;
+}
+.encryption-note {
+  margin-top: 14px !important;
+  color: #748199 !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+}
+.status-message {
+  margin-top: 13px !important;
+  padding: 11px 12px;
+  border-radius: 8px;
+  background: #fff0ee;
+  color: #b84f4a !important;
+  font-size: 12px !important;
+}
+.status-message--success {
+  background: #e5f7eb;
+  color: #207b4e !important;
+}
