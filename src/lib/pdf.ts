@@ -1,3 +1,5 @@
+import { isEncryptedPdfError, unlockPdfWithEmptyPassword } from './unlockPdf'
+
 export type PageGroup = {
   id: string
   name: string
@@ -45,7 +47,13 @@ export async function mergePdfs(files: File[], onProgress?: (done: number) => vo
   const { PDFDocument } = await import('pdf-lib')
   const output = await PDFDocument.create()
   for (let index = 0; index < files.length; index += 1) {
-    const source = await PDFDocument.load(await files[index].arrayBuffer())
+    let source
+    try {
+      source = await PDFDocument.load(await files[index].arrayBuffer())
+    } catch (error) {
+      if (!isEncryptedPdfError(error)) throw error
+      source = await PDFDocument.load(await unlockPdfWithEmptyPassword(files[index]))
+    }
     const pages = await output.copyPages(source, source.getPageIndices())
     for (const page of pages) output.addPage(page)
     onProgress?.(index + 1)
@@ -60,7 +68,13 @@ export async function splitPdf(
 ): Promise<SplitOutput> {
   if (groups.length === 0) throw new Error('請先選擇至少一組頁面。')
   const [{ PDFDocument }, { default: JSZip }] = await Promise.all([import('pdf-lib'), import('jszip')])
-  const source = await PDFDocument.load(await file.arrayBuffer())
+  let source
+  try {
+    source = await PDFDocument.load(await file.arrayBuffer())
+  } catch (error) {
+    if (!isEncryptedPdfError(error)) throw error
+    source = await PDFDocument.load(await unlockPdfWithEmptyPassword(file))
+  }
   const stem = fileStem(file.name)
   const zip = new JSZip()
   const usedNames = new Set<string>()

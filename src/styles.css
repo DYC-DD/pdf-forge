@@ -134,6 +134,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid #e7a190; outline-
 .filename-field span { padding-right: 13px; color: #a1aaa4; font-size: 12px; }
 .output-card .button--accent { min-height: 45px; }
 .helper-text { margin: 10px 0 0 !important; text-align: center; font-size: 11px !important; }
+.encryption-note { margin-top: 11px !important; color: #959e97 !important; font-size: 10px !important; line-height: 1.55 !important; }
 .status-message { margin-top: 12px !important; padding: 11px 12px; border-radius: 7px; background: #fff0eb; color: #b65f48 !important; font-size: 11px !important; }
 .status-message--success { background: #ecf5eb; color: #587760 !important; }
 

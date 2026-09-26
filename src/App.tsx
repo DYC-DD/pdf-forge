@@ -49,8 +49,11 @@ type MergeItem = {
 }
 
 function fileError(error: unknown): string {
+  if (error instanceof Error && error.message.startsWith('這份 PDF 無法以空密碼開啟')) {
+    return error.message
+  }
   if (error instanceof Error && /encrypt|password/i.test(error.message)) {
-    return '這份 PDF 有密碼或受到加密保護，暫時無法處理。'
+    return '這份 PDF 需要開啟密碼，目前無法直接處理。'
   }
   return error instanceof Error ? error.message : '處理檔案時發生錯誤。'
 }
@@ -285,6 +288,7 @@ function MergeWorkspace() {
           {processing ? `處理中 ${progress}/${items.length}` : '合併並下載 PDF'}
           {!processing && <ArrowRight size={17} />}
         </button>
+        <p className="encryption-note">若原檔只有編輯權限限制，輸出檔不會保留原加密設定。</p>
         {!canMerge && <p className="helper-text">請加入至少兩份有效的 PDF。</p>}
         {message && <p className={`status-message ${message.includes('完成') ? 'status-message--success' : ''}`} role="status">{message}</p>}
       </aside>
@@ -547,6 +551,7 @@ function SplitWorkspace() {
           {processing ? `處理中 ${progress}/${outputCount}` : outputCount > 1 ? '下載 ZIP 檔' : '下載 PDF'}
           {!processing && <ArrowRight size={17} />}
         </button>
+        <p className="encryption-note">若原檔只有編輯權限限制，輸出檔不會保留原加密設定。</p>
         {message && <p className={`status-message ${message.includes('完成') ? 'status-message--success' : ''}`} role="status">{message}</p>}
       </aside>
     </div>

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import JSZip from 'jszip'
 import { mergePdfs, parsePageRange, splitPdf } from './pdf'
+import restrictedPdfBase64 from './__fixtures__/empty-user-password.base64?raw'
+import { unlockPdfWithEmptyPassword } from './unlockPdf'
 
 async function makePdf(name: string, widths: number[]): Promise<File> {
   const doc = await PDFDocument.create()
@@ -52,5 +54,18 @@ describe('PDF output', () => {
     expect(output.blob.type).toBe('application/pdf')
     const result = await PDFDocument.load(await output.blob.arrayBuffer())
     expect(result.getPages().map((page) => page.getWidth())).toEqual([102])
+  })
+
+  it('splits a PDF whose editing is restricted by an owner password', async () => {
+    const bytes = Uint8Array.from(atob(restrictedPdfBase64), (character) => character.charCodeAt(0))
+    const restricted = new File([bytes], 'restricted.pdf', { type: 'application/pdf' })
+    await unlockPdfWithEmptyPassword(
+      restricted,
+      new URL('../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm', import.meta.url).pathname,
+    )
+    const output = await splitPdf(restricted, [{ id: 'a', name: 'page-1', pages: [1] }])
+    const result = await PDFDocument.load(await output.blob.arrayBuffer())
+    expect(result.getPageCount()).toBe(1)
+    expect(result.isEncrypted).toBe(false)
   })
 })

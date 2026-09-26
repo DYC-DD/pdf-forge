@@ -1,5 +1,6 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { unlockPdfWithEmptyPassword } from './unlockPdf'
 
 export async function openPdf(file: File) {
   const [{ getDocument, GlobalWorkerOptions }, buffer] = await Promise.all([
@@ -7,7 +8,23 @@ export async function openPdf(file: File) {
     file.arrayBuffer(),
   ])
   GlobalWorkerOptions.workerSrc = workerUrl
-  return getDocument({ data: new Uint8Array(buffer) })
+  const task = getDocument({ data: new Uint8Array(buffer) })
+  try {
+    await task.promise
+    return task
+  } catch (error) {
+    await task.destroy()
+    if (!(error instanceof Error) || !/password/i.test(`${error.name} ${error.message}`)) throw error
+    const bytes = await unlockPdfWithEmptyPassword(file)
+    const retry = getDocument({ data: new Uint8Array(bytes) })
+    try {
+      await retry.promise
+      return retry
+    } catch (retryError) {
+      await retry.destroy()
+      throw retryError
+    }
+  }
 }
 
 export async function renderPageThumbnail(
