@@ -97,9 +97,6 @@
   .hero h1 {
     font-size: 46px;
   }
-  .section-aside {
-    display: none;
-  }
   .tool-section {
     margin-top: 37px;
   }
@@ -177,6 +174,12 @@
   .card-header {
     margin-bottom: 19px;
   }
+  .merge-card-header {
+    flex-wrap: wrap;
+  }
+  .merge-card-header .file-list-actions {
+    margin-left: auto;
+  }
   .drop-zone {
     min-height: 238px;
     padding: 22px 14px;
@@ -188,39 +191,26 @@
     min-height: 68px;
     padding: 9px;
   }
-  .drop-zone--compact .drop-copy {
-    display: none;
-  }
-  .drop-zone--compact .button {
-    margin-left: auto;
-  }
   .file-row {
-    display: grid;
-    grid-template-columns: 22px 42px minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px 10px;
     padding: 11px;
   }
-  .file-index {
-    grid-column: 1;
-    grid-row: 1;
+  .file-main {
+    gap: 10px;
+    max-width: calc(100% - 34px);
   }
   .file-preview {
-    grid-column: 2;
-    grid-row: 1;
     width: 42px;
     height: 55px;
   }
-  .file-info {
-    grid-column: 3;
-    grid-row: 1;
+  .row-drag-region {
+    min-height: 55px;
   }
   .row-controls {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: end;
-  }
-  .step-controls {
-    flex-direction: row;
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
   .icon-button {
     width: 38px;

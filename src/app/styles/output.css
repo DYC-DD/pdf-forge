@@ -68,6 +68,9 @@
 .output-card .button--accent {
   min-height: 48px;
 }
+.output-preview-button {
+  margin-bottom: 9px;
+}
 .helper-text {
   margin: 11px 0 0 !important;
   text-align: center;

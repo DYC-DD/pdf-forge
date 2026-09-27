@@ -10,13 +10,6 @@
 .section-heading h2 {
   color: var(--ink);
 }
-.section-aside {
-  color: #9dc9b1;
-}
-.section-aside .public-icon {
-  color: #74d19d;
-}
-
 .tool-tab {
   border-color: #282b34;
   background: #0b0e14;
@@ -60,8 +53,7 @@
 }
 .drop-zone {
   border-color: #404550;
-  background: radial-gradient(#858a9b24 1px, transparent 1px), #080b10;
-  background-size: 20px 20px;
+  background: #080b10;
 }
 .drop-zone--dragging {
   border-color: #9bafff;

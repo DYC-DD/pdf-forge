@@ -5,6 +5,7 @@ import { formatBytes, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { openPdf } from "../../shared/pdf/preview";
 import DropZone from "../../shared/ui/DropZone";
+import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import PageThumbnail from "./components/PageThumbnail";
 import { parsePageRange } from "./lib/parsePageRange";
@@ -23,6 +24,7 @@ export default function SplitWorkspace() {
   const [message, setMessage] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [previewPage, setPreviewPage] = useState<number | null>(null);
   const taskRef = useRef<PDFDocumentLoadingTask | null>(null);
 
   useEffect(() => {
@@ -67,6 +69,7 @@ export default function SplitWorkspace() {
       return;
     }
     setFile(candidate);
+    setPreviewPage(null);
     setSelected([]);
     setGroups([]);
     setRangeInput("");
@@ -153,7 +156,7 @@ export default function SplitWorkspace() {
           <div>
             <div className="eyebrow">01 / 選擇頁面</div>
             <h2 id="split-heading">把需要的頁面留下來</h2>
-            <p>點選頁面組成新檔案，或直接將每頁分開。</p>
+            <p>點選頁面組成新檔案，點眼睛圖示可放大預覽。</p>
           </div>
           {pdf && <span className="count-badge">{pdf.numPages} 頁</span>}
         </div>
@@ -267,6 +270,7 @@ export default function SplitWorkspace() {
                       onToggle={() => {
                         if (mode === "custom") togglePage(pageNumber);
                       }}
+                      onPreview={() => setPreviewPage(pageNumber)}
                     />
                   ))}
                 </div>
@@ -394,6 +398,15 @@ export default function SplitWorkspace() {
           </p>
         )}
       </aside>
+      {file && pdf && previewPage !== null && (
+        <PdfPreviewDialog
+          key={`${file.name}-${previewPage}`}
+          file={file}
+          pdf={pdf}
+          initialPage={previewPage}
+          onClose={() => setPreviewPage(null)}
+        />
+      )}
     </div>
   );
 }

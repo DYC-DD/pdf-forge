@@ -25,19 +25,6 @@
   color: var(--muted);
   font-size: 14px;
 }
-.section-aside {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding-bottom: 4px;
-  color: #597269;
-  font-size: 12px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.section-aside .public-icon {
-  color: #4f9a70;
-}
 .tool-nav {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -58,11 +45,9 @@
   box-shadow: 0 6px 18px #1c2b5508;
   transition:
     border-color 0.2s,
-    box-shadow 0.2s,
-    transform 0.2s;
+    box-shadow 0.2s;
 }
 .tool-tab:hover {
-  transform: translateY(-2px);
   border-color: #aebafc;
   box-shadow: 0 10px 25px #344ba91c;
 }

@@ -11,6 +11,7 @@ export default function PageThumbnail({
   disabled,
   groupCount,
   onToggle,
+  onPreview,
 }: {
   pdf: PDFDocumentProxy;
   pageNumber: number;
@@ -18,8 +19,9 @@ export default function PageThumbnail({
   disabled: boolean;
   groupCount: number;
   onToggle: () => void;
+  onPreview: () => void;
 }) {
-  const anchorRef = useRef<HTMLButtonElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [image, setImage] = useState<string>();
 
@@ -56,30 +58,44 @@ export default function PageThumbnail({
   }, [pdf, pageNumber, visible]);
 
   return (
-    <button
+    <div
       ref={anchorRef}
       className={`page-tile ${selected ? "page-tile--selected" : ""}`}
-      onClick={onToggle}
-      disabled={disabled}
-      aria-pressed={selected}
-      aria-label={`第 ${pageNumber} 頁${selected ? "，已選取" : ""}`}
     >
-      <div className="page-image">
-        {image ? (
-          <img src={image} alt="" />
-        ) : (
-          <div className="page-skeleton">
-            <PublicIcon name="files" size={22} />
-          </div>
-        )}
-        <span className="selection-mark">
-          <PublicIcon name="check" size={15} />
-        </span>
-      </div>
-      <div className="page-caption">
-        <strong>第 {pageNumber} 頁</strong>
-        {groupCount > 0 && <span>已加入 {groupCount} 組</span>}
-      </div>
-    </button>
+      <button
+        type="button"
+        className="page-tile-select"
+        onClick={onToggle}
+        disabled={disabled}
+        aria-pressed={selected}
+        aria-label={`第 ${pageNumber} 頁${selected ? "，已選取" : ""}`}
+      >
+        <div className="page-image">
+          {image ? (
+            <img src={image} alt="" />
+          ) : (
+            <div className="page-skeleton">
+              <PublicIcon name="files" size={22} />
+            </div>
+          )}
+          <span className="selection-mark">
+            <PublicIcon name="check" size={15} />
+          </span>
+        </div>
+        <div className="page-caption">
+          <strong>第 {pageNumber} 頁</strong>
+          {groupCount > 0 && <span>已加入 {groupCount} 組</span>}
+        </div>
+      </button>
+      <button
+        type="button"
+        className="page-preview-button"
+        onClick={onPreview}
+        aria-label={`預覽第 ${pageNumber} 頁`}
+        title="預覽頁面"
+      >
+        <PublicIcon name="eye" size={17} />
+      </button>
+    </div>
   );
 }

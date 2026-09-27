@@ -7,6 +7,7 @@ export type PublicIconName =
   | "checks"
   | "cloud-off"
   | "download"
+  | "eye"
   | "file-type-pdf"
   | "files"
   | "grip-horizontal"

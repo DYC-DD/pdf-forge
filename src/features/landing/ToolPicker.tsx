@@ -16,9 +16,6 @@ export default function ToolPicker({ tool, onSelect }: ToolPickerProps) {
           <h2 id="tool-heading">今天想整理什麼？</h2>
           <p>選擇工具，接著把 PDF 拖進工作區。</p>
         </div>
-        <span className="section-aside">
-          <PublicIcon name="shield-check" size={17} /> 所有處理都在本機完成
-        </span>
       </div>
       <nav className="tool-nav" aria-label="PDF 工具">
         <button

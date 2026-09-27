@@ -3,6 +3,39 @@
   flex-direction: column;
   gap: 9px;
 }
+.file-list-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+  margin-top: 4px;
+}
+.file-list-actions .count-badge {
+  margin-top: 0;
+}
+.clear-files-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid #414755;
+  border-radius: 8px;
+  background: transparent;
+  color: #aebbd1;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 750;
+}
+.clear-files-button:not(:disabled):hover {
+  border-color: #a6616d;
+  background: #39252d;
+  color: #ffd1d0;
+}
+.clear-files-button:disabled {
+  opacity: 0.45;
+}
 .file-row {
   display: flex;
   align-items: center;
@@ -21,6 +54,26 @@
 }
 .file-row--error {
   border-color: #e8aca4;
+}
+.file-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 0 1 auto;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.file-main:not(:disabled) {
+  cursor: zoom-in;
+}
+.file-main:disabled {
+  cursor: default;
+}
+.file-main:not(:disabled):hover .file-info strong {
+  color: var(--blue);
 }
 .file-index {
   width: 23px;
@@ -51,6 +104,17 @@
   flex-direction: column;
   min-width: 0;
   gap: 7px;
+  flex: 0 1 auto;
+}
+.row-drag-region {
+  min-width: 24px;
+  flex: 1 0 24px;
+  align-self: stretch;
+  cursor: grab;
+  touch-action: none;
+}
+.row-drag-region:active {
+  cursor: grabbing;
 }
 .file-info strong {
   overflow: hidden;
@@ -76,10 +140,6 @@
   gap: 3px;
   margin-left: auto;
   flex: none;
-}
-.step-controls {
-  display: flex;
-  flex-direction: column;
 }
 .drag-handle {
   cursor: grab;

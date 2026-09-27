@@ -19,6 +19,7 @@ import { fileStem, formatBytes, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { inspectPdf } from "../../shared/pdf/preview";
 import DropZone from "../../shared/ui/DropZone";
+import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import SortableFileRow from "./components/SortableFileRow";
 import { mergePdfs } from "./lib/mergePdfs";
@@ -30,13 +31,17 @@ export default function MergeWorkspace() {
   const [message, setMessage] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [previewProcessing, setPreviewProcessing] = useState(false);
+  const [previewProgress, setPreviewProgress] = useState(0);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const busy = processing || previewProcessing;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   async function addFiles(files: File[]) {
-    if (processing || files.length === 0) return;
+    if (busy || files.length === 0) return;
     const valid = files.filter((file) => /\.pdf$/i.test(file.name));
     if (valid.length !== files.length) setMessage("已略過非 PDF 檔案。");
     else setMessage("");
@@ -66,10 +71,6 @@ export default function MergeWorkspace() {
     }
   }
 
-  function moveItem(index: number, direction: -1 | 1) {
-    setItems((current) => arrayMove(current, index, index + direction));
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -80,9 +81,18 @@ export default function MergeWorkspace() {
     });
   }
 
+  function clearFiles() {
+    if (busy) return;
+    setItems([]);
+    setPreviewFile(null);
+    setMessage("");
+    setProgress(0);
+    setPreviewProgress(0);
+  }
+
   async function handleMerge() {
     if (
-      processing ||
+      busy ||
       items.length < 2 ||
       items.some((item) => item.loading || item.error)
     )
@@ -104,6 +114,33 @@ export default function MergeWorkspace() {
     }
   }
 
+  async function handlePreviewOutput() {
+    if (
+      busy ||
+      items.length < 2 ||
+      items.some((item) => item.loading || item.error)
+    )
+      return;
+    setMessage("");
+    setPreviewProgress(0);
+    setPreviewProcessing(true);
+    try {
+      const blob = await mergePdfs(
+        items.map((item) => item.file),
+        setPreviewProgress
+      );
+      setPreviewFile(
+        new File([blob], `${fileStem(outputName)}.pdf`, {
+          type: "application/pdf",
+        })
+      );
+    } catch (error) {
+      setMessage(fileError(error));
+    } finally {
+      setPreviewProcessing(false);
+    }
+  }
+
   const totalPages = items.reduce(
     (sum, item) => sum + (item.pageCount ?? 0),
     0
@@ -119,14 +156,26 @@ export default function MergeWorkspace() {
         className="workspace-card workspace-main"
         aria-labelledby="merge-heading"
       >
-        <div className="card-header">
+        <div className="card-header merge-card-header">
           <div>
             <div className="eyebrow">01 / 排列檔案</div>
             <h2 id="merge-heading">依你想要的順序合併</h2>
-            <p>拖曳右側把手，或用上下按鈕調整 PDF 順序。</p>
+            <p>點選縮圖或檔名預覽；拖曳右側空白處或把手調整順序。</p>
           </div>
           {items.length > 0 && (
-            <span className="count-badge">{items.length} 份檔案</span>
+            <div className="file-list-actions">
+              <button
+                type="button"
+                className="clear-files-button"
+                onClick={clearFiles}
+                disabled={busy}
+                aria-label="清除全部 PDF"
+              >
+                <PublicIcon name="trash" size={15} />
+                清除全部
+              </button>
+              <span className="count-badge">{items.length} 份檔案</span>
+            </div>
           )}
         </div>
         {items.length === 0 ? (
@@ -171,20 +220,20 @@ export default function MergeWorkspace() {
                       key={item.id}
                       item={item}
                       position={index}
-                      total={items.length}
-                      disabled={processing}
-                      onMove={(direction) => moveItem(index, direction)}
-                      onRemove={() =>
+                      disabled={busy}
+                      onPreview={() => setPreviewFile(item.file)}
+                      onRemove={() => {
+                        if (previewFile === item.file) setPreviewFile(null);
                         setItems((current) =>
                           current.filter((entry) => entry.id !== item.id)
-                        )
-                      }
+                        );
+                      }}
                     />
                   ))}
                 </div>
               </SortableContext>
             </DndContext>
-            {!processing && <DropZone multiple compact onFiles={addFiles} />}
+            {!busy && <DropZone multiple compact onFiles={addFiles} />}
           </>
         )}
         <div className="privacy-note">
@@ -231,8 +280,18 @@ export default function MergeWorkspace() {
           <span>.pdf</span>
         </div>
         <button
+          className="button button--outline button--full output-preview-button"
+          disabled={!canMerge || busy}
+          onClick={handlePreviewOutput}
+        >
+          <PublicIcon name="eye" size={18} />
+          {previewProcessing
+            ? `產生預覽中 ${previewProgress}/${items.length}`
+            : "預覽合併結果"}
+        </button>
+        <button
           className="button button--accent button--full"
-          disabled={!canMerge || processing}
+          disabled={!canMerge || busy}
           onClick={handleMerge}
         >
           <PublicIcon name="download" size={18} />
@@ -256,6 +315,13 @@ export default function MergeWorkspace() {
           </p>
         )}
       </aside>
+      {previewFile && (
+        <PdfPreviewDialog
+          key={previewFile.name}
+          file={previewFile}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
     </div>
   );
 }

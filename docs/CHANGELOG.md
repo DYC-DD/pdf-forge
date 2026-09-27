@@ -7,7 +7,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 ### Added
 
 - 建立 Vite、React 與 TypeScript 的純前端 PDF 工作台，檔案在瀏覽器本機處理。
-- 支援匯入多份 PDF，透過拖曳或上下按鈕調整順序後合併下載；提供首頁縮圖、頁數及檔案大小資訊。
+- 支援匯入多份 PDF，透過拖曳或鍵盤操作調整順序後合併下載；提供首頁縮圖、頁數及檔案大小資訊。
 - 支援以頁面縮圖或頁碼範圍選取頁面，建立多個可命名的 PDF 輸出群組。
 - 支援每頁輸出一份 PDF；多份輸出會打包為 ZIP，單份輸出則直接下載 PDF。
 - 加入檔案讀取與處理進度提示，以及無效或加密 PDF 的錯誤訊息。
@@ -15,6 +15,8 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 - 加入頁碼範圍、合併頁面順序與拆分結果的自動化測試。
 - 新增可拖曳、翻面的首頁 PDF 卡片與互動標題；卡片支援鍵盤操作，動畫會配合減少動態效果偏好。
 - 新增首頁浮動提示與專用 SVG 圖示，呈現本機處理、合併及拆分流程。
+- 新增 PDF 預覽視窗，可查看合併原檔、合併結果及拆分頁面，並以按鈕或方向鍵逐頁瀏覽。
+- 合併工作區新增「清除全部」操作。
 
 ### Changed
 
@@ -25,3 +27,5 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 - 切換合併與拆分工具時保留各工作區的檔案、選取及輸出設定。
 - 將合併、拆分與頁碼解析邏輯移至各功能目錄，整理共用檔案工具與 PDF 載入程式，並將測試集中至 `src/tests`。
 - 更新套件名稱及儲存庫中繼資料為 `pdf-forge`。
+- 合併檔案列改為點選縮圖或檔名開啟預覽，並以拖曳區與把手排序；移除上下移動按鈕。
+- 上傳區改為整個區域皆可點選檔案，並加入會回應指標操作的點陣背景。

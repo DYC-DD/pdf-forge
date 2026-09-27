@@ -55,6 +55,7 @@
   font-weight: 750;
 }
 .drop-zone {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -63,8 +64,9 @@
   padding: 28px;
   border: 2px dashed #bbc6f4;
   border-radius: 13px;
-  background: radial-gradient(#d9e2ff 1px, transparent 1px), #f7f9ff;
-  background-size: 20px 20px;
+  overflow: hidden;
+  background: #f7f9ff;
+  cursor: pointer;
   text-align: center;
   transition:
     border-color 0.2s,
@@ -77,6 +79,8 @@
   transform: scale(1.005);
 }
 .drop-icon {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 62px;
@@ -88,7 +92,13 @@
   color: var(--blue);
   box-shadow: 0 7px 18px #3853b119;
 }
+.drop-zone:has(input:focus-visible) .drop-icon {
+  outline: 3px solid #8190ff;
+  outline-offset: 3px;
+}
 .drop-copy {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -101,9 +111,6 @@
 .drop-copy span {
   color: var(--muted);
   font-size: 13px;
-}
-.drop-zone .button {
-  margin-top: 22px;
 }
 .drop-zone--compact {
   min-height: 76px;
@@ -123,9 +130,6 @@
 }
 .drop-zone--compact .drop-copy strong {
   font-size: 13px;
-}
-.drop-zone--compact .button {
-  margin: 0 0 0 auto;
 }
 .button {
   display: inline-flex;

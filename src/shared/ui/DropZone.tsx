@@ -1,5 +1,6 @@
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useState, type ChangeEvent, type DragEvent } from "react";
 
+import DotGrid from "./DotGrid";
 import PublicIcon from "./PublicIcon";
 
 export default function DropZone({
@@ -11,10 +12,9 @@ export default function DropZone({
   onFiles: (files: File[]) => void;
   compact?: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  function handleDrop(event: DragEvent<HTMLDivElement>) {
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     setDragging(false);
     onFiles(Array.from(event.dataTransfer.files));
@@ -26,7 +26,7 @@ export default function DropZone({
   }
 
   return (
-    <div
+    <label
       className={`drop-zone ${compact ? "drop-zone--compact" : ""} ${
         dragging ? "drop-zone--dragging" : ""
       }`}
@@ -41,8 +41,18 @@ export default function DropZone({
       }}
       onDrop={handleDrop}
     >
+      <DotGrid
+        dotSize={2}
+        gap={12}
+        baseColor="#2F293A"
+        activeColor="#5227FF"
+        proximity={120}
+        shockRadius={250}
+        shockStrength={5}
+        resistance={750}
+        returnDuration={1.5}
+      />
       <input
-        ref={inputRef}
         className="visually-hidden"
         type="file"
         accept=".pdf,application/pdf"
@@ -59,19 +69,8 @@ export default function DropZone({
             ? "繼續加入 PDF"
             : `拖曳${multiple ? "多份" : "一份"} PDF 到這裡`}
         </strong>
-        {!compact && <span>或從裝置選取檔案，僅支援 .pdf</span>}
+        {!compact && <span>點擊任意位置選取檔案，僅支援 .pdf</span>}
       </div>
-      <button
-        className={
-          compact
-            ? "button button--small button--outline"
-            : "button button--dark"
-        }
-        onClick={() => inputRef.current?.click()}
-      >
-        <PublicIcon name="upload" size={compact ? 16 : 18} />
-        {compact ? "加入檔案" : "選擇 PDF"}
-      </button>
-    </div>
+    </label>
   );
 }

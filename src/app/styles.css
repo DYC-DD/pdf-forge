@@ -10,4 +10,5 @@
 @import "../features/split/styles/split.css";
 @import "./styles/footer.css";
 @import "./styles/midnight.css";
+@import "./styles/pdf-preview.css";
 @import "./styles/responsive.css";
