@@ -1,11 +1,16 @@
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import { useEffect, useRef, useState } from "react";
 
-import { fileStem, formatBytes, saveBlob } from "../../shared/files/file";
+import { fileStem, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { inspectPdf } from "../../shared/pdf/preview";
+import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
+import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
+import OutputFilenameField from "../../shared/ui/OutputFilenameField";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import { compressPdf } from "./lib/compressPdf";
@@ -88,6 +93,18 @@ export default function CompressWorkspace() {
     setMessage("");
   }
 
+  function clearFile() {
+    if (processing) return;
+    setFile(null);
+    setPageCount(null);
+    setThumbnail("");
+    setLoading(false);
+    setLoadError("");
+    setResult(null);
+    setPreviewFile(null);
+    setMessage("");
+  }
+
   function chooseMode(nextMode: CompressionMode) {
     if (processing || nextMode === mode) return;
     setMode(nextMode);
@@ -150,14 +167,28 @@ export default function CompressWorkspace() {
         className="workspace-card workspace-main"
         aria-labelledby="compress-heading"
       >
-        <div className="card-header">
+        <div className="card-header file-card-header">
           <div>
             <div className="eyebrow">01 / 選擇檔案</div>
             <h2 id="compress-heading">讓 PDF 更輕巧</h2>
             <p>加入一份 PDF，再選擇壓縮方式並查看結果。</p>
           </div>
-          {pageCount !== null && (
-            <span className="count-badge">{pageCount} 頁</span>
+          {file && (
+            <div className="file-list-actions">
+              <button
+                type="button"
+                className="clear-files-button"
+                onClick={clearFile}
+                disabled={processing}
+                aria-label="清除全部 PDF"
+              >
+                <PublicIcon name="trash" size={15} />
+                清除全部
+              </button>
+              <span className="count-badge">
+                <Counter value={1} /> 份檔案
+              </span>
+            </div>
           )}
         </div>
 
@@ -176,8 +207,13 @@ export default function CompressWorkspace() {
               <div>
                 <strong title={file.name}>{file.name}</strong>
                 <span>
-                  {formatBytes(file.size)}
-                  {pageCount !== null ? ` · ${pageCount} 頁` : ""}
+                  <ByteCounter size={file.size} />
+                  {pageCount !== null && (
+                    <>
+                      {" · "}
+                      <Counter value={pageCount} /> 頁
+                    </>
+                  )}
                 </span>
               </div>
               <button
@@ -188,19 +224,6 @@ export default function CompressWorkspace() {
               >
                 <PublicIcon name="eye" size={15} />
                 預覽
-              </button>
-              <button
-                type="button"
-                className="button button--small button--outline"
-                onClick={() => {
-                  setFile(null);
-                  setResult(null);
-                  setPreviewFile(null);
-                  setMessage("");
-                }}
-                disabled={processing}
-              >
-                更換
               </button>
             </div>
             {loading && <div className="loading-panel">正在讀取 PDF…</div>}
@@ -226,75 +249,80 @@ export default function CompressWorkspace() {
           <div className="eyebrow">02 / 壓縮與匯出</div>
           <h2 id="compress-options-heading">設定壓縮方式</h2>
           <p>選擇強度，文字與向量內容會保留；完成後可預覽結果再下載。</p>
-          <label
-            id="compress-mode-label"
-            className="field-label compress-mode-label"
-            htmlFor="compress-mode"
-          >
-            壓縮方式
-          </label>
-          <Select
-            id="compress-mode"
-            labelId="compress-mode-label"
-            className="compress-mode-select"
-            variant="outlined"
-            fullWidth
-            value={mode}
-            onChange={(event) =>
-              chooseMode(event.target.value as CompressionMode)
-            }
-            disabled={processing}
-            renderValue={(selected) => {
-              const details = compressionModes[selected as CompressionMode];
-              return (
-                <span className="compress-mode-content">
-                  <strong>{details.label}</strong>
-                  <small>{details.description}</small>
-                </span>
-              );
-            }}
-            MenuProps={{
-              disableScrollLock: true,
-              slotProps: { paper: { className: "compress-mode-menu" } },
-            }}
-          >
-            {(["high", "medium", "low"] as const).map((value) => (
-              <MenuItem key={value} value={value}>
-                <span className="compress-mode-content">
-                  <strong>{compressionModes[value].label}</strong>
-                  <small>{compressionModes[value].description}</small>
-                </span>
-              </MenuItem>
-            ))}
-          </Select>
+          <FormControl className="compress-mode-field" fullWidth>
+            <InputLabel id="compress-mode-label" shrink>
+              壓縮方式
+            </InputLabel>
+            <Select
+              id="compress-mode"
+              labelId="compress-mode-label"
+              label="壓縮方式"
+              className="compress-mode-select"
+              variant="outlined"
+              value={mode}
+              onChange={(event) =>
+                chooseMode(event.target.value as CompressionMode)
+              }
+              disabled={processing}
+              renderValue={(selected) => {
+                const details = compressionModes[selected as CompressionMode];
+                return (
+                  <span className="compress-mode-content">
+                    <strong>{details.label}</strong>
+                    <small>{details.description}</small>
+                  </span>
+                );
+              }}
+              MenuProps={{
+                disableScrollLock: true,
+                slotProps: { paper: { className: "compress-mode-menu" } },
+              }}
+            >
+              {(["high", "medium", "low"] as const).map((value) => (
+                <MenuItem key={value} value={value}>
+                  <span className="compress-mode-content">
+                    <strong>{compressionModes[value].label}</strong>
+                    <small>{compressionModes[value].description}</small>
+                  </span>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </div>
         <div className="output-stats">
           <div>
             <span>原始大小</span>
-            <strong>{file ? formatBytes(file.size) : "—"}</strong>
+            <strong>{file ? <ByteCounter size={file.size} /> : "—"}</strong>
           </div>
           <div>
             <span>壓縮後</span>
-            <strong>{result ? formatBytes(result.file.size) : "—"}</strong>
+            <strong>
+              {result ? <ByteCounter size={result.file.size} /> : "—"}
+            </strong>
           </div>
           <div>
             <span>縮小幅度</span>
-            <strong>{result ? `${savedPercent.toFixed(1)}%` : "—"}</strong>
+            <strong>
+              {result ? (
+                <>
+                  <Counter value={savedPercent} fractionDigits={1} />%
+                </>
+              ) : (
+                "—"
+              )}
+            </strong>
           </div>
         </div>
-        <label className="field-label" htmlFor="compress-name">
-          輸出檔名
-        </label>
-        <div className="filename-field">
-          <input
-            id="compress-name"
-            value={outputName.replace(/\.pdf$/i, "")}
-            onChange={(event) => setOutputName(event.target.value)}
-            disabled={processing}
-            placeholder="compressed"
-          />
-          <span>.pdf</span>
-        </div>
+        <OutputFilenameField
+          id="compress-name"
+          value={outputName}
+          onChange={setOutputName}
+          defaultName={
+            file ? `${fileStem(file.name)}-compressed.pdf` : "compressed.pdf"
+          }
+          disabled={processing}
+          placeholder="compressed"
+        />
         <button
           type="button"
           className="button button--accent button--full"
@@ -327,9 +355,10 @@ export default function CompressWorkspace() {
               <button
                 type="button"
                 className="button button--dark button--full"
-                onClick={() =>
-                  saveBlob(result.file, `${fileStem(outputName)}.pdf`)
-                }
+                onClick={(event) => {
+                  saveBlob(result.file, `${fileStem(outputName)}.pdf`);
+                  fireButtonConfetti(event.currentTarget);
+                }}
               >
                 <PublicIcon name="download" size={18} />
                 下載壓縮後 PDF

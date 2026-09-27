@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
+import CompressWorkspace from "../features/compress/CompressWorkspace";
 import LandingHero from "../features/landing/LandingHero";
 import ToolPicker, { type Tool } from "../features/landing/ToolPicker";
 import MergeWorkspace from "../features/merge/MergeWorkspace";
@@ -8,16 +9,9 @@ import SiteFooter from "./components/SiteFooter";
 import SiteHeader from "./components/SiteHeader";
 import { toolFromPath, toolHref } from "./toolRoutes";
 
-const CompressWorkspace = lazy(
-  () => import("../features/compress/CompressWorkspace")
-);
-
 export default function App() {
   const [tool, setTool] = useState<Tool>(
     () => toolFromPath(window.location.pathname) ?? "merge"
-  );
-  const [compressVisited, setCompressVisited] = useState(
-    () => toolFromPath(window.location.pathname) === "compress"
   );
 
   useEffect(() => {
@@ -32,7 +26,6 @@ export default function App() {
     const syncTool = () => {
       const nextTool = toolFromPath(window.location.pathname) ?? "merge";
       setTool(nextTool);
-      if (nextTool === "compress") setCompressVisited(true);
     };
     window.addEventListener("popstate", syncTool);
     return () => window.removeEventListener("popstate", syncTool);
@@ -44,7 +37,6 @@ export default function App() {
       window.history.pushState(null, "", nextPath);
     }
     setTool(nextTool);
-    if (nextTool === "compress") setCompressVisited(true);
   }
 
   return (
@@ -58,21 +50,13 @@ export default function App() {
 
         <div className="workspace" id="workspace">
           <div id="merge-panel" hidden={tool !== "merge"}>
-            <MergeWorkspace />
+            {tool === "merge" && <MergeWorkspace />}
           </div>
           <div id="split-panel" hidden={tool !== "split"}>
-            <SplitWorkspace />
+            {tool === "split" && <SplitWorkspace />}
           </div>
           <div id="compress-panel" hidden={tool !== "compress"}>
-            {compressVisited && (
-              <Suspense
-                fallback={
-                  <div className="loading-panel">正在載入壓縮工具…</div>
-                }
-              >
-                <CompressWorkspace />
-              </Suspense>
-            )}
+            {tool === "compress" && <CompressWorkspace />}
           </div>
         </div>
       </main>

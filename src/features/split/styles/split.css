@@ -30,7 +30,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.source-file span {
+.source-file > div:nth-child(2) > span {
   color: var(--muted);
   font-size: 12px;
 }
@@ -116,7 +116,7 @@
   padding-bottom: 4px;
   font-size: 12px;
 }
-.selection-actions span {
+.selection-actions > span {
   color: #3d55c9;
   font-weight: 750;
 }
@@ -238,7 +238,7 @@
   font-size: 11px;
   font-weight: 750;
 }
-.page-caption span {
+.page-caption > span {
   color: #6f7f9b;
   font-size: 10px;
 }
@@ -326,7 +326,7 @@
   outline: 0;
   background: #fff;
 }
-.group-details span {
+.group-details > span {
   overflow: hidden;
   padding-left: 3px;
   color: #71809a;
@@ -354,7 +354,7 @@
   color: #33496f;
   font-size: 13px;
 }
-.every-summary span {
+.every-summary > div > span {
   color: #74839a;
   font-size: 11px;
 }

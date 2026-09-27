@@ -25,6 +25,39 @@
   gap: 16px;
   margin-bottom: 23px;
 }
+.file-list-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+  margin-top: 4px;
+}
+.file-list-actions .count-badge {
+  margin-top: 0;
+}
+.clear-files-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid #414755;
+  border-radius: 8px;
+  background: transparent;
+  color: #aebbd1;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 750;
+}
+.clear-files-button:not(:disabled):hover {
+  border-color: #a6616d;
+  background: #39252d;
+  color: #ffd1d0;
+}
+.clear-files-button:disabled {
+  opacity: 0.45;
+}
 .eyebrow {
   color: var(--blue);
   font-size: 11px;
@@ -180,10 +213,12 @@
 .privacy-note {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   margin-top: 18px;
   color: #76839a;
   font-size: 12px;
+  text-align: center;
 }
 .privacy-note .public-icon {
   color: #3d9b6e;

@@ -17,8 +17,8 @@ export default function HeroArtPortal({ children }: { children: ReactNode }) {
       frame = null;
       const rect = anchor.getBoundingClientRect();
       const next = {
-        left: rect.left,
-        top: rect.top,
+        left: rect.left + window.scrollX,
+        top: rect.top + window.scrollY,
         scale: rect.width / anchor.offsetWidth,
       };
       setPlacement((current) =>
@@ -37,20 +37,18 @@ export default function HeroArtPortal({ children }: { children: ReactNode }) {
     const observer = new ResizeObserver(schedulePlacement);
     observer.observe(anchor);
     if (anchor.parentElement) observer.observe(anchor.parentElement);
-    window.addEventListener("scroll", schedulePlacement, true);
     window.addEventListener("resize", schedulePlacement);
 
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener("scroll", schedulePlacement, true);
       window.removeEventListener("resize", schedulePlacement);
     };
   }, []);
 
   const overlayStyle: CSSProperties | undefined = placement
     ? {
-        position: "fixed",
+        position: "absolute",
         left: placement.left,
         top: placement.top,
         transform: `scale(${placement.scale})`,

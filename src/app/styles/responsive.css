@@ -180,10 +180,10 @@
   .card-header {
     margin-bottom: 19px;
   }
-  .merge-card-header {
+  .file-card-header {
     flex-wrap: wrap;
   }
-  .merge-card-header .file-list-actions {
+  .file-card-header .file-list-actions {
     margin-left: auto;
   }
   .drop-zone {

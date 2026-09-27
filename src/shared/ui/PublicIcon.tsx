@@ -9,6 +9,7 @@ export type PublicIconName =
   | "compress"
   | "download"
   | "eye"
+  | "feather"
   | "file-type-pdf"
   | "files"
   | "grip-horizontal"

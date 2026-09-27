@@ -18,7 +18,10 @@ import { useState } from "react";
 import { fileStem, formatBytes, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { inspectPdf } from "../../shared/pdf/preview";
+import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
+import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
+import OutputFilenameField from "../../shared/ui/OutputFilenameField";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import SortableFileRow from "./components/SortableFileRow";
@@ -145,6 +148,7 @@ export default function MergeWorkspace() {
     (sum, item) => sum + (item.pageCount ?? 0),
     0
   );
+  const originalBytes = items.reduce((sum, item) => sum + item.file.size, 0);
   const canMerge =
     items.length >= 2 && items.every((item) => !item.loading && !item.error);
   const fileLabel = (id: string | number) =>
@@ -156,7 +160,7 @@ export default function MergeWorkspace() {
         className="workspace-card workspace-main"
         aria-labelledby="merge-heading"
       >
-        <div className="card-header merge-card-header">
+        <div className="card-header file-card-header">
           <div>
             <div className="eyebrow">01 / 排列檔案</div>
             <h2 id="merge-heading">依你想要的順序合併</h2>
@@ -174,7 +178,9 @@ export default function MergeWorkspace() {
                 <PublicIcon name="trash" size={15} />
                 清除全部
               </button>
-              <span className="count-badge">{items.length} 份檔案</span>
+              <span className="count-badge">
+                <Counter value={items.length} /> 份檔案
+              </span>
             </div>
           )}
         </div>
@@ -252,33 +258,30 @@ export default function MergeWorkspace() {
         <div className="output-stats">
           <div>
             <span>PDF 檔案</span>
-            <strong>{items.length} 份</strong>
+            <strong>
+              <Counter value={items.length} /> 份
+            </strong>
           </div>
           <div>
             <span>合計頁數</span>
-            <strong>{totalPages} 頁</strong>
+            <strong>
+              <Counter value={totalPages} /> 頁
+            </strong>
           </div>
           <div>
             <span>原始大小</span>
             <strong>
-              {formatBytes(
-                items.reduce((sum, item) => sum + item.file.size, 0)
-              )}
+              <ByteCounter size={originalBytes} />
             </strong>
           </div>
         </div>
-        <label className="field-label" htmlFor="merge-name">
-          輸出檔名
-        </label>
-        <div className="filename-field">
-          <input
-            id="merge-name"
-            value={outputName.replace(/\.pdf$/i, "")}
-            onChange={(event) => setOutputName(event.target.value)}
-            placeholder="merged"
-          />
-          <span>.pdf</span>
-        </div>
+        <OutputFilenameField
+          id="merge-name"
+          value={outputName}
+          onChange={setOutputName}
+          defaultName="merged.pdf"
+          placeholder="merged"
+        />
         <button
           className="button button--outline button--full output-preview-button"
           disabled={!canMerge || busy}
@@ -292,7 +295,10 @@ export default function MergeWorkspace() {
         <button
           className="button button--accent button--full"
           disabled={!canMerge || busy}
-          onClick={handleMerge}
+          onClick={(event) => {
+            void handleMerge();
+            fireButtonConfetti(event.currentTarget);
+          }}
         >
           <PublicIcon name="download" size={18} />
           {processing ? `處理中 ${progress}/${items.length}` : "合併並下載 PDF"}

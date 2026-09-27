@@ -71,10 +71,12 @@
   border-radius: 14px;
   background: #f0f2fe;
   color: var(--blue);
+  transition: box-shadow 0.2s ease;
 }
 .tool-tab.active .tool-tab-icon {
   background: var(--blue);
   color: #fff;
+  box-shadow: 0 0 18px #6879ed55;
 }
 .tool-tab-copy {
   display: flex;
@@ -104,6 +106,13 @@
   margin-left: auto;
   flex: none;
   color: #a5b0c5;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+.tool-tab:hover .tool-tab-arrow,
+.tool-tab:focus-visible .tool-tab-arrow,
+.tool-tab.active .tool-tab-arrow {
+  transform: rotate(0deg);
 }
 .tool-tab.active .tool-tab-arrow {
   color: var(--blue);

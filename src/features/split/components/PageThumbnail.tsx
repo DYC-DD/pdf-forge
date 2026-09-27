@@ -2,6 +2,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 
 import { renderPageThumbnail } from "../../../shared/pdf/preview";
+import Counter from "../../../shared/ui/Counter";
 import PublicIcon from "../../../shared/ui/PublicIcon";
 
 export default function PageThumbnail({
@@ -83,8 +84,14 @@ export default function PageThumbnail({
           </span>
         </div>
         <div className="page-caption">
-          <strong>第 {pageNumber} 頁</strong>
-          {groupCount > 0 && <span>已加入 {groupCount} 組</span>}
+          <strong>
+            第 {visible ? <Counter value={pageNumber} /> : pageNumber} 頁
+          </strong>
+          {groupCount > 0 && (
+            <span>
+              已加入 {visible ? <Counter value={groupCount} /> : groupCount} 組
+            </span>
+          )}
         </div>
       </button>
       <button

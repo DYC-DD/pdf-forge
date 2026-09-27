@@ -112,7 +112,7 @@
   background: #e9edf7;
   color: #5366a8;
 }
-.file-row--error .file-info span {
+.file-row--error .file-info > span {
   color: #ffada9;
 }
 .icon-button {
@@ -134,22 +134,12 @@
 .output-stats {
   border-color: #333944;
 }
-.output-stats span,
-.output-count span {
+.output-stats > div > span,
+.output-count > span {
   color: #b3bfd6;
 }
 .field-label {
   color: #d3dcf4;
-}
-.filename-field {
-  border-color: #404650;
-  background: #090c11;
-}
-.filename-field:focus-within {
-  box-shadow: 0 0 0 3px #8294f533;
-}
-.filename-field span {
-  color: #9faccc;
 }
 .encryption-note {
   color: #aab6ce !important;
@@ -187,11 +177,10 @@
   border-color: #404650;
   background: #090c11;
 }
-.range-form input::placeholder,
-.filename-field input::placeholder {
+.range-form input::placeholder {
   color: #8997b4;
 }
-.selection-actions span {
+.selection-actions > span {
   color: #c4cdff;
 }
 .selection-actions button {
@@ -219,7 +208,7 @@
   border-color: #6879ed;
   background: #6879ed;
 }
-.page-caption span {
+.page-caption > span {
   color: #a8b5cd;
 }
 .page-grid--readonly .page-tile:hover,
@@ -251,7 +240,7 @@
 .group-details input:focus {
   background: #090c11;
 }
-.group-details span {
+.group-details > span {
   color: #aab7cd;
 }
 .every-summary {
@@ -262,7 +251,7 @@
 .every-summary strong {
   color: #eef0ff;
 }
-.every-summary span {
+.every-summary > div > span {
   color: #b0bfd6;
 }
 .output-divider {

@@ -1,9 +1,11 @@
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
-import { formatBytes, saveBlob } from "../../shared/files/file";
+import { saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { openPdf } from "../../shared/pdf/preview";
+import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
+import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
@@ -74,6 +76,20 @@ export default function SplitWorkspace() {
     setGroups([]);
     setRangeInput("");
     setMessage("");
+  }
+
+  function clearFile() {
+    if (processing) return;
+    setFile(null);
+    setPdf(null);
+    setLoading(false);
+    setLoadError("");
+    setPreviewPage(null);
+    setSelected([]);
+    setGroups([]);
+    setRangeInput("");
+    setMessage("");
+    setProgress(0);
   }
 
   function togglePage(page: number) {
@@ -152,13 +168,29 @@ export default function SplitWorkspace() {
         className="workspace-card workspace-main"
         aria-labelledby="split-heading"
       >
-        <div className="card-header">
+        <div className="card-header file-card-header">
           <div>
             <div className="eyebrow">01 / 選擇頁面</div>
             <h2 id="split-heading">把需要的頁面留下來</h2>
             <p>點選頁面組成新檔案，點眼睛圖示可放大預覽。</p>
           </div>
-          {pdf && <span className="count-badge">{pdf.numPages} 頁</span>}
+          {file && (
+            <div className="file-list-actions">
+              <button
+                type="button"
+                className="clear-files-button"
+                onClick={clearFile}
+                disabled={processing}
+                aria-label="清除全部 PDF"
+              >
+                <PublicIcon name="trash" size={15} />
+                清除全部
+              </button>
+              <span className="count-badge">
+                <Counter value={1} /> 份檔案
+              </span>
+            </div>
+          )}
         </div>
         {!file ? (
           <DropZone multiple={false} onFiles={chooseFile} />
@@ -171,17 +203,15 @@ export default function SplitWorkspace() {
               <div>
                 <strong>{file.name}</strong>
                 <span>
-                  {formatBytes(file.size)}
-                  {pdf ? ` · ${pdf.numPages} 頁` : ""}
+                  <ByteCounter size={file.size} />
+                  {pdf && (
+                    <>
+                      {" · "}
+                      <Counter value={pdf.numPages} /> 頁
+                    </>
+                  )}
                 </span>
               </div>
-              <button
-                className="button button--small button--outline"
-                onClick={() => setFile(null)}
-                disabled={processing}
-              >
-                更換
-              </button>
             </div>
             {loading && <div className="loading-panel">正在讀取頁面…</div>}
             {loadError && (
@@ -240,7 +270,9 @@ export default function SplitWorkspace() {
                       </div>
                     </div>
                     <div className="selection-actions">
-                      <span>已選 {selected.length} 頁</span>
+                      <span>
+                        已選 <Counter value={selected.length} /> 頁
+                      </span>
                       <button onClick={() => setSelected(pages)}>全選</button>
                       <button onClick={() => setSelected([])}>清除</button>
                     </div>
@@ -302,8 +334,8 @@ export default function SplitWorkspace() {
               onClick={addGroup}
               disabled={selected.length === 0 || processing}
             >
-              <PublicIcon name="plus" size={18} /> 將 {selected.length}{" "}
-              頁加入新檔案
+              <PublicIcon name="plus" size={18} /> 將{" "}
+              <Counter value={selected.length} /> 頁加入新檔案
             </button>
             <div className="group-list">
               {groups.length === 0 ? (
@@ -316,7 +348,7 @@ export default function SplitWorkspace() {
                 groups.map((group, index) => (
                   <div className="group-card" key={group.id}>
                     <div className="group-number">
-                      {String(index + 1).padStart(2, "0")}
+                      <Counter value={index + 1} minimumIntegerDigits={2} />
                     </div>
                     <div className="group-details">
                       <input
@@ -333,7 +365,8 @@ export default function SplitWorkspace() {
                         aria-label={`第 ${index + 1} 份檔案名稱`}
                       />
                       <span>
-                        {group.pages.length} 頁 · {group.pages.join(", ")}
+                        <Counter value={group.pages.length} /> 頁 ·{" "}
+                        {group.pages.join(", ")}
                       </span>
                     </div>
                     <button
@@ -358,7 +391,13 @@ export default function SplitWorkspace() {
             <PublicIcon name="checks" size={24} />
             <div>
               <strong>
-                {pdf ? `${pdf.numPages} 份獨立 PDF` : "等待匯入 PDF"}
+                {pdf ? (
+                  <>
+                    <Counter value={pdf.numPages} /> 份獨立 PDF
+                  </>
+                ) : (
+                  "等待匯入 PDF"
+                )}
               </strong>
               <span>多個檔案會打包為 ZIP 下載。</span>
             </div>
@@ -367,12 +406,17 @@ export default function SplitWorkspace() {
         <div className="output-divider" />
         <div className="output-count">
           <span>準備輸出</span>
-          <strong>{outputCount} 份 PDF</strong>
+          <strong>
+            <Counter value={outputCount} /> 份 PDF
+          </strong>
         </div>
         <button
           className="button button--accent button--full"
           disabled={!pdf || outputCount === 0 || processing}
-          onClick={handleExport}
+          onClick={(event) => {
+            void handleExport();
+            fireButtonConfetti(event.currentTarget);
+          }}
         >
           <PublicIcon name="download" size={18} />
           {processing

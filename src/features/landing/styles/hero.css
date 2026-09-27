@@ -100,6 +100,7 @@
     transparent 78%
   );
   filter: blur(24px);
+  transform: scale(1.4);
   pointer-events: none;
 }
 .hero-flip-card {
@@ -108,7 +109,7 @@
   height: 295px;
   z-index: 1;
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-y;
   outline: none;
   user-select: none;
   -webkit-user-select: none;
@@ -246,10 +247,24 @@
   -webkit-mask-size: contain;
   mask-size: contain;
 }
+.art-merge-visual,
+.art-split-visual,
+.art-compress-visual {
+  position: absolute;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+}
 .art-merge-visual {
+  top: 44%;
+}
+.art-split-visual,
+.art-compress-visual {
+  top: 38%;
+}
+.art-merge-visual {
+  width: 139px;
   height: 128px;
-  margin-top: 23px;
-  align-self: center;
 }
 .art-merge-papers {
   position: relative;
@@ -314,19 +329,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  align-self: flex-end;
   gap: 10px;
   width: 125px;
-  margin-top: 25px;
 }
 .art-compress-file {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  width: 86px;
-  height: 105px;
+  gap: 6px;
+  width: 78px;
+  height: 94px;
   border: 1px solid #eaf0ffb0;
   border-radius: 10px;
   background: #e4ebfb;
@@ -347,11 +360,9 @@
 }
 .art-split-visual {
   display: grid;
-  align-self: flex-end;
   grid-template-columns: repeat(2, 58px);
   grid-template-rows: repeat(2, 58px);
   gap: 8px;
-  margin-top: 25px;
 }
 .art-split-page {
   display: flex;
@@ -374,42 +385,29 @@
 .art-card-caption {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   margin-top: auto;
 }
 .art-card-caption strong {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.04em;
 }
 .art-card-caption span {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
-  opacity: 0.75;
+  opacity: 0.78;
 }
 .art-card-caption--right {
   align-items: flex-end;
   text-align: right;
 }
-.art-card-caption--center {
-  gap: 6px;
-  margin-top: 17px;
-}
-.art-card-caption--center strong {
-  color: #2e477e;
-  font-size: 21px;
-}
-.art-card-caption--center span {
-  color: #798eb7;
-  font-size: 11px;
-  opacity: 1;
-}
-.art-merge-footer {
+.art-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 5px;
-  margin-top: auto;
+  margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #d5dff0;
   color: #6078a9;
@@ -418,13 +416,22 @@
   letter-spacing: 0.07em;
   white-space: nowrap;
 }
-.art-merge-footer span:first-child {
+.art-card-footer span:first-child {
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.art-merge-footer .hero-card-icon {
+.art-sheet--merge .art-card-footer .hero-card-icon {
   color: #3da274;
+}
+.art-sheet--split .art-card-footer {
+  border-color: #91a6cb;
+  color: #476395;
+}
+.art-sheet--compress .art-card-footer {
+  flex-direction: row-reverse;
+  border-color: #e8efff66;
+  color: #eef3ff;
 }
 .art-sheet--reverse {
   background: #dce5f7;
@@ -436,12 +443,23 @@
 .art-sheet--reverse-compress {
   background: #adbee0;
 }
+.art-reverse-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(100% - 40px);
+  max-width: 190px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
 .art-reverse-icon {
   display: grid;
   place-items: center;
   width: 64px;
   height: 64px;
-  margin-top: 32px;
   border-radius: 15px;
   background: #f5f8ff9c;
   color: #536bd0;

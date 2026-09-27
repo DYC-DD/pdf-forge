@@ -34,6 +34,7 @@ export default function DraggableFlipCard({
     y: number;
     origin: Point;
     moved: boolean;
+    ignoredScroll: boolean;
     type: string;
     scale: number;
     samples: DragSample[];
@@ -123,11 +124,13 @@ export default function DraggableFlipCard({
       y: event.clientY,
       origin: offsetRef.current,
       moved: false,
+      ignoredScroll: false,
       type: event.pointerType,
       scale: scale || 1,
       samples: [{ x: event.clientX, y: event.clientY, time: event.timeStamp }],
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.pointerType !== "touch")
+      event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -136,7 +139,17 @@ export default function DraggableFlipCard({
 
     const dx = event.clientX - active.x;
     const dy = event.clientY - active.y;
-    if (!active.moved && Math.hypot(dx, dy) < 5) return;
+    if (active.ignoredScroll) return;
+    if (!active.moved) {
+      if (Math.hypot(dx, dy) < (active.type === "touch" ? 8 : 5)) return;
+      if (active.type === "touch") {
+        if (Math.abs(dy) >= Math.abs(dx)) {
+          active.ignoredScroll = true;
+          return;
+        }
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }
 
     active.moved = true;
     setIsDragging(true);
@@ -172,16 +185,22 @@ export default function DraggableFlipCard({
         (sample) => event.timeStamp - sample.time <= velocityWindowMs
       );
       startInertia(active.samples, active.scale);
-    } else if (!hasHover || active.type !== "mouse") {
+    } else if (
+      !active.ignoredScroll &&
+      (!hasHover || active.type !== "mouse")
+    ) {
       setIsFlipped((current) => !current);
     }
     pointer.current = null;
     setIsDragging(false);
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   const onPointerCancel = (event: PointerEvent<HTMLDivElement>) => {
-    if (pointer.current?.id !== event.pointerId) return;
+    const active = pointer.current;
+    if (!active || active.id !== event.pointerId) return;
+    if (active.type === "touch" && active.moved) updateOffset(active.origin);
     pointer.current = null;
     setIsDragging(false);
   };

@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { formatBytes } from "../../../shared/files/file";
+import Counter, { ByteCounter } from "../../../shared/ui/Counter";
 import PublicIcon from "../../../shared/ui/PublicIcon";
 import type { MergeItem } from "../types";
 
@@ -43,7 +43,7 @@ export default function SortableFileRow({
         title="預覽 PDF"
       >
         <div className="file-index">
-          {String(position + 1).padStart(2, "0")}
+          <Counter value={position + 1} minimumIntegerDigits={2} />
         </div>
         <div className="file-preview">
           {item.thumbnail ? (
@@ -55,12 +55,17 @@ export default function SortableFileRow({
         <div className="file-info">
           <strong title={item.file.name}>{item.file.name}</strong>
           <span>
-            {formatBytes(item.file.size)}
-            {item.loading
-              ? " · 讀取中…"
-              : item.error
-                ? ` · ${item.error}`
-                : ` · ${item.pageCount} 頁`}
+            <ByteCounter size={item.file.size} />
+            {item.loading ? (
+              " · 讀取中…"
+            ) : item.error ? (
+              ` · ${item.error}`
+            ) : (
+              <>
+                {" · "}
+                <Counter value={item.pageCount ?? 0} /> 頁
+              </>
+            )}
           </span>
         </div>
       </button>

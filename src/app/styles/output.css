@@ -20,8 +20,8 @@
   padding: 10px 0;
   font-size: 13px;
 }
-.output-stats span,
-.output-count span {
+.output-stats > div > span,
+.output-count > span {
   color: #65738d;
 }
 .output-stats strong,
@@ -30,6 +30,9 @@
   font-size: 13px;
   font-weight: 800;
 }
+.output-stats strong {
+  white-space: nowrap;
+}
 .field-label {
   display: block;
   margin-bottom: 9px;
@@ -37,33 +40,58 @@
   font-size: 12px;
   font-weight: 750;
 }
-.filename-field {
-  display: flex;
-  align-items: center;
-  height: 45px;
+.filename-field.MuiFormControl-root {
   margin-bottom: 17px;
-  border: 1px solid #cbd5f0;
+}
+.filename-field .MuiInputLabel-root {
+  color: #d3dcf4;
+  font-family: inherit;
+  font-size: 18px;
+}
+.filename-field .MuiInputLabel-root.Mui-focused {
+  color: #b6c0ff;
+}
+.filename-field .MuiOutlinedInput-root {
+  min-height: 48px;
   border-radius: 9px;
-  background: #fff;
-}
-.filename-field:focus-within {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px #425ce91a;
-}
-.filename-field input {
-  width: 100%;
-  height: 100%;
-  padding: 0 12px;
-  border: 0;
-  outline: 0;
-  background: transparent;
+  background: #090c11;
   color: var(--ink);
+  font-family: inherit;
   font-size: 13px;
 }
-.filename-field span {
-  padding-right: 13px;
-  color: #7f8da5;
+.filename-field .MuiOutlinedInput-notchedOutline {
+  border-color: #404650;
+}
+.filename-field .MuiOutlinedInput-notchedOutline legend {
+  font-size: 13.5px;
+}
+.filename-field .MuiOutlinedInput-root.Mui-focused {
+  background: #10141c;
+}
+.filename-field
+  .MuiOutlinedInput-root.Mui-focused
+  .MuiOutlinedInput-notchedOutline {
+  border-color: #404650;
+  border-width: 1px;
+}
+.filename-field .MuiInputBase-input {
+  padding: 13px 14px;
+  font-family: "Google Sans Code", monospace;
+}
+.filename-field .MuiInputBase-input:focus-visible {
+  outline: none;
+}
+.filename-field .MuiInputBase-input::placeholder {
+  color: #8997b4;
+  opacity: 1;
+}
+.filename-field .MuiInputAdornment-root {
+  color: #9faccc;
+  font-family: "Google Sans Code", monospace;
   font-size: 13px;
+}
+.filename-field .Mui-disabled {
+  -webkit-text-fill-color: #aeb8cc;
 }
 .output-card .button--accent {
   min-height: 48px;

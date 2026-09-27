@@ -61,13 +61,26 @@ function ArtSheetBack({
         <span>PDF FORGE</span>
         <span>{variant.toUpperCase()}</span>
       </div>
-      <div className="art-reverse-icon">{icon}</div>
-      <strong className="art-reverse-title">{title}</strong>
-      <p className="art-reverse-description">{description}</p>
+      <div className="art-reverse-content">
+        <div className="art-reverse-icon">{icon}</div>
+        <strong className="art-reverse-title">{title}</strong>
+        <p className="art-reverse-description">{description}</p>
+      </div>
       <div className="art-reverse-footer">
         <span>MADE SIMPLE</span>
         <PublicIcon name="arrow-up-right" size={13} />
       </div>
+    </div>
+  );
+}
+
+function ArtCardFooter({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <div className="art-card-footer">
+      <span>
+        {icon} {label}
+      </span>
+      <span>PDF FORGE</span>
     </div>
   );
 }
@@ -99,7 +112,7 @@ export default function LandingHero() {
           back={
             <ArtSheetBack
               variant="split"
-              icon={<ScissorsIcon size={29} />}
+              icon={<ScissorsIcon size={40} />}
               title="只留下需要的頁面"
               description="選取頁面，輕鬆輸出新檔。"
             />
@@ -124,6 +137,10 @@ export default function LandingHero() {
               <strong>拆分 PDF</strong>
               <span>只留下需要的頁面</span>
             </div>
+            <ArtCardFooter
+              icon={<ScissorsIcon size={12} />}
+              label="自由選擇頁面"
+            />
           </div>
         </DraggableFlipCard>
         <DraggableFlipCard
@@ -132,7 +149,7 @@ export default function LandingHero() {
           back={
             <ArtSheetBack
               variant="compress"
-              icon={<CompressIcon size={30} />}
+              icon={<CompressIcon size={40} />}
               title="縮小檔案大小"
               description="讓 PDF 更方便分享與儲存。"
             />
@@ -145,7 +162,7 @@ export default function LandingHero() {
             </div>
             <div className="art-compress-visual" aria-hidden="true">
               <div className="art-compress-file">
-                <CompressIcon size={30} />
+                <PublicIcon name="feather" size={40} />
                 <span>PDF</span>
               </div>
               <div className="art-compress-size">檔案更輕巧</div>
@@ -154,6 +171,10 @@ export default function LandingHero() {
               <strong>壓縮 PDF</strong>
               <span>縮小檔案 · 輕鬆分享</span>
             </div>
+            <ArtCardFooter
+              icon={<CompressIcon size={12} />}
+              label="壓縮強度可選"
+            />
           </div>
         </DraggableFlipCard>
         <DraggableFlipCard
@@ -162,7 +183,7 @@ export default function LandingHero() {
           back={
             <ArtSheetBack
               variant="merge"
-              icon={<FilesIcon size={30} />}
+              icon={<FilesIcon size={40} />}
               title="多份，合成一份"
               description="依照你的順序整理文件。"
             />
@@ -188,16 +209,14 @@ export default function LandingHero() {
                 <span>ONE PDF</span>
               </div>
             </div>
-            <div className="art-card-caption art-card-caption--center">
+            <div className="art-card-caption">
               <strong>合併 PDF</strong>
               <span>多份檔案 · 一份完成</span>
             </div>
-            <div className="art-merge-footer">
-              <span>
-                <ShieldCheckIcon size={12} /> 本機完成
-              </span>
-              <span>PDF FORGE</span>
-            </div>
+            <ArtCardFooter
+              icon={<ShieldCheckIcon size={12} />}
+              label="本機完成"
+            />
           </div>
         </DraggableFlipCard>
         <DodgeField
