@@ -1,70 +1,47 @@
-# PDF Forge — PDF 工作台
+# PDF Forge
 
-純前端 PDF 工具，以 Vite、React、TypeScript 製作。檔案在瀏覽器中處理，不會上傳至伺服器。
+合併、拆分、壓縮 PDF，打開瀏覽器就能輕鬆搞定。免安裝、免上傳，讓每份檔案安心留在你的裝置。
 
-## 功能
+## 功能與用法
 
-- **合併 PDF**：加入多份檔案，拖曳或使用上下按鈕調整順序；可預覽原始檔與合併結果，再下載單一 PDF。
-- **拆分 PDF**：點選縮圖或輸入頁碼範圍，建立多個頁面群組；可預覽指定頁面，也可每頁輸出一個檔案。多個結果打包成 ZIP。
-- **壓縮 PDF**：低壓縮只整理 PDF 結構；中壓縮重新編碼適用影像，保留原解析度；高壓縮進一步縮小可處理的大型照片。顯示縮小比例，預覽後下載；若結果沒有變小，保留原始檔案。
+| 工具     | 操作方式                                                                                                   | 下載結果                           |
+| -------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| 合併 PDF | 加入至少兩份 PDF，拖曳檔案列調整順序；可預覽原檔與合併結果，並自訂輸出檔名。                               | 一份 PDF                           |
+| 拆分 PDF | 加入一份 PDF，點選縮圖或輸入頁碼範圍（例如 `1-3, 5, 8`），將選取的頁面加入輸出清單；也可選擇「每頁一檔」。 | 一份結果下載 PDF；多份結果下載 ZIP |
+| 壓縮 PDF | 加入一份 PDF，選擇壓縮強度，完成後比較大小並預覽結果。                                                     | 結果較小時可下載 PDF               |
 
-## 專案結構
+## 本機執行
 
-```text
-src/
-├── main.tsx                  # React 入口
-├── app/
-│   ├── App.tsx               # 組合首頁、工具路由與工作區
-│   ├── components/           # 獨立的頁首與頁尾元件
-│   ├── styles.css            # 依序載入各層樣式
-│   └── styles/              # 基礎、外殼、頁首、頁尾與工作區樣式
-├── features/
-│   ├── landing/             # 首頁展示、工具選擇及其視覺元件
-│   ├── merge/               # 合併介面、排序元件及合併邏輯
-│   ├── split/               # 拆分介面、頁面縮圖及拆分邏輯
-│   └── compress/            # 壓縮介面、Web Worker 與 qpdf 處理邏輯
-├── shared/
-│   ├── files/               # 檔名、大小顯示與下載工具
-│   ├── pdf/                 # PDF 載入、預覽、解鎖與錯誤訊息
-│   └── ui/                  # 跨功能共用的介面元件
-└── tests/                   # 跨功能 PDF 整合測試與測試資料
-public/                       # 靜態資源
-docs/                         # 專案文件
-```
-
-`app` 負責組合與全域樣式載入；`features` 各自擁有畫面、專用元件、處理邏輯與樣式；`shared` 只放跨功能使用的能力。依賴方向為 `app → features → shared`，`shared` 不反向引用功能。新增功能時先放入對應的 `features` 目錄，確定重複使用後再提升至 `shared`。
-
-## 開發
-
-需要 Node.js 22.13 以上。
+建議使用 Node.js 22.13 以上及 npm。  
+安裝依賴後啟動開發伺服器：
 
 ```bash
 npm ci
 npm run dev
 ```
 
-```bash
-npm test
-npm run build
-```
-
-程式碼使用專案固定版本的 Prettier 排版，並由匯入排序外掛統一 `import` 順序。VS Code 會提示安裝 Prettier 擴充套件，並在儲存時依 `.prettierrc.json` 自動格式化。其他編輯器也可執行：
+其他常用指令：
 
 ```bash
-npm run format
-npm run format:check
+npm test              # 執行 Vitest 測試
+npm run build         # TypeScript 檢查並產生 dist/
+npm run preview       # 預覽正式建置
+npm run format        # 使用 Prettier 格式化
+npm run format:check  # 檢查格式
 ```
 
-## GitHub Pages
+## 注意事項
 
-`vite.config.ts` 的正式建置路徑為 `/file-converter/`。儲存庫在 GitHub Pages 設定中選擇 **GitHub Actions** 作為來源後，推送至 `main` 即會執行 `.github/workflows/pages.yml`。目前開發分支是 `develop`，不會因本地建置而部署。
+> [!IMPORTANT]
+>
+> - 合併、拆分與壓縮都在你的瀏覽器中完成。
+> - 原始 PDF 和產生的結果不會上傳雲端或傳送至伺服器。
+> - 重新整理或關閉頁面後，處理狀態不會保留；請先下載並保存結果。
 
-合併、拆分與壓縮分別可從 `/file-converter/merge/`、`/file-converter/split/`、`/file-converter/compress/` 直接開啟。建置時會為每個網址產生 `index.html`，支援在 GitHub Pages 重新整理頁面。
+## Changelog
 
-## 已知限制
+查看完整更新紀錄：[CHANGELOG](./docs/CHANGELOG.md)
 
-- 可直接開啟、但以擁有者密碼限制編輯的 PDF，會在瀏覽器內嘗試用空密碼解鎖後處理；輸出檔不保留原加密設定。真正需要開啟密碼的 PDF 目前仍無法處理。
-- 合併與拆分是複製頁面；原始 PDF 的書籤、內部連結、表單或簽章可能無法完整保留。
-- 每頁一檔的模式會在瀏覽器記憶體中產生所有結果；大型 PDF 可能受到裝置記憶體限制。
-- 中壓縮會重新編碼可處理的 JPEG，並嘗試優化其他影像，保留圖片解析度；高壓縮還會將可處理的大型 JPEG 圖片縮至最長邊 1800 像素。兩者都可能降低照片細節。低壓縮不重新編碼圖片。帶遮罩或特殊解碼設定的圖片，以及已高度壓縮的 PDF，可能縮小有限。
-- 壓縮會重新儲存 PDF，已簽署檔案的數位簽章可能失效；只有編輯權限限制的檔案輸出後不保留原加密設定。
+## License
+
+[MIT License](./LICENSE)

@@ -6,7 +6,7 @@
   width: 43px;
   height: 56px;
   flex: none;
-  border: 1px solid #52617a;
+  border: 1px solid #65676d;
   border-radius: 5px;
   background: #fff;
   object-fit: contain;
@@ -29,19 +29,19 @@
 }
 
 .compress-mode-field .MuiInputLabel-root {
-  color: #d3dcf4;
+  color: #d2d3d7;
   font-family: inherit;
   font-size: 18px;
 }
 
 .compress-mode-field .MuiInputLabel-root.Mui-focused {
-  color: #b6c0ff;
+  color: #c3d0ed;
 }
 
 .compress-mode-select.MuiInputBase-root {
   min-height: 66px;
   border-radius: 9px;
-  background: #151a23;
+  background: #1b1c20;
   color: var(--ink);
   font-family: inherit;
   font-size: 14px;
@@ -67,14 +67,14 @@
 }
 
 .compress-mode-content small {
-  color: #b7c2d7;
+  color: #b6b7bc;
   font-size: 11px;
   font-weight: 400;
   line-height: 1.45;
 }
 
 .compress-mode-select.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
-  border-color: #404650;
+  border-color: #4a4c52;
 }
 
 .compress-mode-select .MuiOutlinedInput-notchedOutline legend {
@@ -83,16 +83,16 @@
 
 .compress-mode-select.MuiOutlinedInput-root:hover
   .MuiOutlinedInput-notchedOutline {
-  border-color: #8092de;
+  border-color: #7d90b5;
 }
 
 .compress-mode-select.MuiOutlinedInput-root.Mui-focused
   .MuiOutlinedInput-notchedOutline {
-  border-color: #8b9af2;
+  border-color: #99add7;
 }
 
 .compress-mode-select .MuiSelect-icon {
-  color: #b7c2d7;
+  color: #b6b7bc;
 }
 
 .compress-mode-select.Mui-disabled {
@@ -101,9 +101,9 @@
 
 .compress-mode-menu.MuiPaper-root {
   max-width: min(420px, calc(100vw - 32px));
-  border: 1px solid #343d4f;
+  border: 1px solid #494b50;
   border-radius: 9px;
-  background: #151a23;
+  background: #1b1c20;
   color: var(--ink);
   box-shadow: 0 16px 36px #0008;
 }
@@ -117,15 +117,15 @@
 }
 
 .compress-mode-menu .MuiMenuItem-root:hover {
-  background: #1b2334;
+  background: #292a2f;
 }
 
 .compress-mode-menu .MuiMenuItem-root.Mui-selected {
-  background: #202946;
+  background: #35373c;
 }
 
 .compress-mode-menu .MuiMenuItem-root.Mui-selected:hover {
-  background: #293554;
+  background: #414349;
 }
 
 .compress-output-card .output-stats {
@@ -146,7 +146,7 @@
 }
 
 .compress-output-card .output-stats > div + div {
-  border-left: 1px solid #333944;
+  border-left: 1px solid #3c3e43;
 }
 
 .compress-result-actions {

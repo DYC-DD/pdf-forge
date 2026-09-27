@@ -44,32 +44,14 @@
   text-align: center;
   font-size: 13px;
 }
-.mode-switch {
-  display: flex;
-  width: fit-content;
-  gap: 4px;
+.rubber-segment.split-mode-segment {
+  display: grid;
+  width: max-content;
   margin-bottom: 20px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #f1f3f9;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.mode-switch button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 14px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #748097;
-  font-size: 12px;
+.split-mode-segment .rubber-segment__item {
   font-weight: 750;
-}
-.mode-switch button.active {
-  background: #fff;
-  color: var(--blue);
-  box-shadow: 0 2px 7px #253b771c;
 }
 .page-tools {
   display: flex;
@@ -84,30 +66,51 @@
 .range-form {
   min-width: 230px;
 }
-.range-form label {
-  display: block;
-  margin-bottom: 8px;
+.range-form .page-range-field .MuiInputLabel-root {
   color: #42516e;
-  font-size: 12px;
+  font-family: inherit;
+  font-size: 16px;
   font-weight: 750;
+}
+.range-form .page-range-field .MuiInputLabel-root.Mui-focused {
+  color: var(--blue);
 }
 .range-form > div {
   display: flex;
   gap: 6px;
 }
-.range-form input {
+.range-form .page-range-field.MuiFormControl-root {
   width: 165px;
+}
+.range-form .page-range-field .MuiOutlinedInput-root {
   height: 36px;
-  padding: 0 10px;
-  border: 1px solid #d5ddea;
   border-radius: 7px;
-  outline: 0;
   background: #fff;
   color: var(--ink);
+  font-family: inherit;
   font-size: 12px;
 }
-.range-form input:focus {
+.range-form .page-range-field .MuiOutlinedInput-notchedOutline {
+  border-color: #d5ddea;
+}
+.range-form .page-range-field .MuiOutlinedInput-notchedOutline legend {
+  font-size: 12px;
+}
+.range-form
+  .page-range-field
+  .MuiOutlinedInput-root:hover
+  .MuiOutlinedInput-notchedOutline,
+.range-form
+  .page-range-field
+  .MuiOutlinedInput-root.Mui-focused
+  .MuiOutlinedInput-notchedOutline {
   border-color: var(--blue);
+}
+.range-form .page-range-field .MuiInputBase-input {
+  padding: 8px 10px;
+}
+.range-form .page-range-field .MuiInputBase-input:focus-visible {
+  outline: none;
 }
 .selection-actions {
   display: flex;
@@ -260,12 +263,20 @@
 .add-group {
   margin-bottom: 15px;
 }
+.group-name-hint {
+  margin: -5px 0 10px;
+  color: #71809a;
+  font-size: 11px;
+  line-height: 1.5;
+}
 .group-list {
   display: flex;
   flex-direction: column;
-  max-height: 395px;
-  overflow: auto;
   gap: 8px;
+}
+.output-card:has(.empty-groups) .group-list,
+.empty-groups {
+  flex: 1;
 }
 .empty-groups {
   display: flex;
@@ -273,7 +284,7 @@
   justify-content: center;
   flex-direction: column;
   gap: 7px;
-  min-height: 175px;
+  min-height: 166px;
   border: 1px dashed #cbd5f0;
   border-radius: 9px;
   background: #fafbff;
@@ -290,12 +301,18 @@
 }
 .group-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 9px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 13px 14px 14px;
   border: 1px solid #dce4f5;
   border-radius: 8px;
   background: #fff;
+}
+.group-card-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
 }
 .group-number {
   width: 24px;
@@ -304,35 +321,25 @@
   font-size: 12px;
   font-weight: 800;
 }
-.group-details {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  gap: 3px;
-}
-.group-details input {
-  width: 100%;
-  padding: 2px 3px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: transparent;
+.group-label {
+  flex: none;
   color: var(--ink);
   font-size: 12px;
-  font-weight: 750;
 }
-.group-details input:focus {
-  border-color: var(--blue);
-  outline: 0;
-  background: #fff;
-}
-.group-details > span {
+.group-page-summary {
+  min-width: 0;
+  margin-left: auto;
   overflow: hidden;
-  padding-left: 3px;
   color: #71809a;
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.group-card-heading .icon-button {
+  flex: none;
+}
+.split-group-filename.MuiFormControl-root {
+  margin-bottom: 0;
 }
 .every-summary {
   display: flex;

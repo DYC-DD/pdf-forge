@@ -1,7 +1,7 @@
 :root {
   font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   color: #f2f2f4;
-  background: #03050a;
+  background: #08090b;
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -21,8 +21,8 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(ellipse 65% 35% at 50% -8%, #0b0e18 0%, transparent 75%),
-    #03050a;
+    radial-gradient(ellipse 65% 35% at 50% -8%, #151619 0%, transparent 75%),
+    #08090b;
 }
 button,
 input {

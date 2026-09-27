@@ -7,6 +7,7 @@ export type PublicIconName =
   | "checks"
   | "cloud-off"
   | "compress"
+  | "copyright"
   | "download"
   | "eye"
   | "feather"

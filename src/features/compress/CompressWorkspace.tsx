@@ -102,6 +102,7 @@ export default function CompressWorkspace() {
     setLoadError("");
     setResult(null);
     setPreviewFile(null);
+    setOutputName("compressed.pdf");
     setMessage("");
   }
 
@@ -175,19 +176,19 @@ export default function CompressWorkspace() {
           </div>
           {file && (
             <div className="file-list-actions">
+              <span className="count-badge">
+                <Counter value={1} /> 份檔案
+              </span>
               <button
                 type="button"
                 className="clear-files-button"
                 onClick={clearFile}
                 disabled={processing}
-                aria-label="清除全部 PDF"
+                aria-label="清除 PDF"
               >
                 <PublicIcon name="trash" size={15} />
-                清除全部
+                清除
               </button>
-              <span className="count-badge">
-                <Counter value={1} /> 份檔案
-              </span>
             </div>
           )}
         </div>
@@ -367,8 +368,7 @@ export default function CompressWorkspace() {
           </div>
         )}
         <p className="encryption-note">
-          有密碼限制的檔案不會保留加密設定；已簽署的 PDF
-          重新儲存後簽章可能失效。
+          若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
         </p>
         {message && (
           <p

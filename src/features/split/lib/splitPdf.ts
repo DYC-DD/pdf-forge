@@ -17,6 +17,7 @@ export async function splitPdf(
   const zip = new JSZip();
   const usedNames = new Set<string>();
   let singlePdf: Uint8Array | undefined;
+  let singleFilename: string | undefined;
 
   for (let index = 0; index < groups.length; index += 1) {
     const group = groups[index];
@@ -34,22 +35,27 @@ export async function splitPdf(
     for (const page of pages) output.addPage(page);
     const bytes = new Uint8Array(await output.save());
     const label = fileStem(group.name) || `part-${index + 1}`;
-    let name = `${stem}-${label}.pdf`;
+    const baseName = group.filename?.trim()
+      ? fileStem(group.filename)
+      : `${stem}-${label}`;
+    let name = `${baseName}.pdf`;
     let suffix = 2;
     while (usedNames.has(name.toLowerCase())) {
-      name = `${stem}-${label}-${suffix}.pdf`;
+      name = `${baseName}-${suffix}.pdf`;
       suffix += 1;
     }
     usedNames.add(name.toLowerCase());
-    if (groups.length === 1) singlePdf = bytes;
-    else zip.file(name, bytes);
+    if (groups.length === 1) {
+      singlePdf = bytes;
+      singleFilename = name;
+    } else zip.file(name, bytes);
     onProgress?.(index + 1);
   }
 
-  if (singlePdf) {
+  if (singlePdf && singleFilename) {
     return {
       blob: new Blob([new Uint8Array(singlePdf)], { type: "application/pdf" }),
-      filename: [...usedNames][0],
+      filename: singleFilename,
       fileCount: 1,
     };
   }

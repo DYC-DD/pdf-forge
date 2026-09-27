@@ -75,6 +75,31 @@ describe("PDF output", () => {
     expect(result.getPages().map((page) => page.getWidth())).toEqual([102]);
   });
 
+  it("preserves the custom filename when downloading one PDF", async () => {
+    const source = await makePdf("source.pdf", [101]);
+    const output = await splitPdf(source, [
+      { id: "a", name: "部分 1", filename: "My Report.PDF", pages: [1] },
+    ]);
+
+    expect(output.filename).toBe("My Report.pdf");
+  });
+
+  it("uses custom filenames and defaults for unnamed groups", async () => {
+    const source = await makePdf("source.pdf", [101, 102, 103]);
+    const output = await splitPdf(source, [
+      { id: "a", name: "部分 1", filename: "報告.pdf", pages: [1] },
+      { id: "b", name: "部分 2", filename: "  ", pages: [2] },
+      { id: "c", name: "部分 3", filename: "報告", pages: [3] },
+    ]);
+    const zip = await JSZip.loadAsync(await output.blob.arrayBuffer());
+
+    expect(Object.keys(zip.files)).toEqual([
+      "報告.pdf",
+      "source-部分 2.pdf",
+      "報告-2.pdf",
+    ]);
+  });
+
   it("splits a PDF whose editing is restricted by an owner password", async () => {
     const bytes = Uint8Array.from(atob(restrictedPdfBase64), (character) =>
       character.charCodeAt(0)

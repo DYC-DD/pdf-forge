@@ -1,7 +1,9 @@
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { saveBlob } from "../../shared/files/file";
+import { fileStem, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { openPdf } from "../../shared/pdf/preview";
 import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
@@ -9,6 +11,7 @@ import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
+import RubberSegment from "../../shared/ui/RubberSegment";
 import PageThumbnail from "./components/PageThumbnail";
 import { parsePageRange } from "./lib/parsePageRange";
 import { splitPdf } from "./lib/splitPdf";
@@ -176,19 +179,19 @@ export default function SplitWorkspace() {
           </div>
           {file && (
             <div className="file-list-actions">
+              <span className="count-badge">
+                <Counter value={1} /> 份檔案
+              </span>
               <button
                 type="button"
                 className="clear-files-button"
                 onClick={clearFile}
                 disabled={processing}
-                aria-label="清除全部 PDF"
+                aria-label="清除 PDF"
               >
                 <PublicIcon name="trash" size={15} />
-                清除全部
+                清除
               </button>
-              <span className="count-badge">
-                <Counter value={1} /> 份檔案
-              </span>
             </div>
           )}
         </div>
@@ -221,42 +224,52 @@ export default function SplitWorkspace() {
             )}
             {pdf && (
               <>
-                <div className="mode-switch" role="group" aria-label="拆分方式">
-                  <button
-                    className={mode === "custom" ? "active" : ""}
-                    onClick={() => {
-                      setMode("custom");
-                      setMessage("");
-                    }}
-                    aria-pressed={mode === "custom"}
-                  >
-                    <PublicIcon name="scissors" size={17} /> 自選頁面
-                  </button>
-                  <button
-                    className={mode === "every" ? "active" : ""}
-                    onClick={() => {
-                      setMode("every");
-                      setMessage("");
-                    }}
-                    aria-pressed={mode === "every"}
-                  >
-                    <PublicIcon name="files" size={17} /> 每頁一檔
-                  </button>
-                </div>
+                <RubberSegment
+                  className="split-mode-segment"
+                  aria-label="拆分方式"
+                  items={[
+                    {
+                      value: "custom",
+                      label: "自選頁面",
+                      icon: <PublicIcon name="scissors" size={17} />,
+                    },
+                    {
+                      value: "every",
+                      label: "每頁一檔",
+                      icon: <PublicIcon name="files" size={17} />,
+                    },
+                  ]}
+                  value={mode}
+                  onChange={(_, index) => {
+                    setMode(index === 0 ? "custom" : "every");
+                    setMessage("");
+                  }}
+                  trackColor="#111215"
+                  thumbColor="#383a40"
+                  textColor="#f0f0f1"
+                  activeTextColor="#f0f0f1"
+                  size="md"
+                  radius={10}
+                  inset={3}
+                  equalSlots
+                  draggable
+                />
                 {mode === "custom" && (
                   <div className="page-tools">
                     <div className="range-form">
-                      <label htmlFor="page-range">快速選取頁碼</label>
                       <div>
-                        <input
+                        <TextField
                           id="page-range"
+                          className="page-range-field"
+                          label="快速選取頁碼"
+                          variant="outlined"
+                          size="small"
+                          slotProps={{ inputLabel: { shrink: true } }}
                           value={rangeInput}
                           onChange={(event) =>
                             setRangeInput(event.target.value)
                           }
-                          onKeyDown={(
-                            event: KeyboardEvent<HTMLInputElement>
-                          ) => {
+                          onKeyDown={(event) => {
                             if (event.key === "Enter") applyRange();
                           }}
                           placeholder="例如 1-3, 5, 8"
@@ -337,6 +350,11 @@ export default function SplitWorkspace() {
               <PublicIcon name="plus" size={18} /> 將{" "}
               <Counter value={selected.length} /> 頁加入新檔案
             </button>
+            {groups.length > 0 && (
+              <div className="group-name-hint" id="split-name-hint">
+                檔名可自訂，留空時使用預設名稱。
+              </div>
+            )}
             <div className="group-list">
               {groups.length === 0 ? (
                 <div className="empty-groups">
@@ -347,40 +365,79 @@ export default function SplitWorkspace() {
               ) : (
                 groups.map((group, index) => (
                   <div className="group-card" key={group.id}>
-                    <div className="group-number">
-                      <Counter value={index + 1} minimumIntegerDigits={2} />
-                    </div>
-                    <div className="group-details">
-                      <input
-                        value={group.name}
-                        onChange={(event) =>
-                          setGroups((current) =>
-                            current.map((entry) =>
-                              entry.id === group.id
-                                ? { ...entry, name: event.target.value }
-                                : entry
-                            )
-                          )
-                        }
-                        aria-label={`第 ${index + 1} 份檔案名稱`}
-                      />
-                      <span>
+                    <div className="group-card-heading">
+                      <span className="group-number">
+                        <Counter value={index + 1} minimumIntegerDigits={2} />
+                      </span>
+                      <strong className="group-label">{group.name}</strong>
+                      <span className="group-page-summary">
                         <Counter value={group.pages.length} /> 頁 ·{" "}
                         {group.pages.join(", ")}
                       </span>
+                      <button
+                        className="icon-button icon-button--danger"
+                        onClick={() =>
+                          setGroups((current) =>
+                            current.filter((entry) => entry.id !== group.id)
+                          )
+                        }
+                        disabled={processing}
+                        aria-label={`移除 ${group.filename?.trim() || group.name}`}
+                      >
+                        <PublicIcon name="trash" size={16} />
+                      </button>
                     </div>
-                    <button
-                      className="icon-button icon-button--danger"
-                      onClick={() =>
-                        setGroups((current) =>
-                          current.filter((entry) => entry.id !== group.id)
-                        )
+                    <TextField
+                      id={`split-group-filename-${group.id}`}
+                      className="filename-field split-group-filename"
+                      label="輸出檔名"
+                      variant="outlined"
+                      fullWidth
+                      value={
+                        group.filename ??
+                        `${fileStem(file?.name ?? "document.pdf")}-${group.name}`
                       }
+                      onFocus={(event) => event.currentTarget.select()}
+                      onChange={(event) => {
+                        const filename = event.target.value.replace(
+                          /\.pdf$/i,
+                          ""
+                        );
+                        setGroups((current) =>
+                          current.map((entry) =>
+                            entry.id === group.id
+                              ? { ...entry, filename }
+                              : entry
+                          )
+                        );
+                      }}
+                      onBlur={(event) => {
+                        if (event.currentTarget.value.trim()) return;
+                        setGroups((current) =>
+                          current.map((entry) =>
+                            entry.id === group.id
+                              ? { ...entry, filename: undefined }
+                              : entry
+                          )
+                        );
+                      }}
                       disabled={processing}
-                      aria-label={`移除 ${group.name}`}
-                    >
-                      <PublicIcon name="trash" size={16} />
-                    </button>
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end" disableTypography>
+                              .pdf
+                            </InputAdornment>
+                          ),
+                        },
+                        htmlInput: {
+                          "aria-label": `第 ${index + 1} 份輸出檔名`,
+                          "aria-describedby": "split-name-hint",
+                          autoComplete: "off",
+                          spellCheck: false,
+                        },
+                      }}
+                    />
                   </div>
                 ))
               )}
@@ -424,9 +481,6 @@ export default function SplitWorkspace() {
             : outputCount > 1
               ? "下載 ZIP 檔"
               : "下載 PDF"}
-          {!processing && (
-            <PublicIcon name="arrow-narrow-up-dashed" size={17} rotate={90} />
-          )}
         </button>
         <p className="encryption-note">
           若原檔只有編輯權限限制，輸出檔不會保留原加密設定。

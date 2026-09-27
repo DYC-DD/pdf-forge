@@ -8,19 +8,10 @@
     max-width: 59%;
   }
 }
-@media (max-width: 900px) {
-  .app-shell {
-    width: min(100% - 48px, 1440px);
-  }
+@media (max-width: 1000px) {
   .hero {
     flex-direction: column;
     align-items: stretch;
-  }
-  .workspace-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .workspace-main {
-    min-height: 0;
   }
   .hero-art {
     position: relative;
@@ -39,6 +30,22 @@
   }
   .hero-copy {
     max-width: 100%;
+  }
+}
+@media (min-width: 901px) and (max-width: 1099px) {
+  .workspace-grid {
+    min-height: 593px;
+  }
+}
+@media (max-width: 900px) {
+  .app-shell {
+    width: min(100% - 48px, 1440px);
+  }
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-main {
+    min-height: 0;
   }
 }
 @media (max-width: 650px) {
@@ -100,23 +107,22 @@
   .tool-section {
     margin-top: 37px;
   }
-  .tool-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tool-tab:last-child {
-    grid-column: 1 / -1;
-  }
   .tool-tab {
-    min-height: 95px;
-    padding: 14px;
-    gap: 11px;
+    min-height: 88px;
+    padding: 12px;
+    gap: 9px;
   }
   .tool-tab-icon {
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
   }
   .tool-tab-copy strong {
     font-size: 17px;
+  }
+  .tool-tab-copy small {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
   }
   .tool-tab-copy > span {
     display: none;
@@ -143,12 +149,13 @@
     font-size: 23px;
   }
   .tool-nav {
+    grid-template-columns: minmax(0, 1fr);
     gap: 9px;
   }
   .tool-tab {
-    min-height: 88px;
-    gap: 9px;
-    padding: 11px;
+    min-height: 72px;
+    gap: 11px;
+    padding: 12px 14px;
     border-radius: 12px;
   }
   .tool-tab-icon {
@@ -161,10 +168,10 @@
     height: 20px;
   }
   .tool-tab-copy small {
-    font-size: 8px;
+    font-size: 10px;
   }
   .tool-tab-copy strong {
-    font-size: 15px;
+    font-size: 16px;
   }
   .workspace {
     margin-top: 14px;
@@ -230,7 +237,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .range-form input {
+  .range-form .page-range-field.MuiFormControl-root {
     width: 100%;
   }
   .selection-actions {
@@ -282,6 +289,12 @@
   }
 }
 @media (max-width: 355px) {
+  .hero p {
+    font-size: 14px;
+  }
+  .hero p br {
+    display: none;
+  }
   .hero-art {
     height: 254px;
   }

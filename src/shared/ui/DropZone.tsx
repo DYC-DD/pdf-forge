@@ -44,8 +44,8 @@ export default function DropZone({
       <DotGrid
         dotSize={2}
         gap={12}
-        baseColor="#2F293A"
-        activeColor="#5227FF"
+        baseColor="#34363B"
+        activeColor="#809ACC"
         proximity={120}
         shockRadius={250}
         shockStrength={5}

@@ -168,19 +168,19 @@ export default function MergeWorkspace() {
           </div>
           {items.length > 0 && (
             <div className="file-list-actions">
+              <span className="count-badge">
+                <Counter value={items.length} /> 份檔案
+              </span>
               <button
                 type="button"
                 className="clear-files-button"
                 onClick={clearFiles}
                 disabled={busy}
-                aria-label="清除全部 PDF"
+                aria-label="清除 PDF"
               >
                 <PublicIcon name="trash" size={15} />
-                清除全部
+                清除
               </button>
-              <span className="count-badge">
-                <Counter value={items.length} /> 份檔案
-              </span>
             </div>
           )}
         </div>
@@ -302,14 +302,10 @@ export default function MergeWorkspace() {
         >
           <PublicIcon name="download" size={18} />
           {processing ? `處理中 ${progress}/${items.length}` : "合併並下載 PDF"}
-          {!processing && (
-            <PublicIcon name="arrow-narrow-up-dashed" size={17} rotate={90} />
-          )}
         </button>
         <p className="encryption-note">
           若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
         </p>
-        {!canMerge && <p className="helper-text">請加入至少兩份有效的 PDF。</p>}
         {message && (
           <p
             className={`status-message ${
