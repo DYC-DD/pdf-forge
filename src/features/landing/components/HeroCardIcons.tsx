@@ -23,6 +23,10 @@ export function ScissorsIcon(props: HeroCardIconProps) {
   return <HeroCardIcon name="scissors" {...props} />;
 }
 
+export function CompressIcon(props: HeroCardIconProps) {
+  return <HeroCardIcon name="compress" {...props} />;
+}
+
 export function ShieldCheckIcon(props: HeroCardIconProps) {
   return <HeroCardIcon name="shield-check" {...props} />;
 }

@@ -8,6 +8,7 @@
 @import "../features/merge/styles/merge.css";
 @import "./styles/output.css";
 @import "../features/split/styles/split.css";
+@import "../features/compress/styles/compress.css";
 @import "./styles/footer.css";
 @import "./styles/midnight.css";
 @import "./styles/pdf-preview.css";

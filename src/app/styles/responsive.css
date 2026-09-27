@@ -58,23 +58,23 @@
     width: 480px;
     height: 320px;
   }
-  .hero-flip-card--back {
+  .hero-flip-card--right {
     top: 57px;
     left: 250px;
     --card-rotate: 10deg;
   }
-  .hero-flip-card--middle {
+  .hero-flip-card--left {
     top: 57px;
     left: 20px;
     --card-rotate: -10deg;
   }
-  .hero-flip-card--front {
+  .hero-flip-card--center {
     top: 22px;
     left: 125px;
   }
   .art-float-field--bottom-right {
     right: -40px;
-    bottom: -10px;
+    bottom: -80px;
   }
   .art-float-field--top-left {
     left: -25px;
@@ -99,6 +99,12 @@
   }
   .tool-section {
     margin-top: 37px;
+  }
+  .tool-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tool-tab:last-child {
+    grid-column: 1 / -1;
   }
   .tool-tab {
     min-height: 95px;

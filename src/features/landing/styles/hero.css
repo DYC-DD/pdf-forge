@@ -113,20 +113,20 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.hero-flip-card--back {
+.hero-flip-card--right {
   top: 68px;
   left: 350px;
   --card-rotate: 15deg;
   --card-delay: 0.1s;
 }
-.hero-flip-card--middle {
+.hero-flip-card--left {
   top: 68px;
   left: 20px;
   z-index: 2;
   --card-rotate: -15deg;
   --card-delay: 0.2s;
 }
-.hero-flip-card--front {
+.hero-flip-card--center {
   top: 40px;
   left: 175px;
   width: 250px;
@@ -212,16 +212,16 @@
   box-shadow: 0 24px 35px #0b153551;
 }
 .art-sheet--merge {
+  background: #e9edf8;
+  color: #304b82;
+}
+.art-sheet--split {
   background: #b7c5e0;
   color: #476395;
 }
-.art-sheet--split {
+.art-sheet--compress {
   background: #879ac9;
   color: #eef3ff;
-}
-.art-sheet--ready {
-  background: #e9edf8;
-  color: #304b82;
 }
 .art-card-top {
   display: flex;
@@ -249,6 +249,7 @@
 .art-merge-visual {
   height: 128px;
   margin-top: 23px;
+  align-self: center;
 }
 .art-merge-papers {
   position: relative;
@@ -309,6 +310,41 @@
   border-radius: 5px;
   background: #dce7fa;
 }
+.art-compress-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: flex-end;
+  gap: 10px;
+  width: 125px;
+  margin-top: 25px;
+}
+.art-compress-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 86px;
+  height: 105px;
+  border: 1px solid #eaf0ffb0;
+  border-radius: 10px;
+  background: #e4ebfb;
+  box-shadow: 0 8px 15px #40598545;
+  color: #506bb2;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+.art-compress-size {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #dfe8f9;
+  color: #4967ac;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
 .art-split-visual {
   display: grid;
   align-self: flex-end;
@@ -351,67 +387,29 @@
   font-weight: 650;
   opacity: 0.75;
 }
-.art-ready-symbol {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 78px;
-  height: 78px;
-  margin-top: 28px;
-  border-radius: 18px;
-  background: #dbe4f9;
-  color: #596fdb;
+.art-card-caption--right {
+  align-items: flex-end;
+  text-align: right;
 }
-.art-ready-symbol span {
-  position: absolute;
-  right: -7px;
-  bottom: -6px;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 2px solid #e9edf8;
-  border-radius: 50%;
-  background: #c8ead8;
-  color: #27895e;
+.art-card-caption--center {
+  gap: 6px;
+  margin-top: 17px;
 }
-.art-ready-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 19px;
-}
-.art-ready-copy strong {
+.art-card-caption--center strong {
   color: #2e477e;
-  font-size: 19px;
-  font-weight: 850;
-  letter-spacing: -0.055em;
+  font-size: 21px;
 }
-.art-ready-copy span {
+.art-card-caption--center span {
   color: #798eb7;
   font-size: 11px;
-  font-weight: 650;
+  opacity: 1;
 }
-.art-ready-progress {
-  display: flex;
-  gap: 5px;
-  height: 6px;
-  margin-top: auto;
-}
-.art-ready-progress span {
-  flex: 1;
-  border-radius: 999px;
-  background: #9cafe9;
-}
-.art-ready-progress span:last-child {
-  background: #6e84e4;
-}
-.art-ready-footer {
+.art-merge-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 5px;
-  margin-top: 12px;
+  margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid #d5dff0;
   color: #6078a9;
@@ -420,12 +418,12 @@
   letter-spacing: 0.07em;
   white-space: nowrap;
 }
-.art-ready-footer span:first-child {
+.art-merge-footer span:first-child {
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.art-ready-footer .hero-card-icon {
+.art-merge-footer .hero-card-icon {
   color: #3da274;
 }
 .art-sheet--reverse {
@@ -435,8 +433,8 @@
 .art-sheet--reverse-split {
   background: #adbee0;
 }
-.art-sheet--reverse-ready {
-  background: #e5ebf8;
+.art-sheet--reverse-compress {
+  background: #adbee0;
 }
 .art-reverse-icon {
   display: grid;
@@ -495,7 +493,7 @@
 }
 .art-float-field--bottom-right {
   right: -70px;
-  bottom: 8px;
+  bottom: -50px;
 }
 .dodge-field__mover {
   display: inline-grid;

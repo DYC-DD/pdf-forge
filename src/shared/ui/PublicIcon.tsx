@@ -6,6 +6,7 @@ export type PublicIconName =
   | "check"
   | "checks"
   | "cloud-off"
+  | "compress"
   | "download"
   | "eye"
   | "file-type-pdf"

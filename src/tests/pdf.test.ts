@@ -2,6 +2,10 @@ import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
+import {
+  compressPdfBytes,
+  compressPdfWithDetails,
+} from "../features/compress/lib/compressPdfBytes";
 import { mergePdfs } from "../features/merge/lib/mergePdfs";
 import { parsePageRange } from "../features/split/lib/parsePageRange";
 import { splitPdf } from "../features/split/lib/splitPdf";
@@ -91,5 +95,54 @@ describe("PDF output", () => {
     const result = await PDFDocument.load(await output.blob.arrayBuffer());
     expect(result.getPageCount()).toBe(1);
     expect(result.isEncrypted).toBe(false);
+  });
+});
+
+describe("PDF compression", () => {
+  const wasmPath = new URL(
+    "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
+    import.meta.url
+  ).pathname;
+
+  it.each(["low", "medium", "high"] as const)(
+    "%s mode makes an inefficient PDF smaller while retaining its pages",
+    async (mode) => {
+      const source = await PDFDocument.create();
+      for (let index = 0; index < 40; index += 1) {
+        source.addPage([200 + index, 300]);
+      }
+      const input = new Uint8Array(
+        await source.save({ useObjectStreams: false })
+      );
+      const output = await compressPdfBytes(input, mode, wasmPath);
+      const compressed = await PDFDocument.load(output);
+
+      expect(output.length).toBeLessThan(input.length);
+      expect(compressed.getPages().map((page) => page.getWidth())).toEqual(
+        source.getPages().map((page) => page.getWidth())
+      );
+    }
+  );
+
+  it("compresses an owner-restricted PDF and removes its encryption", async () => {
+    const input = Uint8Array.from(atob(restrictedPdfBase64), (character) =>
+      character.charCodeAt(0)
+    );
+    const output = await compressPdfBytes(input, "low", wasmPath);
+    const compressed = await PDFDocument.load(output);
+
+    expect(compressed.getPageCount()).toBe(1);
+    expect(compressed.isEncrypted).toBe(false);
+  });
+
+  it("reports structural compression when a text-only PDF has no smaller image candidate", async () => {
+    const source = await PDFDocument.create();
+    source.addPage([300, 300]).drawText("Searchable text");
+    const input = new Uint8Array(await source.save());
+
+    const result = await compressPdfWithDetails(input, "high", wasmPath);
+
+    expect(result.appliedMode).toBe("low");
+    expect((await PDFDocument.load(result.bytes)).getPageCount()).toBe(1);
   });
 });

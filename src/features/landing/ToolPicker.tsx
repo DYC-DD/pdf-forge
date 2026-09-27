@@ -1,13 +1,35 @@
 import PublicIcon from "../../shared/ui/PublicIcon";
 
-export type Tool = "merge" | "split";
+export type Tool = "merge" | "split" | "compress";
 
 type ToolPickerProps = {
   tool: Tool;
   onSelect: (tool: Tool) => void;
+  hrefForTool: (tool: Tool) => string;
 };
 
-export default function ToolPicker({ tool, onSelect }: ToolPickerProps) {
+export default function ToolPicker({
+  tool,
+  onSelect,
+  hrefForTool,
+}: ToolPickerProps) {
+  function handleSelect(
+    event: React.MouseEvent<HTMLAnchorElement>,
+    nextTool: Tool
+  ) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    onSelect(nextTool);
+  }
+
   return (
     <section className="tool-section" aria-labelledby="tool-heading">
       <div className="section-heading">
@@ -18,11 +40,11 @@ export default function ToolPicker({ tool, onSelect }: ToolPickerProps) {
         </div>
       </div>
       <nav className="tool-nav" aria-label="PDF 工具">
-        <button
-          type="button"
+        <a
+          href={hrefForTool("merge")}
           className={tool === "merge" ? "tool-tab active" : "tool-tab"}
-          onClick={() => onSelect("merge")}
-          aria-pressed={tool === "merge"}
+          onClick={(event) => handleSelect(event, "merge")}
+          aria-current={tool === "merge" ? "page" : undefined}
           aria-controls="merge-panel"
         >
           <span className="tool-tab-icon">
@@ -38,12 +60,12 @@ export default function ToolPicker({ tool, onSelect }: ToolPickerProps) {
             size={20}
             className="tool-tab-arrow"
           />
-        </button>
-        <button
-          type="button"
+        </a>
+        <a
+          href={hrefForTool("split")}
           className={tool === "split" ? "tool-tab active" : "tool-tab"}
-          onClick={() => onSelect("split")}
-          aria-pressed={tool === "split"}
+          onClick={(event) => handleSelect(event, "split")}
+          aria-current={tool === "split" ? "page" : undefined}
           aria-controls="split-panel"
         >
           <span className="tool-tab-icon">
@@ -59,7 +81,28 @@ export default function ToolPicker({ tool, onSelect }: ToolPickerProps) {
             size={20}
             className="tool-tab-arrow"
           />
-        </button>
+        </a>
+        <a
+          href={hrefForTool("compress")}
+          className={tool === "compress" ? "tool-tab active" : "tool-tab"}
+          onClick={(event) => handleSelect(event, "compress")}
+          aria-current={tool === "compress" ? "page" : undefined}
+          aria-controls="compress-panel"
+        >
+          <span className="tool-tab-icon">
+            <PublicIcon name="compress" size={25} />
+          </span>
+          <span className="tool-tab-copy">
+            <small>03 / COMPRESS</small>
+            <strong>壓縮 PDF</strong>
+            <span>縮小檔案，維持清晰品質。</span>
+          </span>
+          <PublicIcon
+            name="arrow-up-right"
+            size={20}
+            className="tool-tab-arrow"
+          />
+        </a>
       </nav>
     </section>
   );
