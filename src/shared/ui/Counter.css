@@ -1,0 +1,30 @@
+.rolling-counter,
+.rolling-counter-display {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+}
+
+.rolling-counter-display {
+  overflow: hidden;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rolling-counter-digit {
+  position: relative;
+  display: inline-block;
+  width: 1ch;
+  height: 1em;
+}
+
+.rolling-counter-number {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.rolling-counter-decimal {
+  align-self: flex-end;
+}

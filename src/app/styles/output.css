@@ -1,0 +1,138 @@
+.output-card {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 25px 27px;
+  border-color: #d9e2fc;
+  background: #f1f4ff;
+}
+.output-card > p {
+  margin-bottom: 23px;
+}
+.output-card > .encryption-note {
+  margin-top: auto !important;
+  margin-bottom: 0;
+  padding-top: 14px;
+}
+.output-card > .status-message {
+  margin-bottom: 0;
+}
+.output-stats {
+  margin-bottom: 23px;
+  padding: 5px 0;
+  border-top: 1px solid #d9e1f5;
+  border-bottom: 1px solid #d9e1f5;
+}
+.output-stats div,
+.output-count {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.output-card:not(.compress-output-card) .output-stats > div {
+  padding: 14px 0;
+}
+.output-stats > div > span,
+.output-count > span {
+  color: #65738d;
+}
+.output-stats strong,
+.output-count strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+.output-stats strong {
+  white-space: nowrap;
+}
+.field-label {
+  display: block;
+  margin-bottom: 9px;
+  color: #354565;
+  font-size: 12px;
+  font-weight: 750;
+}
+.filename-field.MuiFormControl-root {
+  margin-bottom: 17px;
+}
+.filename-field .MuiInputLabel-root {
+  color: #d2d3d7;
+  font-family: inherit;
+  font-size: 18px;
+}
+.filename-field .MuiInputLabel-root.Mui-focused {
+  color: #c3d0ed;
+}
+.filename-field .MuiOutlinedInput-root {
+  min-height: 48px;
+  border-radius: 9px;
+  background: #111215;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+.filename-field .MuiOutlinedInput-notchedOutline {
+  border-color: #4a4c52;
+}
+.filename-field .MuiOutlinedInput-notchedOutline legend {
+  font-size: 13.5px;
+}
+.filename-field .MuiOutlinedInput-root.Mui-focused {
+  background: #191a1e;
+}
+.filename-field
+  .MuiOutlinedInput-root.Mui-focused
+  .MuiOutlinedInput-notchedOutline {
+  border-color: #7d90b5;
+  border-width: 1px;
+}
+.filename-field .MuiInputBase-input {
+  padding: 13px 14px;
+  font-family: "Google Sans Code", monospace;
+}
+.filename-field .MuiInputBase-input:focus-visible {
+  outline: none;
+}
+.filename-field .MuiInputBase-input::placeholder {
+  color: #9a9ca3;
+  opacity: 1;
+}
+.filename-field .MuiInputAdornment-root {
+  color: #b6b7bc;
+  font-family: "Google Sans Code", monospace;
+  font-size: 13px;
+}
+.filename-field .Mui-disabled {
+  -webkit-text-fill-color: #a5a6ab;
+}
+.output-card .button--accent {
+  min-height: 48px;
+}
+.output-preview-button {
+  margin-bottom: 14px;
+}
+.helper-text {
+  margin: 11px 0 0 !important;
+  text-align: center;
+  font-size: 12px !important;
+}
+.encryption-note {
+  margin-top: 14px !important;
+  text-align: center;
+  color: #748199 !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+}
+.status-message {
+  margin-top: 13px !important;
+  padding: 11px 12px;
+  border-radius: 8px;
+  background: #fff0ee;
+  color: #b84f4a !important;
+  font-size: 12px !important;
+}
+.status-message--success {
+  background: #e5f7eb;
+  color: #207b4e !important;
+}

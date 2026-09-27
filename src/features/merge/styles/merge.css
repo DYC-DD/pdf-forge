@@ -1,0 +1,117 @@
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  min-height: 88px;
+  gap: 14px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  touch-action: pan-y;
+}
+.file-row--dragging {
+  z-index: 5;
+  opacity: 0.9;
+  box-shadow: 0 13px 28px #1b31552e;
+}
+.file-row--error {
+  border-color: #e8aca4;
+}
+.file-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 0 1 auto;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.file-main:not(:disabled) {
+  cursor: zoom-in;
+}
+.file-main:disabled {
+  cursor: default;
+}
+.file-main:not(:disabled):hover .file-info strong {
+  color: var(--blue);
+}
+.file-index {
+  width: 23px;
+  flex: none;
+  color: #8d9ab2;
+  font-size: 12px;
+  font-weight: 800;
+}
+.file-preview {
+  display: grid;
+  place-items: center;
+  width: 47px;
+  height: 63px;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid #dce3f0;
+  border-radius: 4px 9px 4px 4px;
+  background: #f3f6fd;
+  color: #677cba;
+}
+.file-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.file-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 7px;
+  flex: 0 1 auto;
+}
+.row-drag-region {
+  min-width: 24px;
+  flex: 1 0 24px;
+  align-self: stretch;
+  cursor: grab;
+  touch-action: none;
+}
+.row-drag-region:active {
+  cursor: grabbing;
+}
+.file-info strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-info > span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-row--error .file-info > span {
+  color: #bd554f;
+}
+.row-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex: none;
+}
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}

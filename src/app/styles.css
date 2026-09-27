@@ -1,0 +1,16 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght,MONO@0,300..800,1;1,300..800,1&display=swap");
+@import "./styles/base.css";
+@import "./styles/shell.css";
+@import "./styles/header.css";
+@import "../features/landing/styles/hero.css";
+@import "../features/landing/styles/tool-picker.css";
+@import "./styles/workspace.css";
+@import "../features/merge/styles/merge.css";
+@import "./styles/output.css";
+@import "../features/split/styles/split.css";
+@import "../features/compress/styles/compress.css";
+@import "./styles/footer.css";
+@import "./styles/midnight.css";
+@import "./styles/pdf-preview.css";
+@import "./styles/responsive.css";
