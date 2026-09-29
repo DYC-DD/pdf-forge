@@ -306,6 +306,16 @@
   html {
     scroll-behavior: auto;
   }
+  .tool-section[data-reveal="waiting"]
+    :is(.section-kicker, .section-heading h2, .section-heading p, .tool-tab),
+  .workspace[data-reveal="waiting"] .workspace-card {
+    opacity: 1;
+  }
+  .tool-section
+    :is(.section-kicker, .section-heading h2, .section-heading p, .tool-tab),
+  .workspace .workspace-card {
+    animation: none;
+  }
   *,
   *::before,
   *::after {
@@ -313,6 +323,9 @@
     animation-duration: 0.01ms !important;
   }
   .hero-flip-card-entrance {
+    animation: none;
+  }
+  .art-float {
     animation: none;
   }
 }
