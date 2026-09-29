@@ -6,6 +6,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Added
 
+- 新增 main 分支的 PR 測試與建置檢查、每週依賴安全稽核，以及 npm 和 GitHub Actions 的每週 Dependabot 更新檢查；啟用 GitHub 依賴圖譜與 Dependabot alerts。
 - 工具選擇區的標題、說明與三張工具卡，以及工作區的左右面板加入依序淡入與輕微上移效果；切換工具時也會播放短暫進場動畫，直接開啟工具網址則立即顯示。
 - 首頁 PDF 卡片旁的三個浮動標籤加入依序淡入效果，並配合減少動態效果偏好。
 - 合併與拆分處理中可取消操作；拆分多份 PDF 時會顯示 ZIP 打包進度。
@@ -13,6 +14,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Changed
 
+- GitHub Pages 部署前會先執行測試與依賴安全稽核，檢查失敗時不會進入建置與部署。
 - 略微放慢工具選擇區與工作區的淡入速度。
 - 合併與拆分改由 Web Worker 執行，減少處理期間的介面卡頓；拆分單一 PDF 時不再載入 ZIP 函式庫。
 - 合併與拆分的預設上限調整為單檔 64 MB、600 頁；合併最多 30 份、總計 160 MB／900 頁；拆分最多輸出 100 份、累計複製 600 頁。
