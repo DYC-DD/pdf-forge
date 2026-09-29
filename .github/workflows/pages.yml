@@ -3,6 +3,11 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "README.md"
+      - "src/tests/**"
   workflow_dispatch:
 
 concurrency:
@@ -26,6 +31,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
