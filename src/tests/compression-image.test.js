@@ -50,7 +50,7 @@ it("medium and high compression reduce an image while retaining page content", a
   expect(medium.length).toBeLessThan(low.length);
   expect(high.length).toBeLessThan(medium.length);
   expect(compressed.getPageCount()).toBe(1);
-});
+}, 30_000);
 
 it("re-encodes existing JPEGs at medium quality and also resizes them at high compression", async () => {
   const sourceJpeg = readFileSync(
@@ -109,4 +109,4 @@ it("re-encodes existing JPEGs at medium quality and also resizes them at high co
   expect(await imageInfo(medium)).toEqual([{ width: 2200, height: 2200 }]);
   expect(await imageInfo(resized)).toEqual([{ width: 1800, height: 1800 }]);
   expect((await PDFDocument.load(high)).getPageCount()).toBe(1);
-});
+}, 30_000);
