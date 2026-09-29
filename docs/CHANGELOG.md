@@ -13,6 +13,8 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Changed
 
+- 依賴安全稽核及 npm、GitHub Actions 的 Dependabot 版本更新改為每月一次；例行更新 PR 改指向 develop，並加入 develop 的 PR 檢查。
+- 更新 lucide-react、Prettier、Vite、Vitest 與五個 GitHub Actions。
 - 略微放慢工具選擇區與工作區的淡入速度。
 - 合併與拆分改由 Web Worker 執行，減少處理期間的介面卡頓；拆分單一 PDF 時不再載入 ZIP 函式庫。
 - 合併與拆分的預設上限調整為單檔 64 MB、600 頁；合併最多 30 份、總計 160 MB／900 頁；拆分最多輸出 100 份、累計複製 600 頁。
