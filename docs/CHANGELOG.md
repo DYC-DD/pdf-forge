@@ -6,7 +6,24 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Added
 
-- 新增 main 分支的 PR 測試與建置檢查、每週依賴安全稽核，以及 npm 和 GitHub Actions 的每週 Dependabot 更新檢查；啟用 GitHub 依賴圖譜與 Dependabot alerts。
+- 工具選擇區的標題、說明與三張工具卡，以及工作區的左右面板加入依序淡入與輕微上移效果；切換工具時也會播放短暫進場動畫，直接開啟工具網址則立即顯示。
+- 首頁 PDF 卡片旁的三個浮動標籤加入依序淡入效果，並配合減少動態效果偏好。
+- 合併與拆分處理中可取消操作；拆分多份 PDF 時會顯示 ZIP 打包進度。
+- 合併與拆分新增檔案大小、頁數及輸出數量檢查，並在 README 條列處理上限。
+
+### Changed
+
+- 依賴安全稽核及 npm、GitHub Actions 的 Dependabot 版本更新改為每月一次；例行更新 PR 改指向 develop，並加入 develop 的 PR 檢查。
+- 更新 lucide-react、Prettier、Vite、Vitest 與五個 GitHub Actions。
+- 略微放慢工具選擇區與工作區的淡入速度。
+- 合併與拆分改由 Web Worker 執行，減少處理期間的介面卡頓；拆分單一 PDF 時不再載入 ZIP 函式庫。
+- 合併與拆分的預設上限調整為單檔 64 MB、600 頁；合併最多 30 份、總計 160 MB／900 頁；拆分最多輸出 100 份、累計複製 600 頁。
+- 改善拆分頁面選取與輸出群組的計數效能，減少大量頁面時的重複查找。
+
+## [1.0.0] - 2026-09-28
+
+### Added
+
 - 建立 Vite、React 與 TypeScript 的純前端 PDF 工作台，檔案在瀏覽器本機處理。
 - 支援匯入多份 PDF，透過拖曳或鍵盤操作調整順序後合併下載；提供首頁縮圖、頁數及檔案大小資訊。
 - 支援以頁面縮圖或頁碼範圍選取頁面，建立多個 PDF 輸出群組，並為各群組自訂輸出檔名。

@@ -504,14 +504,17 @@
 .art-float-field--top {
   top: -42px;
   right: 0;
+  --label-delay: 0.6s;
 }
 .art-float-field--top-left {
   top: 180px;
   left: -110px;
+  --label-delay: 0.75s;
 }
 .art-float-field--bottom-right {
   right: -70px;
   bottom: -50px;
+  --label-delay: 0.9s;
 }
 .dodge-field__mover {
   display: inline-grid;
@@ -534,6 +537,15 @@
   font-weight: 800;
   white-space: nowrap;
   pointer-events: none;
+  animation: hero-label-enter 0.5s ease-out var(--label-delay) both;
+}
+@keyframes hero-label-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .art-float--top {
   transform: rotate(6deg);

@@ -13,11 +13,18 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { fileStem, formatBytes, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
+import {
+  mergeInputError,
+  mergePageCountError,
+  pdfFileError,
+  pdfPageCountError,
+} from "../../shared/pdf/limits";
 import { inspectPdf } from "../../shared/pdf/preview";
+import { runMergePdfs } from "../../shared/pdf/runPdfOperation";
 import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
 import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
@@ -25,7 +32,6 @@ import OutputFilenameField from "../../shared/ui/OutputFilenameField";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import SortableFileRow from "./components/SortableFileRow";
-import { mergePdfs } from "./lib/mergePdfs";
 import type { MergeItem } from "./types";
 
 export default function MergeWorkspace() {
@@ -37,7 +43,10 @@ export default function MergeWorkspace() {
   const [previewProcessing, setPreviewProcessing] = useState(false);
   const [previewProgress, setPreviewProgress] = useState(0);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
   const busy = processing || previewProcessing;
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -45,10 +54,17 @@ export default function MergeWorkspace() {
 
   async function addFiles(files: File[]) {
     if (busy || files.length === 0) return;
-    const valid = files.filter((file) => /\.pdf$/i.test(file.name));
-    if (valid.length !== files.length) setMessage("已略過非 PDF 檔案。");
-    else setMessage("");
-    const added = valid.map((file): MergeItem => ({
+    const accepted: File[] = [];
+    let rejection = "";
+    for (const file of files) {
+      const error =
+        pdfFileError(file) ??
+        mergeInputError([...items.map((item) => item.file), ...accepted, file]);
+      if (error) rejection = error;
+      else accepted.push(file);
+    }
+    setMessage(rejection);
+    const added = accepted.map((file): MergeItem => ({
       id: crypto.randomUUID(),
       file,
       loading: true,
@@ -56,7 +72,7 @@ export default function MergeWorkspace() {
     setItems((current) => [...current, ...added]);
     for (const item of added) {
       try {
-        const info = await inspectPdf(item.file);
+        const info = await inspectPdf(item.file, pdfPageCountError);
         setItems((current) =>
           current.map((entry) =>
             entry.id === item.id ? { ...entry, ...info, loading: false } : entry
@@ -103,16 +119,26 @@ export default function MergeWorkspace() {
     setMessage("");
     setProgress(0);
     setProcessing(true);
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
-      const blob = await mergePdfs(
+      const blob = await runMergePdfs(
         items.map((item) => item.file),
-        setProgress
+        {
+          signal: controller.signal,
+          onProgress: setProgress,
+        }
       );
       saveBlob(blob, `${fileStem(outputName)}.pdf`);
       setMessage(`合併完成，已下載 ${formatBytes(blob.size)} 的 PDF。`);
     } catch (error) {
-      setMessage(fileError(error));
+      setMessage(
+        error instanceof Error && error.name === "AbortError"
+          ? "已取消合併。"
+          : fileError(error)
+      );
     } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
       setProcessing(false);
     }
   }
@@ -127,10 +153,15 @@ export default function MergeWorkspace() {
     setMessage("");
     setPreviewProgress(0);
     setPreviewProcessing(true);
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
-      const blob = await mergePdfs(
+      const blob = await runMergePdfs(
         items.map((item) => item.file),
-        setPreviewProgress
+        {
+          signal: controller.signal,
+          onProgress: setPreviewProgress,
+        }
       );
       setPreviewFile(
         new File([blob], `${fileStem(outputName)}.pdf`, {
@@ -138,8 +169,13 @@ export default function MergeWorkspace() {
         })
       );
     } catch (error) {
-      setMessage(fileError(error));
+      setMessage(
+        error instanceof Error && error.name === "AbortError"
+          ? "已取消預覽。"
+          : fileError(error)
+      );
     } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
       setPreviewProcessing(false);
     }
   }
@@ -149,8 +185,11 @@ export default function MergeWorkspace() {
     0
   );
   const originalBytes = items.reduce((sum, item) => sum + item.file.size, 0);
+  const pageLimitError = mergePageCountError(totalPages);
   const canMerge =
-    items.length >= 2 && items.every((item) => !item.loading && !item.error);
+    items.length >= 2 &&
+    !pageLimitError &&
+    items.every((item) => !item.loading && !item.error);
   const fileLabel = (id: string | number) =>
     items.find((item) => item.id === id)?.file.name ?? "檔案";
 
@@ -282,6 +321,11 @@ export default function MergeWorkspace() {
           defaultName="merged.pdf"
           placeholder="merged"
         />
+        {pageLimitError && (
+          <p className="status-message" role="status">
+            {pageLimitError}
+          </p>
+        )}
         <button
           className="button button--outline button--full output-preview-button"
           disabled={!canMerge || busy}
@@ -303,6 +347,15 @@ export default function MergeWorkspace() {
           <PublicIcon name="download" size={18} />
           {processing ? `處理中 ${progress}/${items.length}` : "合併並下載 PDF"}
         </button>
+        {busy && (
+          <button
+            type="button"
+            className="button button--outline button--full operation-cancel"
+            onClick={() => controllerRef.current?.abort()}
+          >
+            取消處理
+          </button>
+        )}
         <p className="encryption-note">
           若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
         </p>

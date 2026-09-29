@@ -54,11 +54,14 @@ export async function renderPageThumbnail(
 }
 
 export async function inspectPdf(
-  file: File
+  file: File,
+  validatePageCount?: (count: number) => string | null
 ): Promise<{ pageCount: number; thumbnail: string }> {
   const task = await openPdf(file);
   try {
     const pdf = await task.promise;
+    const error = validatePageCount?.(pdf.numPages);
+    if (error) throw new Error(error);
     return {
       pageCount: pdf.numPages,
       thumbnail: await renderPageThumbnail(pdf, 1, 116),

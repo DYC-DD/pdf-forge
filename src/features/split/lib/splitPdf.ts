@@ -1,20 +1,27 @@
 import { fileStem } from "../../../shared/files/file";
+import {
+  pdfFileError,
+  pdfPageCountError,
+  splitPlanError,
+} from "../../../shared/pdf/limits";
 import { loadPdfDocument } from "../../../shared/pdf/loadPdfDocument";
 import type { PageGroup, SplitOutput } from "../types";
 
 export async function splitPdf(
   file: File,
   groups: PageGroup[],
-  onProgress?: (done: number) => void
+  onProgress?: (done: number) => void,
+  onPackingProgress?: (percent: number) => void
 ): Promise<SplitOutput> {
   if (groups.length === 0) throw new Error("請先選擇至少一組頁面。");
-  const [{ PDFDocument }, { default: JSZip }] = await Promise.all([
-    import("pdf-lib"),
-    import("jszip"),
-  ]);
+  const inputError = pdfFileError(file) ?? splitPlanError(groups);
+  if (inputError) throw new Error(inputError);
+  const { PDFDocument } = await import("pdf-lib");
   const source = await loadPdfDocument(file);
+  const pageError = pdfPageCountError(source.getPageCount());
+  if (pageError) throw new Error(pageError);
   const stem = fileStem(file.name);
-  const zip = new JSZip();
+  const zip = groups.length > 1 ? new (await import("jszip")).default() : null;
   const usedNames = new Set<string>();
   let singlePdf: Uint8Array | undefined;
   let singleFilename: string | undefined;
@@ -23,7 +30,10 @@ export async function splitPdf(
     const group = groups[index];
     if (
       group.pages.length === 0 ||
-      group.pages.some((page) => page < 1 || page > source.getPageCount())
+      group.pages.some(
+        (page) =>
+          !Number.isInteger(page) || page < 1 || page > source.getPageCount()
+      )
     ) {
       throw new Error(`「${group.name}」的頁碼不正確。`);
     }
@@ -48,7 +58,9 @@ export async function splitPdf(
     if (groups.length === 1) {
       singlePdf = bytes;
       singleFilename = name;
-    } else zip.file(name, bytes);
+    } else if (zip) {
+      zip.file(name, bytes);
+    }
     onProgress?.(index + 1);
   }
 
@@ -59,12 +71,16 @@ export async function splitPdf(
       fileCount: 1,
     };
   }
+  if (!zip) throw new Error("無法建立拆分檔案。");
   return {
-    blob: await zip.generateAsync({
-      type: "blob",
-      compression: "STORE",
-      streamFiles: true,
-    }),
+    blob: await zip.generateAsync(
+      {
+        type: "blob",
+        compression: "STORE",
+        streamFiles: true,
+      },
+      ({ percent }) => onPackingProgress?.(Math.floor(percent))
+    ),
     filename: `${stem}-split.zip`,
     fileCount: groups.length,
   };

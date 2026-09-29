@@ -1,4 +1,5 @@
 import PublicIcon from "../../shared/ui/PublicIcon";
+import useScrollReveal from "../../shared/ui/useScrollReveal";
 
 export type Tool = "merge" | "split" | "compress";
 
@@ -6,13 +7,17 @@ type ToolPickerProps = {
   tool: Tool;
   onSelect: (tool: Tool) => void;
   hrefForTool: (tool: Tool) => string;
+  skipEntrance: boolean;
 };
 
 export default function ToolPicker({
   tool,
   onSelect,
   hrefForTool,
+  skipEntrance,
 }: ToolPickerProps) {
+  const { ref, reveal } = useScrollReveal<HTMLElement>(skipEntrance);
+
   function handleSelect(
     event: React.MouseEvent<HTMLAnchorElement>,
     nextTool: Tool
@@ -31,7 +36,12 @@ export default function ToolPicker({
   }
 
   return (
-    <section className="tool-section" aria-labelledby="tool-heading">
+    <section
+      className="tool-section"
+      aria-labelledby="tool-heading"
+      ref={ref}
+      data-reveal={reveal}
+    >
       <div className="section-heading">
         <div>
           <span className="section-kicker">START HERE</span>
