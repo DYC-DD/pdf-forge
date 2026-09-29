@@ -1,11 +1,18 @@
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fileStem, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
+import {
+  PDF_LIMITS,
+  pdfFileError,
+  pdfPageCountError,
+  splitPlanError,
+} from "../../shared/pdf/limits";
 import { openPdf } from "../../shared/pdf/preview";
+import { runSplitPdf } from "../../shared/pdf/runPdfOperation";
 import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
 import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
@@ -14,7 +21,6 @@ import PublicIcon from "../../shared/ui/PublicIcon";
 import RubberSegment from "../../shared/ui/RubberSegment";
 import PageThumbnail from "./components/PageThumbnail";
 import { parsePageRange } from "./lib/parsePageRange";
-import { splitPdf } from "./lib/splitPdf";
 import type { PageGroup } from "./types";
 
 export default function SplitWorkspace() {
@@ -29,8 +35,11 @@ export default function SplitWorkspace() {
   const [message, setMessage] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [packingProgress, setPackingProgress] = useState<number | null>(null);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
-  const taskRef = useRef<PDFDocumentLoadingTask | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
 
   useEffect(() => {
     if (!file) {
@@ -38,22 +47,30 @@ export default function SplitWorkspace() {
       return;
     }
     let cancelled = false;
+    let task: PDFDocumentLoadingTask | null = null;
+    const releaseTask = () => {
+      const current = task;
+      task = null;
+      if (current) void current.destroy();
+    };
     setLoading(true);
     setLoadError("");
     setPdf(null);
     openPdf(file)
-      .then((task) => {
+      .then(async (openedTask) => {
         if (cancelled) {
-          void task.destroy();
+          await openedTask.destroy();
           return;
         }
-        taskRef.current = task;
-        return task.promise;
-      })
-      .then((document) => {
-        if (document && !cancelled) setPdf(document);
+        task = openedTask;
+        const document = await openedTask.promise;
+        if (cancelled) return;
+        const error = pdfPageCountError(document.numPages);
+        if (error) throw new Error(error);
+        setPdf(document);
       })
       .catch((error) => {
+        releaseTask();
         if (!cancelled) setLoadError(fileError(error));
       })
       .finally(() => {
@@ -61,16 +78,16 @@ export default function SplitWorkspace() {
       });
     return () => {
       cancelled = true;
-      if (taskRef.current) void taskRef.current.destroy();
-      taskRef.current = null;
+      releaseTask();
     };
   }, [file]);
 
   function chooseFile(files: File[]) {
     if (processing || files.length === 0) return;
     const candidate = files[0];
-    if (!/\.pdf$/i.test(candidate.name)) {
-      setMessage("請選擇 PDF 檔案。");
+    const error = pdfFileError(candidate);
+    if (error) {
+      setMessage(error);
       return;
     }
     setFile(candidate);
@@ -93,6 +110,7 @@ export default function SplitWorkspace() {
     setRangeInput("");
     setMessage("");
     setProgress(0);
+    setPackingProgress(null);
   }
 
   function togglePage(page: number) {
@@ -142,11 +160,26 @@ export default function SplitWorkspace() {
           }))
         : groups;
     if (exportGroups.length === 0) return;
+    const planError =
+      pdfFileError(file) ??
+      pdfPageCountError(pdf.numPages) ??
+      splitPlanError(exportGroups);
+    if (planError) {
+      setMessage(planError);
+      return;
+    }
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setProcessing(true);
     setProgress(0);
+    setPackingProgress(null);
     setMessage("");
     try {
-      const result = await splitPdf(file, exportGroups, setProgress);
+      const result = await runSplitPdf(file, exportGroups, {
+        signal: controller.signal,
+        onProgress: setProgress,
+        onPackingProgress: setPackingProgress,
+      });
       saveBlob(result.blob, result.filename);
       setMessage(
         `完成！已下載 ${result.fileCount} 份 PDF${
@@ -154,8 +187,13 @@ export default function SplitWorkspace() {
         }。`
       );
     } catch (error) {
-      setMessage(fileError(error));
+      setMessage(
+        error instanceof Error && error.name === "AbortError"
+          ? "已取消拆分。"
+          : fileError(error)
+      );
     } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
       setProcessing(false);
     }
   }
@@ -164,6 +202,22 @@ export default function SplitWorkspace() {
     ? Array.from({ length: pdf.numPages }, (_, index) => index + 1)
     : [];
   const outputCount = mode === "every" ? (pdf?.numPages ?? 0) : groups.length;
+  const planError =
+    mode === "every" && pdf
+      ? pdf.numPages > PDF_LIMITS.splitFiles
+        ? `每頁一檔最多可輸出 ${PDF_LIMITS.splitFiles} 份 PDF；請改用自訂範圍。`
+        : null
+      : splitPlanError(groups);
+  const selectedPages = useMemo(() => new Set(selected), [selected]);
+  const groupCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const group of groups) {
+      for (const page of group.pages) {
+        counts.set(page, (counts.get(page) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [groups]);
 
   return (
     <div className="workspace-grid">
@@ -302,14 +356,12 @@ export default function SplitWorkspace() {
                       pdf={pdf}
                       pageNumber={pageNumber}
                       selected={
-                        mode === "every" || selected.includes(pageNumber)
+                        mode === "every" || selectedPages.has(pageNumber)
                       }
                       disabled={mode === "every"}
                       groupCount={
                         mode === "custom"
-                          ? groups.filter((group) =>
-                              group.pages.includes(pageNumber)
-                            ).length
+                          ? (groupCounts.get(pageNumber) ?? 0)
                           : 0
                       }
                       onToggle={() => {
@@ -467,9 +519,14 @@ export default function SplitWorkspace() {
             <Counter value={outputCount} /> 份 PDF
           </strong>
         </div>
+        {planError && (
+          <p className="status-message" role="status">
+            {planError}
+          </p>
+        )}
         <button
           className="button button--accent button--full"
-          disabled={!pdf || outputCount === 0 || processing}
+          disabled={!pdf || outputCount === 0 || processing || !!planError}
           onClick={(event) => {
             void handleExport();
             fireButtonConfetti(event.currentTarget);
@@ -477,11 +534,22 @@ export default function SplitWorkspace() {
         >
           <PublicIcon name="download" size={18} />
           {processing
-            ? `處理中 ${progress}/${outputCount}`
+            ? packingProgress === null
+              ? `處理中 ${progress}/${outputCount}`
+              : `建立 ZIP 中 ${packingProgress}%`
             : outputCount > 1
               ? "下載 ZIP 檔"
               : "下載 PDF"}
         </button>
+        {processing && (
+          <button
+            type="button"
+            className="button button--outline button--full operation-cancel"
+            onClick={() => controllerRef.current?.abort()}
+          >
+            取消處理
+          </button>
+        )}
         <p className="encryption-note">
           若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
         </p>

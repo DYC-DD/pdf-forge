@@ -112,6 +112,9 @@
 .output-preview-button {
   margin-bottom: 14px;
 }
+.operation-cancel {
+  margin-top: 10px;
+}
 .helper-text {
   margin: 11px 0 0 !important;
   text-align: center;
