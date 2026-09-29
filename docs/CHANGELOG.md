@@ -6,6 +6,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Added
 
+- 新增 main 分支的 PR 測試與建置檢查、每週依賴安全稽核，以及 npm 和 GitHub Actions 的每週 Dependabot 更新檢查；啟用 GitHub 依賴圖譜與 Dependabot alerts。
 - 建立 Vite、React 與 TypeScript 的純前端 PDF 工作台，檔案在瀏覽器本機處理。
 - 支援匯入多份 PDF，透過拖曳或鍵盤操作調整順序後合併下載；提供首頁縮圖、頁數及檔案大小資訊。
 - 支援以頁面縮圖或頁碼範圍選取頁面，建立多個 PDF 輸出群組，並為各群組自訂輸出檔名。
@@ -25,6 +26,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Changed
 
+- GitHub Pages 部署前會先執行測試與依賴安全稽核；只有 `.github/**`、`docs/**`、`README.md` 或 `src/tests/**` 檔案變更時不觸發部署。
 - 改善手機與平板版面：調整頁首、工作區欄數、上傳區及觸控操作尺寸。
 - 將應用程式依頁面外殼、合併與拆分功能、共用元件及 PDF 處理分層整理。
 - 合併與拆分現在可處理能以空使用者密碼開啟、但受擁有者密碼限制的 PDF；檔案會在瀏覽器內解鎖，輸出不保留原加密設定。真正需要開啟密碼的 PDF 仍會提示無法處理。
