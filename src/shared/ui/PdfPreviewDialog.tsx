@@ -224,6 +224,9 @@ export default function PdfPreviewDialog({
       className="pdf-preview-dialog"
       style={dialogStyle}
       aria-label={`${file.name} PDF 預覽`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();

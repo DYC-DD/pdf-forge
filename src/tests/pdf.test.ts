@@ -96,8 +96,33 @@ describe("PDF output", () => {
     expect(Object.keys(zip.files)).toEqual([
       "報告.pdf",
       "source-部分 2.pdf",
-      "報告-2.pdf",
+      "報告-1.pdf",
     ]);
+  });
+
+  it("keeps existing numbered filenames and every PDF when names collide", async () => {
+    const source = await makePdf("source.pdf", [101, 102, 103, 104]);
+    const output = await splitPdf(source, [
+      { id: "a", name: "部分 1", filename: "Report", pages: [1] },
+      { id: "b", name: "部分 2", filename: "report.PDF", pages: [2] },
+      { id: "c", name: "部分 3", filename: "REPORT-1", pages: [3] },
+      { id: "d", name: "部分 4", filename: "Report", pages: [4] },
+    ]);
+    const zip = await JSZip.loadAsync(await output.blob.arrayBuffer());
+
+    expect(Object.keys(zip.files)).toEqual([
+      "Report.pdf",
+      "report-2.pdf",
+      "REPORT-1.pdf",
+      "Report-3.pdf",
+    ]);
+    const widths = await Promise.all(
+      Object.values(zip.files).map(async (entry) => {
+        const pdf = await PDFDocument.load(await entry.async("uint8array"));
+        return pdf.getPage(0).getWidth();
+      })
+    );
+    expect(widths).toEqual([101, 102, 103, 104]);
   });
 
   it("splits a PDF whose editing is restricted by an owner password", async () => {
