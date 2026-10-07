@@ -1,6 +1,8 @@
-name: Pull request checks
+name: CI checks
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
