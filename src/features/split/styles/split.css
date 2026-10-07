@@ -44,21 +44,26 @@
   text-align: center;
   font-size: 13px;
 }
+.split-toolbar {
+  --split-control-height: 36px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
 .rubber-segment.split-mode-segment {
   display: grid;
   width: max-content;
-  margin-bottom: 20px;
+  height: var(--split-control-height);
+  flex: none;
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .split-mode-segment .rubber-segment__item {
+  height: calc(var(--split-control-height) - var(--rs-inset) * 2);
   font-weight: 750;
 }
-.page-tools {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+.split-toolbar--custom {
   margin-bottom: 18px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
@@ -77,13 +82,25 @@
 }
 .range-form > div {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+.range-form .button {
+  height: var(--split-control-height);
+  min-height: var(--split-control-height);
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+}
+.range-form .button:not(:disabled):hover {
+  transform: none;
 }
 .range-form .page-range-field.MuiFormControl-root {
   width: 165px;
+  height: var(--split-control-height);
 }
 .range-form .page-range-field .MuiOutlinedInput-root {
-  height: 36px;
+  height: var(--split-control-height);
   border-radius: 7px;
   background: #fff;
   color: var(--ink);
@@ -115,9 +132,12 @@
 .selection-actions {
   display: flex;
   align-items: center;
+  flex: none;
+  min-height: var(--split-control-height);
   gap: 12px;
-  padding-bottom: 4px;
+  margin-left: auto;
   font-size: 12px;
+  white-space: nowrap;
 }
 .selection-actions > span {
   color: #3d55c9;
