@@ -1,4 +1,5 @@
 import { fileStem } from "../../../shared/files/file";
+import { copyPagesWithForms } from "../../../shared/pdf/copyPagesWithForms";
 import {
   pdfFileError,
   pdfPageCountError,
@@ -39,12 +40,14 @@ export async function splitPdf(
       throw new Error(`「${group.name}」的頁碼不正確。`);
     }
     const output = await PDFDocument.create();
-    const pages = await output.copyPages(
+    await copyPagesWithForms(
       source,
+      output,
       group.pages.map((page) => page - 1)
     );
-    for (const page of pages) output.addPage(page);
-    const bytes = new Uint8Array(await output.save());
+    const bytes = new Uint8Array(
+      await output.save({ updateFieldAppearances: false })
+    );
     const name = `${group.filename}.pdf`;
     if (groups.length === 1) {
       singlePdf = bytes;

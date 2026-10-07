@@ -138,6 +138,8 @@ dist
 !.yarn/versions
 
 # Vite files
+# Generated PDF.js resources (copied from node_modules by vite.config.ts)
+public/pdfjs/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/

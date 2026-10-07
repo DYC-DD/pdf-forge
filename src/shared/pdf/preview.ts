@@ -3,13 +3,27 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 import { unlockPdfWithEmptyPassword } from "./unlockPdf";
 
-export async function openPdf(file: File) {
+export async function openPdf(file: File, maxImagePixels?: number) {
   const [{ getDocument, GlobalWorkerOptions }, buffer] = await Promise.all([
     import("pdfjs-dist"),
     file.arrayBuffer(),
   ]);
   GlobalWorkerOptions.workerSrc = workerUrl;
-  const task = getDocument({ data: new Uint8Array(buffer) });
+  const resourceBase = `${import.meta.env.BASE_URL}pdfjs/`;
+  const resourceOptions = {
+    cMapUrl: `${resourceBase}cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `${resourceBase}standard_fonts/`,
+    wasmUrl: `${resourceBase}wasm/`,
+    iccUrl: `${resourceBase}iccs/`,
+    maxImageSize: maxImagePixels,
+    canvasMaxAreaInBytes:
+      maxImagePixels === undefined ? undefined : maxImagePixels * 4,
+  };
+  const task = getDocument({
+    ...resourceOptions,
+    data: new Uint8Array(buffer),
+  });
   try {
     await task.promise;
     return task;
@@ -21,7 +35,10 @@ export async function openPdf(file: File) {
     )
       throw error;
     const bytes = await unlockPdfWithEmptyPassword(file);
-    const retry = getDocument({ data: new Uint8Array(bytes) });
+    const retry = getDocument({
+      ...resourceOptions,
+      data: new Uint8Array(bytes),
+    });
     try {
       await retry.promise;
       return retry;
@@ -39,7 +56,10 @@ export async function renderPageThumbnail(
 ): Promise<string> {
   const page = await pdf.getPage(pageNumber);
   const original = page.getViewport({ scale: 1 });
-  const viewport = page.getViewport({ scale: width / original.width });
+  // Unusual page aspect ratios must not create arbitrarily tall thumbnails.
+  const viewport = page.getViewport({
+    scale: Math.min(width / original.width, 2048 / original.height),
+  });
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.ceil(viewport.width));
   canvas.height = Math.max(1, Math.ceil(viewport.height));
@@ -55,9 +75,10 @@ export async function renderPageThumbnail(
 
 export async function inspectPdf(
   file: File,
-  validatePageCount?: (count: number) => string | null
+  validatePageCount?: (count: number) => string | null,
+  maxImagePixels?: number
 ): Promise<{ pageCount: number; thumbnail: string }> {
-  const task = await openPdf(file);
+  const task = await openPdf(file, maxImagePixels);
   try {
     const pdf = await task.promise;
     const error = validatePageCount?.(pdf.numPages);

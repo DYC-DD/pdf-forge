@@ -13,13 +13,25 @@ export const PDF_LIMITS = {
   splitCopiedPages: 600,
 } as const;
 
-export function pdfFileError(file: File): string | null {
-  if (!/\.pdf$/i.test(file.name)) return "請選擇 PDF 檔案。";
-  if (file.size === 0) return "這份 PDF 是空的。";
-  if (file.size > PDF_LIMITS.fileBytes) {
+export const COMPRESSION_LIMITS = {
+  timeoutMs: 120_000,
+  workingFileBytes: 128 * MiB,
+  imageEdge: 8192,
+  imagePixels: 16_000_000,
+  totalImagePixels: 64_000_000,
+} as const;
+
+export function pdfBytesError(size: number): string | null {
+  if (size === 0) return "這份 PDF 是空的。";
+  if (size > PDF_LIMITS.fileBytes) {
     return `單一 PDF 不可超過 ${PDF_LIMITS.fileBytes / MiB} MB。`;
   }
   return null;
+}
+
+export function pdfFileError(file: File): string | null {
+  if (!/\.pdf$/i.test(file.name)) return "請選擇 PDF 檔案。";
+  return pdfBytesError(file.size);
 }
 
 export function mergeInputError(files: readonly File[]): string | null {

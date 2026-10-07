@@ -1,11 +1,19 @@
 import type { CompressionMode } from "../types";
+import {
+  createImageBudget,
+  imagePixels,
+  jpegDimensions,
+  reserveImagePixels,
+  type ImageBudget,
+} from "./imageResources";
 
 const HIGH_MAX_IMAGE_EDGE = 1800;
 const MIN_JPEG_BYTES = 16_384;
 
 export async function recompressJpegImages(
   input: Uint8Array,
-  mode: Extract<CompressionMode, "medium" | "high">
+  mode: Extract<CompressionMode, "medium" | "high">,
+  budget: ImageBudget = createImageBudget()
 ): Promise<Uint8Array | null> {
   if (
     typeof OffscreenCanvas === "undefined" ||
@@ -69,10 +77,8 @@ export async function recompressJpegImages(
       !supportedColorSpace ||
       !(bits instanceof PDFNumber) ||
       bits.asNumber() !== 8 ||
-      !width ||
-      !height ||
-      !Number.isInteger(width) ||
-      !Number.isInteger(height) ||
+      width === undefined ||
+      height === undefined ||
       object.getContentsSize() < MIN_JPEG_BYTES ||
       dict.has(PDFName.of("SMask")) ||
       dict.has(PDFName.of("Mask")) ||
@@ -82,9 +88,21 @@ export async function recompressJpegImages(
       continue;
     }
 
+    const pixels = imagePixels(width, height);
+    if (pixels === null) continue;
+    const original = object.getContents();
+    const dimensions = jpegDimensions(original);
+    if (
+      !dimensions ||
+      dimensions.width !== width ||
+      dimensions.height !== height
+    )
+      continue;
+    if (!reserveImagePixels(budget, pixels)) continue;
+
     let bitmap: ImageBitmap | null = null;
+    let canvas: OffscreenCanvas | null = null;
     try {
-      const original = object.getContents();
       bitmap = await createImageBitmap(
         new Blob([new Uint8Array(original)], { type: "image/jpeg" })
       );
@@ -95,7 +113,7 @@ export async function recompressJpegImages(
       const scale = Math.min(1, maxEdge / Math.max(width, height));
       const targetWidth = Math.max(1, Math.round(width * scale));
       const targetHeight = Math.max(1, Math.round(height * scale));
-      const canvas = new OffscreenCanvas(targetWidth, targetHeight);
+      canvas = new OffscreenCanvas(targetWidth, targetHeight);
       const context = canvas.getContext("2d", { alpha: false });
       if (!context) continue;
       context.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
@@ -122,6 +140,10 @@ export async function recompressJpegImages(
       // Keep image streams that the browser cannot safely decode or re-encode.
     } finally {
       bitmap?.close();
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
     }
   }
 
