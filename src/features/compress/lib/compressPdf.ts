@@ -1,3 +1,4 @@
+import { COMPRESSION_LIMITS, pdfFileError } from "../../../shared/pdf/limits";
 import type {
   CompressionMode,
   CompressionWorkerRequest,
@@ -12,6 +13,8 @@ export function compressPdf(
   if (signal?.aborted) {
     return Promise.reject(new DOMException("壓縮已取消。", "AbortError"));
   }
+  const error = pdfFileError(file);
+  if (error) return Promise.reject(new Error(error));
 
   return new Promise((resolve, reject) => {
     const worker = new Worker(
@@ -21,12 +24,22 @@ export function compressPdf(
       }
     );
     let settled = false;
+    const timeout = setTimeout(
+      () =>
+        finish(
+          new Error(
+            "壓縮已超過 2 分鐘，已停止處理；請拆分檔案或改用低壓縮後重試。"
+          )
+        ),
+      COMPRESSION_LIMITS.timeoutMs
+    );
 
     function finish(
       result: { blob: Blob; appliedMode: CompressionMode } | Error
     ) {
       if (settled) return;
       settled = true;
+      clearTimeout(timeout);
       signal?.removeEventListener("abort", onAbort);
       worker.terminate();
       if (result instanceof Error) reject(result);
@@ -49,6 +62,12 @@ export function compressPdf(
       });
     };
     worker.onerror = () => finish(new Error("壓縮程序發生錯誤，請重試。"));
+    worker.onmessageerror = () =>
+      finish(new Error("無法接收壓縮結果，請重試。"));
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
 
     file
       .arrayBuffer()

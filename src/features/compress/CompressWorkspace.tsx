@@ -6,6 +6,11 @@ import { useEffect, useRef, useState } from "react";
 
 import { fileStem, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
+import {
+  COMPRESSION_LIMITS,
+  pdfFileError,
+  pdfPageCountError,
+} from "../../shared/pdf/limits";
 import { inspectPdf } from "../../shared/pdf/preview";
 import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
 import Counter, { ByteCounter } from "../../shared/ui/Counter";
@@ -57,7 +62,7 @@ export default function CompressWorkspace() {
     if (!file) return;
     let cancelled = false;
     setLoading(true);
-    inspectPdf(file)
+    inspectPdf(file, pdfPageCountError, COMPRESSION_LIMITS.imagePixels)
       .then((info) => {
         if (cancelled) return;
         setPageCount(info.pageCount);
@@ -79,8 +84,9 @@ export default function CompressWorkspace() {
   function chooseFile(files: File[]) {
     if (processing || files.length === 0) return;
     const chosen = files[0];
-    if (!/\.pdf$/i.test(chosen.name)) {
-      setMessage("請選擇 PDF 檔案。");
+    const error = pdfFileError(chosen);
+    if (error) {
+      setMessage(error);
       return;
     }
     setFile(chosen);
@@ -114,7 +120,8 @@ export default function CompressWorkspace() {
   }
 
   async function handleCompress() {
-    if (!file || pageCount === null || processing) return;
+    if (!file || pageCount === null || loading || loadError || processing)
+      return;
     const controller = new AbortController();
     controllerRef.current = controller;
     setProcessing(true);
@@ -142,7 +149,7 @@ export default function CompressWorkspace() {
           appliedMode === mode
             ? "壓縮完成，可以預覽或下載結果。"
             : appliedMode === "low"
-              ? "圖片處理沒有產生更小的結果；已採用 PDF 結構壓縮。"
+              ? "圖片不適用、超出處理限制或沒有產生更小的結果；已採用 PDF 結構壓縮。"
               : "高壓縮沒有比中壓縮更小；已採用較小的中壓縮結果。"
         );
       }
@@ -172,7 +179,7 @@ export default function CompressWorkspace() {
           <div>
             <div className="eyebrow">01 / 選擇檔案</div>
             <h2 id="compress-heading">讓 PDF 更輕巧</h2>
-            <p>加入一份 PDF，再選擇壓縮方式並查看結果。</p>
+            <p>加入一份 PDF（最多 64 MB、600 頁），再選擇壓縮方式。</p>
           </div>
           {file && (
             <div className="file-list-actions">
@@ -327,7 +334,13 @@ export default function CompressWorkspace() {
         <button
           type="button"
           className="button button--accent button--full"
-          disabled={!file || pageCount === null || processing}
+          disabled={
+            !file ||
+            pageCount === null ||
+            loading ||
+            Boolean(loadError) ||
+            processing
+          }
           onClick={handleCompress}
         >
           <PublicIcon name="compress" size={18} />
@@ -383,6 +396,7 @@ export default function CompressWorkspace() {
         <PdfPreviewDialog
           key={previewFile.name}
           file={previewFile}
+          maxImagePixels={COMPRESSION_LIMITS.imagePixels}
           onClose={() => setPreviewFile(null)}
         />
       )}

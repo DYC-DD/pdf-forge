@@ -52,6 +52,7 @@
   box-shadow: 0 8px 25px #1b31550a;
 }
 .workspace-main {
+  container: pdf-workspace / inline-size;
   min-height: 508px;
   padding: 31px;
 }
@@ -72,6 +73,15 @@
 .file-card-header {
   align-items: flex-end;
 }
+.file-card-header:has(.view-mode-toggle) {
+  flex-wrap: wrap;
+}
+.file-card-header:has(.view-mode-toggle) > :first-child {
+  flex: 1 1 280px;
+}
+.file-card-header:has(.view-mode-toggle) .file-list-actions {
+  margin-left: auto;
+}
 .file-list-actions {
   display: flex;
   flex-direction: column;
@@ -82,6 +92,11 @@
 }
 .file-list-actions .count-badge {
   margin-top: 0;
+}
+.file-list-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .clear-files-button {
   display: inline-flex;

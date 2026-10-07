@@ -1,4 +1,5 @@
 import { fileStem } from "../../../shared/files/file";
+import { copyPagesWithForms } from "../../../shared/pdf/copyPagesWithForms";
 import {
   pdfFileError,
   pdfPageCountError,
@@ -6,6 +7,7 @@ import {
 } from "../../../shared/pdf/limits";
 import { loadPdfDocument } from "../../../shared/pdf/loadPdfDocument";
 import type { PageGroup, SplitOutput } from "../types";
+import { resolveGroupFilenames } from "./resolveGroupFilenames";
 
 export async function splitPdf(
   file: File,
@@ -22,12 +24,12 @@ export async function splitPdf(
   if (pageError) throw new Error(pageError);
   const stem = fileStem(file.name);
   const zip = groups.length > 1 ? new (await import("jszip")).default() : null;
-  const usedNames = new Set<string>();
+  const outputGroups = resolveGroupFilenames(file.name, groups);
   let singlePdf: Uint8Array | undefined;
   let singleFilename: string | undefined;
 
   for (let index = 0; index < groups.length; index += 1) {
-    const group = groups[index];
+    const group = outputGroups[index];
     if (
       group.pages.length === 0 ||
       group.pages.some(
@@ -38,23 +40,15 @@ export async function splitPdf(
       throw new Error(`「${group.name}」的頁碼不正確。`);
     }
     const output = await PDFDocument.create();
-    const pages = await output.copyPages(
+    await copyPagesWithForms(
       source,
+      output,
       group.pages.map((page) => page - 1)
     );
-    for (const page of pages) output.addPage(page);
-    const bytes = new Uint8Array(await output.save());
-    const label = fileStem(group.name) || `part-${index + 1}`;
-    const baseName = group.filename?.trim()
-      ? fileStem(group.filename)
-      : `${stem}-${label}`;
-    let name = `${baseName}.pdf`;
-    let suffix = 2;
-    while (usedNames.has(name.toLowerCase())) {
-      name = `${baseName}-${suffix}.pdf`;
-      suffix += 1;
-    }
-    usedNames.add(name.toLowerCase());
+    const bytes = new Uint8Array(
+      await output.save({ updateFieldAppearances: false })
+    );
+    const name = `${group.filename}.pdf`;
     if (groups.length === 1) {
       singlePdf = bytes;
       singleFilename = name;

@@ -1,13 +1,18 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 
-import { renderPageThumbnail } from "../../../shared/pdf/preview";
+import {
+  renderPageThumbnail,
+  type PdfThumbnail,
+} from "../../../shared/pdf/preview";
 import Counter from "../../../shared/ui/Counter";
-import PublicIcon from "../../../shared/ui/PublicIcon";
+import PdfCollectionItem from "../../../shared/ui/PdfCollectionItem";
+import type { ViewMode } from "../../../shared/ui/useViewMode";
 
 export default function PageThumbnail({
   pdf,
   pageNumber,
+  viewMode,
   selected,
   disabled,
   groupCount,
@@ -16,6 +21,7 @@ export default function PageThumbnail({
 }: {
   pdf: PDFDocumentProxy;
   pageNumber: number;
+  viewMode: ViewMode;
   selected: boolean;
   disabled: boolean;
   groupCount: number;
@@ -24,7 +30,7 @@ export default function PageThumbnail({
 }) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  const [image, setImage] = useState<string>();
+  const [image, setImage] = useState<PdfThumbnail>();
 
   useEffect(() => {
     const element = anchorRef.current;
@@ -46,7 +52,7 @@ export default function PageThumbnail({
     if (!visible) return;
     let cancelled = false;
     setImage(undefined);
-    renderPageThumbnail(pdf, pageNumber, 156)
+    renderPageThumbnail(pdf, pageNumber)
       .then((result) => {
         if (!cancelled) setImage(result);
       })
@@ -59,50 +65,33 @@ export default function PageThumbnail({
   }, [pdf, pageNumber, visible]);
 
   return (
-    <div
-      ref={anchorRef}
-      className={`page-tile ${selected ? "page-tile--selected" : ""}`}
-    >
-      <button
-        type="button"
-        className="page-tile-select"
-        onClick={onToggle}
-        disabled={disabled}
-        aria-pressed={selected}
-        aria-label={`第 ${pageNumber} 頁${selected ? "，已選取" : ""}`}
-      >
-        <div className="page-image">
-          {image ? (
-            <img src={image} alt="" />
-          ) : (
-            <div className="page-skeleton">
-              <PublicIcon name="files" size={22} />
-            </div>
-          )}
-          <span className="selection-mark">
-            <PublicIcon name="check" size={15} />
-          </span>
-        </div>
-        <div className="page-caption">
-          <strong>
-            第 {visible ? <Counter value={pageNumber} /> : pageNumber} 頁
-          </strong>
-          {groupCount > 0 && (
-            <span>
-              已加入 {visible ? <Counter value={groupCount} /> : groupCount} 組
-            </span>
-          )}
-        </div>
-      </button>
-      <button
-        type="button"
-        className="page-preview-button"
-        onClick={onPreview}
-        aria-label={`預覽第 ${pageNumber} 頁`}
-        title="預覽頁面"
-      >
-        <PublicIcon name="eye" size={17} />
-      </button>
-    </div>
+    <PdfCollectionItem
+      rootRef={anchorRef}
+      viewMode={viewMode}
+      position={
+        visible ? (
+          <Counter value={pageNumber} minimumIntegerDigits={2} />
+        ) : (
+          String(pageNumber).padStart(2, "0")
+        )
+      }
+      thumbnail={image?.src}
+      thumbnailAspectRatio={image?.aspectRatio}
+      title={`第 ${pageNumber} 頁`}
+      titleStatus={disabled ? "每頁一檔" : selected ? "已選取" : "未選取"}
+      metadata={
+        groupCount > 0 ? (
+          <>已加入 {visible ? <Counter value={groupCount} /> : groupCount} 組</>
+        ) : undefined
+      }
+      activateLabel={`第 ${pageNumber} 頁${selected ? "，已選取" : ""}`}
+      activateTitle={selected ? "取消選取頁面" : "選取頁面"}
+      previewLabel={`預覽第 ${pageNumber} 頁`}
+      onActivate={onToggle}
+      onPreview={onPreview}
+      mainDisabled={disabled}
+      selected={selected}
+      readOnly={disabled}
+    />
   );
 }

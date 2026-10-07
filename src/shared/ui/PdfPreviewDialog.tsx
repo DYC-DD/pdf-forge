@@ -17,11 +17,13 @@ export default function PdfPreviewDialog({
   file,
   pdf,
   initialPage = 1,
+  maxImagePixels,
   onClose,
 }: {
   file: File;
   pdf?: PDFDocumentProxy;
   initialPage?: number;
+  maxImagePixels?: number;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -69,7 +71,7 @@ export default function PdfPreviewDialog({
 
     let cancelled = false;
     let task: PDFDocumentLoadingTask | undefined;
-    openPdf(file)
+    openPdf(file, maxImagePixels)
       .then(async (openedTask) => {
         task = openedTask;
         if (cancelled) {
@@ -90,7 +92,7 @@ export default function PdfPreviewDialog({
       cancelled = true;
       if (task) void task.destroy();
     };
-  }, [file, pdf]);
+  }, [file, pdf, maxImagePixels]);
 
   useEffect(() => {
     if (!documentPdf) return;
@@ -224,6 +226,9 @@ export default function PdfPreviewDialog({
       className="pdf-preview-dialog"
       style={dialogStyle}
       aria-label={`${file.name} PDF 預覽`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();

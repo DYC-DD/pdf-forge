@@ -1,3 +1,4 @@
+import { copyPagesWithForms } from "../../../shared/pdf/copyPagesWithForms";
 import {
   mergeInputError,
   mergePageCountError,
@@ -27,11 +28,13 @@ export async function mergePdfs(
     totalPages += source.getPageCount();
     const totalError = mergePageCountError(totalPages);
     if (totalError) throw new Error(totalError);
-    const pages = await output.copyPages(source, source.getPageIndices());
-    for (const page of pages) output.addPage(page);
+    await copyPagesWithForms(source, output, source.getPageIndices());
     onProgress?.(index + 1);
   }
-  return new Blob([new Uint8Array(await output.save())], {
-    type: "application/pdf",
-  });
+  return new Blob(
+    [new Uint8Array(await output.save({ updateFieldAppearances: false }))],
+    {
+      type: "application/pdf",
+    }
+  );
 }

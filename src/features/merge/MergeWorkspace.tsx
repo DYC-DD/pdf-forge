@@ -9,6 +9,7 @@ import {
 } from "@dnd-kit/core";
 import {
   arrayMove,
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -31,11 +32,15 @@ import DropZone from "../../shared/ui/DropZone";
 import OutputFilenameField from "../../shared/ui/OutputFilenameField";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
+import useViewMode from "../../shared/ui/useViewMode";
+import ViewModeToggle from "../../shared/ui/ViewModeToggle";
 import SortableFileRow from "./components/SortableFileRow";
 import type { MergeItem } from "./types";
 
 export default function MergeWorkspace() {
   const [items, setItems] = useState<MergeItem[]>([]);
+  const [viewMode, setViewMode] = useViewMode("merge", "list");
+  const [sorting, setSorting] = useState(false);
   const [outputName, setOutputName] = useState("merged.pdf");
   const [message, setMessage] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -91,6 +96,7 @@ export default function MergeWorkspace() {
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    setSorting(false);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setItems((current) => {
@@ -102,6 +108,7 @@ export default function MergeWorkspace() {
 
   function clearFiles() {
     if (busy) return;
+    setSorting(false);
     setItems([]);
     setPreviewFile(null);
     setMessage("");
@@ -190,6 +197,16 @@ export default function MergeWorkspace() {
     items.length >= 2 &&
     !pageLimitError &&
     items.every((item) => !item.loading && !item.error);
+  const mixedOrientations =
+    items.some(
+      (item) =>
+        item.thumbnailAspectRatio !== undefined && item.thumbnailAspectRatio > 1
+    ) &&
+    items.some(
+      (item) =>
+        item.thumbnailAspectRatio !== undefined &&
+        item.thumbnailAspectRatio <= 1
+    );
   const fileLabel = (id: string | number) =>
     items.find((item) => item.id === id)?.file.name ?? "檔案";
 
@@ -203,23 +220,30 @@ export default function MergeWorkspace() {
           <div>
             <div className="eyebrow">01 / 排列檔案</div>
             <h2 id="merge-heading">依你想要的順序合併</h2>
-            <p>點選縮圖或檔名預覽；拖曳右側空白處或把手調整順序。</p>
+            <p>拖曳檔案或把手調整順序；點選眼睛圖示預覽。</p>
           </div>
           {items.length > 0 && (
             <div className="file-list-actions">
               <span className="count-badge">
                 <Counter value={items.length} /> 份檔案
               </span>
-              <button
-                type="button"
-                className="clear-files-button"
-                onClick={clearFiles}
-                disabled={busy}
-                aria-label="清除 PDF"
-              >
-                <PublicIcon name="trash" size={15} />
-                清除
-              </button>
+              <div className="file-list-action-buttons">
+                <button
+                  type="button"
+                  className="clear-files-button"
+                  onClick={clearFiles}
+                  disabled={busy || sorting}
+                  aria-label="清除 PDF"
+                >
+                  <PublicIcon name="trash" size={15} />
+                  清除
+                </button>
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  disabled={busy || sorting}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -230,7 +254,9 @@ export default function MergeWorkspace() {
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragStart={() => setSorting(true)}
               onDragEnd={handleDragEnd}
+              onDragCancel={() => setSorting(false)}
               accessibility={{
                 screenReaderInstructions: {
                   draggable:
@@ -257,15 +283,22 @@ export default function MergeWorkspace() {
             >
               <SortableContext
                 items={items.map((item) => item.id)}
-                strategy={verticalListSortingStrategy}
+                strategy={
+                  viewMode === "list"
+                    ? verticalListSortingStrategy
+                    : rectSortingStrategy
+                }
               >
-                <div className="file-list">
+                <div className={`pdf-collection pdf-collection--${viewMode}`}>
                   {items.map((item, index) => (
                     <SortableFileRow
                       key={item.id}
                       item={item}
                       position={index}
+                      viewMode={viewMode}
+                      portraitThumbnailFrame={mixedOrientations}
                       disabled={busy}
+                      sorting={sorting}
                       onPreview={() => setPreviewFile(item.file)}
                       onRemove={() => {
                         if (previewFile === item.file) setPreviewFile(null);

@@ -19,12 +19,16 @@ import DropZone from "../../shared/ui/DropZone";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import RubberSegment from "../../shared/ui/RubberSegment";
+import useViewMode from "../../shared/ui/useViewMode";
+import ViewModeToggle from "../../shared/ui/ViewModeToggle";
 import PageThumbnail from "./components/PageThumbnail";
 import { parsePageRange } from "./lib/parsePageRange";
+import { resolveGroupFilenames } from "./lib/resolveGroupFilenames";
 import type { PageGroup } from "./types";
 
 export default function SplitWorkspace() {
   const [file, setFile] = useState<File | null>(null);
+  const [viewMode, setViewMode] = useViewMode("split", "grid");
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -133,14 +137,16 @@ export default function SplitWorkspace() {
 
   function addGroup() {
     if (selected.length === 0) return;
-    setGroups((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        name: `部分 ${current.length + 1}`,
-        pages: selected,
-      },
-    ]);
+    setGroups((current) =>
+      resolveGroupFilenames(file?.name ?? "document.pdf", [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          name: `部分 ${current.length + 1}`,
+          pages: selected,
+        },
+      ])
+    );
     setSelected([]);
     setRangeInput("");
     setMessage("");
@@ -158,7 +164,7 @@ export default function SplitWorkspace() {
             )}`,
             pages: [index + 1],
           }))
-        : groups;
+        : resolveGroupFilenames(file.name, groups);
     if (exportGroups.length === 0) return;
     const planError =
       pdfFileError(file) ??
@@ -168,6 +174,7 @@ export default function SplitWorkspace() {
       setMessage(planError);
       return;
     }
+    if (mode === "custom") setGroups(exportGroups);
     const controller = new AbortController();
     controllerRef.current = controller;
     setProcessing(true);
@@ -236,16 +243,23 @@ export default function SplitWorkspace() {
               <span className="count-badge">
                 <Counter value={1} /> 份檔案
               </span>
-              <button
-                type="button"
-                className="clear-files-button"
-                onClick={clearFile}
-                disabled={processing}
-                aria-label="清除 PDF"
-              >
-                <PublicIcon name="trash" size={15} />
-                清除
-              </button>
+              <div className="file-list-action-buttons">
+                <button
+                  type="button"
+                  className="clear-files-button"
+                  onClick={clearFile}
+                  disabled={processing}
+                  aria-label="清除 PDF"
+                >
+                  <PublicIcon name="trash" size={15} />
+                  清除
+                </button>
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  disabled={processing}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -345,16 +359,13 @@ export default function SplitWorkspace() {
                     </div>
                   </div>
                 )}
-                <div
-                  className={`page-grid ${
-                    mode === "every" ? "page-grid--readonly" : ""
-                  }`}
-                >
+                <div className={`pdf-collection pdf-collection--${viewMode}`}>
                   {pages.map((pageNumber) => (
                     <PageThumbnail
                       key={`${file.name}-${pageNumber}`}
                       pdf={pdf}
                       pageNumber={pageNumber}
+                      viewMode={viewMode}
                       selected={
                         mode === "every" || selectedPages.has(pageNumber)
                       }
@@ -404,7 +415,7 @@ export default function SplitWorkspace() {
             </button>
             {groups.length > 0 && (
               <div className="group-name-hint" id="split-name-hint">
-                檔名可自訂，留空時使用預設名稱。
+                檔名可自訂，留空時使用預設名稱；同名時自動補上編號。
               </div>
             )}
             <div className="group-list">
@@ -463,13 +474,12 @@ export default function SplitWorkspace() {
                           )
                         );
                       }}
-                      onBlur={(event) => {
-                        if (event.currentTarget.value.trim()) return;
+                      onBlur={() => {
                         setGroups((current) =>
-                          current.map((entry) =>
-                            entry.id === group.id
-                              ? { ...entry, filename: undefined }
-                              : entry
+                          resolveGroupFilenames(
+                            file?.name ?? "document.pdf",
+                            current,
+                            group.id
                           )
                         );
                       }}
