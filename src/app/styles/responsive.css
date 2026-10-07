@@ -219,9 +219,6 @@
   .range-form .page-range-field.MuiFormControl-root {
     width: 100%;
   }
-  .selection-actions {
-    padding-bottom: 0;
-  }
   .selection-actions button {
     min-height: 35px;
     padding: 6px 2px;

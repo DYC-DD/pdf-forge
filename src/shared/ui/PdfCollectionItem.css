@@ -205,24 +205,6 @@
 .pdf-item-drag-handle:active {
   cursor: grabbing;
 }
-.pdf-item-selection {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: grid;
-  place-items: center;
-  width: 19px;
-  height: 19px;
-  border: 1px solid #606673;
-  border-radius: 5px;
-  background: #1b2029;
-  color: transparent;
-}
-.pdf-item--selected .pdf-item-selection {
-  border-color: #aabbe2;
-  background: #aabbe2;
-  color: #141820;
-}
 .pdf-item--grid {
   flex-direction: column;
   align-items: stretch;
@@ -334,7 +316,8 @@
   .pdf-item--list .pdf-item-actions {
     flex-basis: 100%;
   }
-  .pdf-item--list .pdf-item-actions .icon-button {
+  .pdf-item--list .pdf-item-actions .icon-button,
+  .pdf-item--list .pdf-item-select.MuiCheckbox-root {
     width: 38px;
     height: 38px;
   }

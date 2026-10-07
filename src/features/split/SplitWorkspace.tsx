@@ -292,38 +292,40 @@ export default function SplitWorkspace() {
             )}
             {pdf && (
               <>
-                <RubberSegment
-                  className="split-mode-segment"
-                  aria-label="拆分方式"
-                  items={[
-                    {
-                      value: "custom",
-                      label: "自選頁面",
-                      icon: <PublicIcon name="scissors" size={17} />,
-                    },
-                    {
-                      value: "every",
-                      label: "每頁一檔",
-                      icon: <PublicIcon name="files" size={17} />,
-                    },
-                  ]}
-                  value={mode}
-                  onChange={(_, index) => {
-                    setMode(index === 0 ? "custom" : "every");
-                    setMessage("");
-                  }}
-                  trackColor="#111215"
-                  thumbColor="#383a40"
-                  textColor="#f0f0f1"
-                  activeTextColor="#f0f0f1"
-                  size="md"
-                  radius={10}
-                  inset={3}
-                  equalSlots
-                  draggable
-                />
-                {mode === "custom" && (
-                  <div className="page-tools">
+                <div
+                  className={`split-toolbar${mode === "custom" ? " split-toolbar--custom" : ""}`}
+                >
+                  <RubberSegment
+                    className="split-mode-segment"
+                    aria-label="拆分方式"
+                    items={[
+                      {
+                        value: "custom",
+                        label: "自選頁面",
+                        icon: <PublicIcon name="scissors" size={17} />,
+                      },
+                      {
+                        value: "every",
+                        label: "每頁一檔",
+                        icon: <PublicIcon name="files" size={17} />,
+                      },
+                    ]}
+                    value={mode}
+                    onChange={(_, index) => {
+                      setMode(index === 0 ? "custom" : "every");
+                      setMessage("");
+                    }}
+                    trackColor="#111215"
+                    thumbColor="#383a40"
+                    textColor="#f0f0f1"
+                    activeTextColor="#f0f0f1"
+                    size="md"
+                    radius={10}
+                    inset={3}
+                    equalSlots
+                    draggable
+                  />
+                  {mode === "custom" && (
                     <div className="range-form">
                       <div>
                         <TextField
@@ -350,6 +352,8 @@ export default function SplitWorkspace() {
                         </button>
                       </div>
                     </div>
+                  )}
+                  {mode === "custom" && (
                     <div className="selection-actions">
                       <span>
                         已選 <Counter value={selected.length} /> 頁
@@ -357,8 +361,8 @@ export default function SplitWorkspace() {
                       <button onClick={() => setSelected(pages)}>全選</button>
                       <button onClick={() => setSelected([])}>清除</button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 <div className={`pdf-collection pdf-collection--${viewMode}`}>
                   {pages.map((pageNumber) => (
                     <PageThumbnail

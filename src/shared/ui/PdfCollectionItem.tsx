@@ -78,7 +78,7 @@ export default function PdfCollectionItem({
       >
         <PublicIcon name="eye" size={17} />
       </button>
-      {isGrid && selected !== undefined && (
+      {selected !== undefined && (
         <Checkbox
           className="pdf-item-select"
           size={viewMode === "grid-small" ? "small" : "medium"}
@@ -139,11 +139,6 @@ export default function PdfCollectionItem({
             <img src={thumbnail} alt="" draggable={false} />
           ) : (
             <PublicIcon name="files" size={24} />
-          )}
-          {!isGrid && selected !== undefined && (
-            <span className="pdf-item-selection" aria-hidden="true">
-              <PublicIcon name="check" size={14} />
-            </span>
           )}
         </span>
         <span className="pdf-item-info">
