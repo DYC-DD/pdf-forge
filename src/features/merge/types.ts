@@ -4,5 +4,6 @@ export type MergeItem = {
   loading: boolean;
   pageCount?: number;
   thumbnail?: string;
+  thumbnailAspectRatio?: number;
   error?: string;
 };

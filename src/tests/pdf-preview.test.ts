@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { PDFDocument, PDFName, PDFString } from "pdf-lib";
+import { degrees, PDFDocument, PDFName, PDFString } from "pdf-lib";
 import { OPS, type PDFDocumentProxy } from "pdfjs-dist";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -44,30 +44,109 @@ it("applies the image decoding limit to compression previews", async () => {
   }
 });
 
-it("bounds thumbnail height for pages with extreme aspect ratios and releases the canvas", async () => {
-  const canvas = { width: 0, height: 0, toDataURL: () => "thumbnail" };
-  vi.stubGlobal("document", { createElement: () => canvas });
-  let renderedSize: [number, number] | undefined;
-  const cleanup = vi.fn();
-  const pdf = {
-    getPage: async () => ({
-      getViewport: ({ scale }: { scale: number }) => ({
-        width: 100 * scale,
-        height: 1_000_000 * scale,
+it.each([
+  [1, 360, 480],
+  [1.5, 540, 720],
+  [2, 720, 960],
+  [3, 720, 960],
+])(
+  "renders sharp grid thumbnails at device pixel ratio %s with a bounded density",
+  async (devicePixelRatio, expectedWidth, expectedHeight) => {
+    const canvas = { width: 0, height: 0, toDataURL: () => "thumbnail" };
+    vi.stubGlobal("window", { devicePixelRatio });
+    vi.stubGlobal("document", { createElement: () => canvas });
+    let renderedSize: [number, number] | undefined;
+    const pdf = {
+      getPage: async () => ({
+        getViewport: ({ scale }: { scale: number }) => ({
+          width: 600 * scale,
+          height: 800 * scale,
+        }),
+        render: () => {
+          renderedSize = [canvas.width, canvas.height];
+          return { promise: Promise.resolve() };
+        },
+        cleanup: vi.fn(),
       }),
-      render: () => {
-        renderedSize = [canvas.width, canvas.height];
-        return { promise: Promise.resolve() };
-      },
-      cleanup,
-    }),
-  } as unknown as PDFDocumentProxy;
-  expect(await renderPageThumbnail(pdf, 1, 116)).toBe("thumbnail");
-  expect(renderedSize![0]).toBeLessThanOrEqual(116);
-  expect(renderedSize![1]).toBeLessThanOrEqual(2048);
-  expect(canvas).toMatchObject({ width: 0, height: 0 });
-  expect(cleanup).toHaveBeenCalledOnce();
-});
+    } as unknown as PDFDocumentProxy;
+
+    expect((await renderPageThumbnail(pdf, 1)).src).toBe("thumbnail");
+    expect(renderedSize).toEqual([expectedWidth, expectedHeight]);
+    expect(canvas).toMatchObject({ width: 0, height: 0 });
+  }
+);
+
+it.each([
+  [100, 1_000_000],
+  [1_000_000, 100],
+  [10_000, 10_000],
+])(
+  "bounds thumbnail dimensions for a %s × %s page and releases the canvas",
+  async (width, height) => {
+    const canvas = { width: 0, height: 0, toDataURL: () => "thumbnail" };
+    vi.stubGlobal("window", { devicePixelRatio: 3 });
+    vi.stubGlobal("document", { createElement: () => canvas });
+    let renderedSize: [number, number] | undefined;
+    const cleanup = vi.fn();
+    const pdf = {
+      getPage: async () => ({
+        getViewport: ({ scale }: { scale: number }) => ({
+          width: width * scale,
+          height: height * scale,
+        }),
+        render: () => {
+          renderedSize = [canvas.width, canvas.height];
+          return { promise: Promise.resolve() };
+        },
+        cleanup,
+      }),
+    } as unknown as PDFDocumentProxy;
+    expect((await renderPageThumbnail(pdf, 1, 4000)).src).toBe("thumbnail");
+    expect(renderedSize![0]).toBeGreaterThanOrEqual(1);
+    expect(renderedSize![1]).toBeGreaterThanOrEqual(1);
+    expect(renderedSize![0]).toBeLessThanOrEqual(2048);
+    expect(renderedSize![1]).toBeLessThanOrEqual(2048);
+    expect(canvas).toMatchObject({ width: 0, height: 0 });
+    expect(cleanup).toHaveBeenCalledOnce();
+  }
+);
+
+it.each([
+  [600, 800, 0, 3 / 4],
+  [800, 600, 0, 4 / 3],
+  [600, 800, 90, 4 / 3],
+  [800, 600, 270, 3 / 4],
+])(
+  "preserves the displayed aspect ratio of a %s × %s page rotated %s degrees",
+  async (width, height, rotation, expectedRatio) => {
+    const document = await PDFDocument.create();
+    document.addPage([width, height]).setRotation(degrees(rotation));
+    const file = new File(
+      [new Uint8Array(await document.save())],
+      "orientation.pdf",
+      { type: "application/pdf" }
+    );
+    const task = await openPdf(file);
+    try {
+      const pdf = await task.promise;
+      const page = await pdf.getPage(1);
+      const canvas = { width: 0, height: 0, toDataURL: () => "thumbnail" };
+      vi.stubGlobal("document", { createElement: () => canvas });
+      const render = vi.spyOn(page, "render").mockReturnValue({
+        promise: Promise.resolve(),
+      } as ReturnType<typeof page.render>);
+      try {
+        const thumbnail = await renderPageThumbnail(pdf, 1);
+        expect(thumbnail.src).toBe("thumbnail");
+        expect(thumbnail.aspectRatio).toBeCloseTo(expectedRatio);
+      } finally {
+        render.mockRestore();
+      }
+    } finally {
+      await task.destroy();
+    }
+  }
+);
 
 describe("Chinese PDF previews", () => {
   it.each([

@@ -6,7 +6,6 @@
 @import "../features/landing/styles/hero.css";
 @import "../features/landing/styles/tool-picker.css";
 @import "./styles/workspace.css";
-@import "../features/merge/styles/merge.css";
 @import "./styles/output.css";
 @import "../features/split/styles/split.css";
 @import "../features/compress/styles/compress.css";

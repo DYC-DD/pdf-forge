@@ -1,0 +1,30 @@
+.view-mode-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #414755;
+  border-radius: 999px;
+  background: transparent;
+  color: #aebbd1;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 750;
+}
+.view-mode-toggle-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.view-mode-toggle:not(:disabled):hover {
+  border-color: #7d90b5;
+  background: #292e3b;
+  color: #eef2ff;
+}
+.view-mode-toggle:disabled {
+  opacity: 0.45;
+}

@@ -113,27 +113,6 @@
   color: #72d19b;
 }
 
-.file-row {
-  border-color: #2d323c;
-  background: #141820;
-}
-.file-row--dragging {
-  box-shadow: 0 14px 30px #030713a8;
-}
-.file-row--error {
-  border-color: #b96c77;
-}
-.file-index {
-  color: #9cacc9;
-}
-.file-preview {
-  border-color: #50617f;
-  background: #e9edf7;
-  color: #5366a8;
-}
-.file-row--error .file-info > span {
-  color: #ffada9;
-}
 .icon-button {
   color: #a9b6d0;
 }
@@ -196,39 +175,6 @@
 }
 .selection-actions button {
   color: #b5b6bc;
-}
-.page-tile:hover {
-  background: #242529;
-}
-.page-tile--selected {
-  background: #2c2d32;
-}
-.page-image {
-  border-color: #54627e;
-  background: #f3f5fa;
-  box-shadow: 0 5px 12px #050a1b65;
-}
-.page-skeleton {
-  color: #687cb5;
-}
-.selection-mark {
-  border-color: #606673;
-  background: #1b2029;
-}
-.page-tile--selected .selection-mark {
-  border-color: #8b8e95;
-  background: #8b8e95;
-}
-.page-caption > span {
-  color: #a8b5cd;
-}
-.page-grid--readonly .page-tile:hover,
-.page-grid--readonly .page-tile--selected {
-  background: transparent;
-}
-.page-grid--readonly .page-tile--selected .selection-mark {
-  border-color: #8b8e95;
-  background: #8b8e95;
 }
 .empty-groups {
   border-color: #414650;
