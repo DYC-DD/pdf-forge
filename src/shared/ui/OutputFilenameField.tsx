@@ -8,6 +8,7 @@ type OutputFilenameFieldProps = {
   defaultName: string;
   placeholder: string;
   disabled?: boolean;
+  extension?: "pdf" | "jpg" | "png" | "zip";
 };
 
 export default function OutputFilenameField({
@@ -17,6 +18,7 @@ export default function OutputFilenameField({
   defaultName,
   placeholder,
   disabled = false,
+  extension = "pdf",
 }: OutputFilenameFieldProps) {
   return (
     <TextField
@@ -25,7 +27,7 @@ export default function OutputFilenameField({
       label="輸出檔名"
       variant="outlined"
       fullWidth
-      value={value.replace(/\.pdf$/i, "")}
+      value={value.replace(new RegExp(`\\.${extension}$`, "i"), "")}
       onChange={(event) => onChange(event.target.value)}
       onFocus={(event) => event.currentTarget.select()}
       onBlur={(event) => {
@@ -37,7 +39,7 @@ export default function OutputFilenameField({
         input: {
           endAdornment: (
             <InputAdornment position="end" disableTypography>
-              .pdf
+              .{extension}
             </InputAdornment>
           ),
         },

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 export type ViewMode = "list" | "grid" | "grid-small";
 
 export default function useViewMode(
-  tool: "merge" | "split",
+  tool: "merge" | "split" | "convert",
   defaultMode: ViewMode
 ) {
   const storageKey = `pdf-forge:${tool}:view-mode`;

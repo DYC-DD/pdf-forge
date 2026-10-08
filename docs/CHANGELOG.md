@@ -4,6 +4,16 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ## [Unreleased]
 
+### Added
+
+- 新增「04／轉換 PDF」與獨立 `/convert/` 網址，支援 PDF 轉 JPG／PNG；可透過縮圖或頁碼選取頁面及設定輸出檔名，固定以 300 DPI、JPG 最高畫質或 PNG 無損格式輸出，單張直接下載圖片、多張打包 ZIP。
+- 轉換沿用列表、大網格與小網格、頁面預覽及本機處理流程；提供轉換與 ZIP 進度、取消操作及輸出頁數、像素與大小限制。
+
+### Changed
+
+- 工具選擇區調整為桌面四欄、平板兩欄與手機單欄，並使用提供的 photo.svg 作為轉換工具圖示。
+- 拆分與轉換共用頁面縮圖元件；輸出檔名欄位支援 PDF、JPG、PNG 與 ZIP 副檔名。
+
 ## [1.0.2] - 2026-10-07
 
 ### Added

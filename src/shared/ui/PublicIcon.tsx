@@ -18,6 +18,7 @@ export type PublicIconName =
   | "grip-horizontal"
   | "list"
   | "lock"
+  | "photo"
   | "plus"
   | "scissors"
   | "shield-check"

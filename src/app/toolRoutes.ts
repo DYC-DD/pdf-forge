@@ -9,7 +9,12 @@ export function toolFromPath(pathname: string): Tool | null {
   if (!pathname.startsWith(base)) return null;
 
   const route = pathname.slice(base.length).replace(/\/$/, "");
-  if (route === "merge" || route === "split" || route === "compress") {
+  if (
+    route === "merge" ||
+    route === "split" ||
+    route === "compress" ||
+    route === "convert"
+  ) {
     return route;
   }
   return null;

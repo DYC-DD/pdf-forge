@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 const output = resolve("dist");
 
 await Promise.all(
-  ["merge", "split", "compress"].map(async (tool) => {
+  ["merge", "split", "compress", "convert"].map(async (tool) => {
     const directory = resolve(output, tool);
     await mkdir(directory, { recursive: true });
     await copyFile(

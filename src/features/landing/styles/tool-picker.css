@@ -25,6 +25,9 @@
 .tool-section[data-reveal="play"] .tool-tab:nth-child(3) {
   --enter-delay: 180ms;
 }
+.tool-section[data-reveal="play"] .tool-tab:nth-child(4) {
+  --enter-delay: 225ms;
+}
 @keyframes tool-section-enter {
   from {
     opacity: 0;
@@ -62,7 +65,7 @@
 }
 .tool-nav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 .tool-tab {
@@ -70,9 +73,9 @@
   text-decoration: none;
   align-items: center;
   min-width: 0;
-  gap: 18px;
+  gap: 12px;
   min-height: 116px;
-  padding: 19px 21px;
+  padding: 19px 16px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
@@ -100,8 +103,8 @@
 .tool-tab-icon {
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
+  width: 48px;
+  height: 48px;
   flex: none;
   border-radius: 14px;
   background: #f0f2fe;
@@ -151,4 +154,9 @@
 }
 .tool-tab.active .tool-tab-arrow {
   color: var(--blue);
+}
+@media (max-width: 1199px) {
+  .tool-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

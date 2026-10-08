@@ -153,10 +153,15 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
   const edgeR = useMotionValue(0);
   const innerW = useMotionValue(0);
   const thumbRadius = Math.max(0, radius - inset);
-  const clipPath = useTransform(
-    () =>
-      `inset(0 ${Math.max(0, innerW.get() - edgeR.get())}px 0 ${Math.max(0, edgeL.get())}px round ${thumbRadius}px)`
-  );
+  const getClipPath = () => {
+    const width = innerW.get();
+    const right = edgeR.get();
+    const left = edgeL.get();
+    // Keep the thumb hidden until its first layout measurement.
+    if (width <= 0) return `inset(0 100% 0 0 round ${thumbRadius}px)`;
+    return `inset(0 ${Math.max(0, width - right)}px 0 ${Math.max(0, left)}px round ${thumbRadius}px)`;
+  };
+  const clipPath = useTransform(getClipPath);
 
   const t = (seconds: number) => seconds / speed;
 
@@ -167,6 +172,9 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
     gen.current += 1;
     edgeL.jump(s.l);
     edgeR.jump(s.r);
+    // Strict Mode can cancel the derived value's queued first-frame update.
+    // Commit measured jumps synchronously so the first paint is also correct.
+    clipPath.jump(getClipPath());
   };
 
   const measure = () => {

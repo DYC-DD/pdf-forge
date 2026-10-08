@@ -1,7 +1,7 @@
 import PublicIcon from "../../shared/ui/PublicIcon";
 import useScrollReveal from "../../shared/ui/useScrollReveal";
 
-export type Tool = "merge" | "split" | "compress";
+export type Tool = "merge" | "split" | "compress" | "convert";
 
 type ToolPickerProps = {
   tool: Tool;
@@ -106,6 +106,27 @@ export default function ToolPicker({
             <small>03 / COMPRESS</small>
             <strong>壓縮 PDF</strong>
             <span>縮小檔案，維持清晰品質。</span>
+          </span>
+          <PublicIcon
+            name="arrow-up-right"
+            size={20}
+            className="tool-tab-arrow"
+          />
+        </a>
+        <a
+          href={hrefForTool("convert")}
+          className={tool === "convert" ? "tool-tab active" : "tool-tab"}
+          onClick={(event) => handleSelect(event, "convert")}
+          aria-current={tool === "convert" ? "page" : undefined}
+          aria-controls="convert-panel"
+        >
+          <span className="tool-tab-icon">
+            <PublicIcon name="photo" size={25} />
+          </span>
+          <span className="tool-tab-copy">
+            <small>04 / CONVERT</small>
+            <strong>轉換 PDF</strong>
+            <span>每頁轉圖片，分享更方便。</span>
           </span>
           <PublicIcon
             name="arrow-up-right"

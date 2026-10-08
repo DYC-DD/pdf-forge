@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import CompressWorkspace from "../features/compress/CompressWorkspace";
+import ConvertWorkspace from "../features/convert/ConvertWorkspace";
 import LandingHero from "../features/landing/LandingHero";
 import ToolPicker, { type Tool } from "../features/landing/ToolPicker";
 import MergeWorkspace from "../features/merge/MergeWorkspace";
@@ -85,6 +86,9 @@ export default function App() {
           </div>
           <div id="compress-panel" hidden={tool !== "compress"}>
             {tool === "compress" && <CompressWorkspace />}
+          </div>
+          <div id="convert-panel" hidden={tool !== "convert"}>
+            {tool === "convert" && <ConvertWorkspace />}
           </div>
         </div>
       </main>
