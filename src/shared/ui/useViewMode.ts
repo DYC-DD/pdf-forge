@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react";
 
-export type ViewMode = "list" | "grid" | "grid-small";
+export type ViewMode = "list" | "grid" | "grid-medium" | "grid-small";
 
-export default function useViewMode(
-  tool: "merge" | "split" | "convert",
-  defaultMode: ViewMode
-) {
-  const storageKey = `pdf-forge:${tool}:view-mode`;
+const storageKey = "pdf-forge:view-mode";
+
+export default function useViewMode() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = window.localStorage.getItem(storageKey);
-      if (saved === "list" || saved === "grid" || saved === "grid-small")
+      if (
+        saved === "list" ||
+        saved === "grid" ||
+        saved === "grid-medium" ||
+        saved === "grid-small"
+      )
         return saved;
     } catch {
       // Display switching still works when browser storage is unavailable.
     }
-    return defaultMode;
+    return "list";
   });
 
   useEffect(() => {
@@ -24,7 +27,7 @@ export default function useViewMode(
     } catch {
       // Remembering the preference is optional.
     }
-  }, [storageKey, viewMode]);
+  }, [viewMode]);
 
   return [viewMode, setViewMode] as const;
 }

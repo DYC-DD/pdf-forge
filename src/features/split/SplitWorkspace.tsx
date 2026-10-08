@@ -28,7 +28,7 @@ import type { PageGroup } from "./types";
 
 export default function SplitWorkspace() {
   const [file, setFile] = useState<File | null>(null);
-  const [viewMode, setViewMode] = useViewMode("split", "grid");
+  const [viewMode, setViewMode] = useViewMode();
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");

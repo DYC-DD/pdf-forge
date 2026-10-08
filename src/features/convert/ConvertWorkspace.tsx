@@ -1,3 +1,7 @@
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +17,6 @@ import OutputFilenameField from "../../shared/ui/OutputFilenameField";
 import PdfPageThumbnail from "../../shared/ui/PdfPageThumbnail";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
-import RubberSegment from "../../shared/ui/RubberSegment";
 import useViewMode from "../../shared/ui/useViewMode";
 import ViewModeToggle from "../../shared/ui/ViewModeToggle";
 import { parsePageRange } from "../split/lib/parsePageRange";
@@ -26,7 +29,7 @@ import {
 export default function ConvertWorkspace() {
   const [file, setFile] = useState<File | null>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
-  const [viewMode, setViewMode] = useViewMode("convert", "grid");
+  const [viewMode, setViewMode] = useViewMode();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
@@ -329,31 +332,33 @@ export default function ConvertWorkspace() {
         <h2 id="convert-output-heading">設定圖片格式</h2>
         <p>每頁輸出一張圖片，多張圖片會打包為 ZIP。</p>
         <div className="convert-format">
-          <span className="field-label">輸出格式</span>
-          <RubberSegment
-            className="convert-format-segment"
-            aria-label="輸出格式"
-            items={[
-              { value: "jpg", label: "JPG" },
-              { value: "png", label: "PNG" },
-            ]}
-            value={format}
-            onChange={(value) => {
-              setFormat(value as ImageFormat);
-              setMessage("");
-            }}
-            disabled={processing}
-            trackColor="#111215"
-            thumbColor="#383a40"
-            textColor="#f0f0f1"
-            activeTextColor="#f0f0f1"
-            size="md"
-            radius={10}
-            inset={3}
-            equalSlots
-            draggable
-          />
-          <p className="convert-format-hint">
+          <FormControl className="convert-format-field" fullWidth>
+            <InputLabel id="convert-format-label" shrink>
+              輸出格式
+            </InputLabel>
+            <Select
+              id="convert-format"
+              labelId="convert-format-label"
+              label="輸出格式"
+              aria-describedby="convert-format-hint"
+              className="convert-format-select"
+              variant="outlined"
+              value={format}
+              onChange={(event) => {
+                setFormat(event.target.value as ImageFormat);
+                setMessage("");
+              }}
+              disabled={processing}
+              MenuProps={{
+                disableScrollLock: true,
+                slotProps: { paper: { className: "convert-format-menu" } },
+              }}
+            >
+              <MenuItem value="jpg">JPG：適用於照片與日常分享</MenuItem>
+              <MenuItem value="png">PNG：適用於文字、圖表與線條</MenuItem>
+            </Select>
+          </FormControl>
+          <p id="convert-format-hint" className="convert-format-hint">
             {format === "jpg"
               ? "最高畫質 JPG，適合照片與日常分享。"
               : "無損 PNG，適合文字、圖表與線條。"}

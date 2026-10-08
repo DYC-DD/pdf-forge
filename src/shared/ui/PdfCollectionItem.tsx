@@ -65,6 +65,7 @@ export default function PdfCollectionItem({
   style?: CSSProperties;
 }) {
   const isGrid = viewMode !== "list";
+  const isCompact = viewMode === "grid-medium" || viewMode === "grid-small";
   const controls = (
     <div className="pdf-item-actions">
       {actions}
@@ -81,7 +82,7 @@ export default function PdfCollectionItem({
       {selected !== undefined && (
         <Checkbox
           className="pdf-item-select"
-          size={viewMode === "grid-small" ? "small" : "medium"}
+          size={isCompact ? "small" : "medium"}
           checked={selected}
           onChange={onActivate}
           slotProps={{ input: { "aria-label": activateLabel } }}
@@ -97,7 +98,7 @@ export default function PdfCollectionItem({
     <div
       ref={rootRef}
       className={`pdf-item pdf-item--${viewMode === "list" ? "list" : "grid"} ${
-        viewMode === "grid-small" ? "pdf-item--compact" : ""
+        isCompact ? "pdf-item--compact" : ""
       } ${
         selected ? "pdf-item--selected" : ""
       } ${readOnly ? "pdf-item--readonly" : ""} ${

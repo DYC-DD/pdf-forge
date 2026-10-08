@@ -15,6 +15,7 @@ export type PublicIconName =
   | "files"
   | "grid-3x3"
   | "grid-4x4"
+  | "grid-5x5"
   | "grip-horizontal"
   | "list"
   | "lock"

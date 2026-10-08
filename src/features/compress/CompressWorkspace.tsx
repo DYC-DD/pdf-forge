@@ -16,8 +16,11 @@ import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
 import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
 import OutputFilenameField from "../../shared/ui/OutputFilenameField";
+import PdfCollectionItem from "../../shared/ui/PdfCollectionItem";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
+import useViewMode from "../../shared/ui/useViewMode";
+import ViewModeToggle from "../../shared/ui/ViewModeToggle";
 import { compressPdf } from "./lib/compressPdf";
 import type { CompressionMode } from "./types";
 
@@ -46,8 +49,10 @@ const compressionModes: Record<
 
 export default function CompressWorkspace() {
   const [file, setFile] = useState<File | null>(null);
+  const [viewMode, setViewMode] = useViewMode();
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [thumbnail, setThumbnail] = useState("");
+  const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState<number>();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [mode, setMode] = useState<CompressionMode>("medium");
@@ -67,6 +72,7 @@ export default function CompressWorkspace() {
         if (cancelled) return;
         setPageCount(info.pageCount);
         setThumbnail(info.thumbnail);
+        setThumbnailAspectRatio(info.thumbnailAspectRatio);
       })
       .catch((error) => {
         if (!cancelled) setLoadError(fileError(error));
@@ -92,6 +98,7 @@ export default function CompressWorkspace() {
     setFile(chosen);
     setPageCount(null);
     setThumbnail("");
+    setThumbnailAspectRatio(undefined);
     setLoadError("");
     setResult(null);
     setPreviewFile(null);
@@ -104,6 +111,7 @@ export default function CompressWorkspace() {
     setFile(null);
     setPageCount(null);
     setThumbnail("");
+    setThumbnailAspectRatio(undefined);
     setLoading(false);
     setLoadError("");
     setResult(null);
@@ -186,16 +194,23 @@ export default function CompressWorkspace() {
               <span className="count-badge">
                 <Counter value={1} /> 份檔案
               </span>
-              <button
-                type="button"
-                className="clear-files-button"
-                onClick={clearFile}
-                disabled={processing}
-                aria-label="清除 PDF"
-              >
-                <PublicIcon name="trash" size={15} />
-                清除
-              </button>
+              <div className="file-list-action-buttons">
+                <button
+                  type="button"
+                  className="clear-files-button"
+                  onClick={clearFile}
+                  disabled={processing}
+                  aria-label="清除 PDF"
+                >
+                  <PublicIcon name="trash" size={15} />
+                  清除
+                </button>
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  disabled={processing}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -204,35 +219,33 @@ export default function CompressWorkspace() {
           <DropZone multiple={false} onFiles={chooseFile} />
         ) : (
           <>
-            <div className="source-file compress-source-file">
-              {thumbnail ? (
-                <img className="compress-file-preview" src={thumbnail} alt="" />
-              ) : (
-                <div className="source-file-icon">
-                  <PublicIcon name="file-type-pdf" size={22} />
-                </div>
-              )}
-              <div>
-                <strong title={file.name}>{file.name}</strong>
-                <span>
-                  <ByteCounter size={file.size} />
-                  {pageCount !== null && (
-                    <>
-                      {" · "}
-                      <Counter value={pageCount} /> 頁
-                    </>
-                  )}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="button button--small button--outline"
-                onClick={() => setPreviewFile(file)}
-                disabled={loading || Boolean(loadError)}
-              >
-                <PublicIcon name="eye" size={15} />
-                預覽
-              </button>
+            <div className={`pdf-collection pdf-collection--${viewMode}`}>
+              <PdfCollectionItem
+                viewMode={viewMode}
+                position={<Counter value={1} minimumIntegerDigits={2} />}
+                thumbnail={thumbnail}
+                thumbnailAspectRatio={thumbnailAspectRatio}
+                title={file.name}
+                metadata={
+                  <>
+                    <ByteCounter size={file.size} />
+                    {pageCount !== null && (
+                      <>
+                        {" · "}
+                        <Counter value={pageCount} /> 頁
+                      </>
+                    )}
+                  </>
+                }
+                activateLabel={`預覽 ${file.name}`}
+                activateTitle="預覽 PDF"
+                previewLabel={`預覽 ${file.name}`}
+                onActivate={() => setPreviewFile(file)}
+                onPreview={() => setPreviewFile(file)}
+                mainDisabled={loading || Boolean(loadError)}
+                previewDisabled={loading || Boolean(loadError)}
+                error={Boolean(loadError)}
+              />
             </div>
             {loading && <div className="loading-panel">正在讀取 PDF…</div>}
             {loadError && (
