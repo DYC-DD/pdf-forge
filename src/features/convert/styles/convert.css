@@ -41,8 +41,18 @@
   color: #b6b7bc;
 }
 .convert-format-select.Mui-disabled {
-  -webkit-text-fill-color: #a5a6ab;
   opacity: 0.7;
+}
+.convert-format-select .MuiSelect-select.Mui-disabled {
+  color: #a5a6ab;
+  -webkit-text-fill-color: #a5a6ab;
+}
+.convert-format-select .MuiSelect-icon.Mui-disabled {
+  color: #a5a6ab;
+}
+.convert-format-select.MuiOutlinedInput-root.Mui-disabled
+  .MuiOutlinedInput-notchedOutline {
+  border-color: #4a4c52;
 }
 .convert-format-menu.MuiPaper-root {
   border: 1px solid #494b50;
@@ -75,4 +85,68 @@
 }
 .convert-output-card > .status-message {
   margin-bottom: 13px;
+}
+.convert-output-card .filename-field .MuiInputBase-input.Mui-disabled {
+  color: #a5a6ab;
+  -webkit-text-fill-color: #a5a6ab;
+}
+.convert-output-card
+  .filename-field
+  .MuiOutlinedInput-root.Mui-disabled
+  .MuiOutlinedInput-notchedOutline {
+  border-color: #4a4c52;
+}
+.convert-format-menu.MuiPaper-root {
+  max-width: calc(100vw - 32px);
+}
+.drop-zone--disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.convert-image-preview {
+  width: min(960px, calc(100vw - 24px));
+  max-width: none;
+  height: 85dvh;
+  max-height: none;
+  padding: 0;
+  border: 1px solid #4b5264;
+  border-radius: 16px;
+  background: #11151d;
+  color: #f2f2f4;
+  box-shadow: 0 24px 80px #000b;
+}
+.convert-image-preview::backdrop {
+  background: #000000eb;
+}
+.convert-image-preview-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.convert-image-preview-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+  background-color: #25262b;
+  background-image: conic-gradient(
+    #303137 25%,
+    transparent 0 50%,
+    #303137 0 75%,
+    transparent 0
+  );
+  background-size: 20px 20px;
+}
+.convert-image-preview-body img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(85dvh - 100px);
+  object-fit: contain;
+}
+.convert-image-preview-body img.convert-image-preview-rotated {
+  max-width: calc(85dvh - 110px);
+  max-height: min(920px, calc(100vw - 64px));
 }

@@ -23,6 +23,7 @@ export default function PdfCollectionItem({
   activateLabel,
   activateTitle,
   previewLabel,
+  previewTitle = "預覽 PDF",
   onActivate,
   onPreview,
   mainDragProps,
@@ -49,6 +50,7 @@ export default function PdfCollectionItem({
   activateLabel: string;
   activateTitle: string;
   previewLabel: string;
+  previewTitle?: string;
   onActivate?: () => void;
   onPreview: () => void;
   mainDragProps?: ButtonHTMLAttributes<HTMLButtonElement>;
@@ -75,7 +77,7 @@ export default function PdfCollectionItem({
         onClick={onPreview}
         disabled={previewDisabled}
         aria-label={previewLabel}
-        title="預覽 PDF"
+        title={previewTitle}
       >
         <PublicIcon name="eye" size={17} />
       </button>

@@ -7,20 +7,32 @@ export default function DropZone({
   multiple,
   onFiles,
   compact = false,
+  accept = ".pdf,application/pdf",
+  label,
+  title,
+  description = "點擊任意位置選取檔案，僅支援 .pdf",
+  disabled = false,
 }: {
   multiple: boolean;
   onFiles: (files: File[]) => void;
   compact?: boolean;
+  accept?: string;
+  label?: string;
+  title?: string;
+  description?: string;
+  disabled?: boolean;
 }) {
   const [dragging, setDragging] = useState(false);
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     setDragging(false);
+    if (disabled) return;
     onFiles(Array.from(event.dataTransfer.files));
   }
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    if (disabled) return;
     onFiles(Array.from(event.target.files ?? []));
     event.target.value = "";
   }
@@ -29,9 +41,11 @@ export default function DropZone({
     <label
       className={`drop-zone ${compact ? "drop-zone--compact" : ""} ${
         dragging ? "drop-zone--dragging" : ""
-      }`}
+      } ${disabled ? "drop-zone--disabled" : ""}`}
+      aria-disabled={disabled || undefined}
       onDragEnter={(event) => {
         event.preventDefault();
+        if (disabled) return;
         setDragging(true);
       }}
       onDragOver={(event) => event.preventDefault()}
@@ -55,21 +69,23 @@ export default function DropZone({
       <input
         className="visually-hidden"
         type="file"
-        accept=".pdf,application/pdf"
+        accept={accept}
+        disabled={disabled}
         multiple={multiple}
         onChange={handleChange}
-        aria-label={multiple ? "選擇多份 PDF" : "選擇一份 PDF"}
+        aria-label={label ?? (multiple ? "選擇多份 PDF" : "選擇一份 PDF")}
       />
       <div className="drop-icon">
         <PublicIcon name="upload" size={compact ? 20 : 27} />
       </div>
       <div className="drop-copy">
         <strong>
-          {compact
-            ? "繼續加入 PDF"
-            : `拖曳${multiple ? "多份" : "一份"} PDF 到這裡`}
+          {title ??
+            (compact
+              ? "繼續加入 PDF"
+              : `拖曳${multiple ? "多份" : "一份"} PDF 到這裡`)}
         </strong>
-        {!compact && <span>點擊任意位置選取檔案，僅支援 .pdf</span>}
+        {!compact && <span>{description}</span>}
       </div>
     </label>
   );

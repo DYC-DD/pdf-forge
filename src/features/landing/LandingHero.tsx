@@ -100,7 +100,7 @@ export default function LandingHero() {
           />
         </h1>
         <p>
-          合併、拆分、壓縮 PDF，或將頁面轉成圖片，
+          合併、拆分、壓縮 PDF，或轉換 PDF 與圖片格式，
           <br />
           所有操作都直接在瀏覽器中完成。
         </p>

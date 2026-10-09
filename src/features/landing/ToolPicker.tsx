@@ -46,7 +46,7 @@ export default function ToolPicker({
         <div>
           <span className="section-kicker">START HERE</span>
           <h2 id="tool-heading">今天想整理什麼？</h2>
-          <p>選擇工具，接著把 PDF 拖進工作區。</p>
+          <p>選擇工具，接著把檔案拖進工作區。</p>
         </div>
       </div>
       <nav className="tool-nav" aria-label="PDF 工具">
@@ -126,7 +126,7 @@ export default function ToolPicker({
           <span className="tool-tab-copy">
             <small>04 / CONVERT</small>
             <strong>轉換 PDF</strong>
-            <span>每頁轉圖片，分享更方便。</span>
+            <span>PDF 與圖片，轉成需要的格式。</span>
           </span>
           <PublicIcon
             name="arrow-up-right"

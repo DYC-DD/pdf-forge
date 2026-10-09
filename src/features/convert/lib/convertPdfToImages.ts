@@ -1,7 +1,7 @@
-import type JSZip from "jszip";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 import { fileStem } from "../../../shared/files/file";
+import { packImageZip } from "../../../shared/files/imageZip";
 import { pdfFileError, pdfPageCountError } from "../../../shared/pdf/limits";
 import { openPdf } from "../../../shared/pdf/preview";
 
@@ -127,51 +127,6 @@ async function renderImage(
   }
 }
 
-function packImages(
-  zip: JSZip,
-  signal?: AbortSignal,
-  onProgress?: (percent: number) => void
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const stream = zip.generateInternalStream({
-      type: "uint8array",
-      compression: "STORE",
-      streamFiles: true,
-    });
-    let chunks: BlobPart[] = [];
-    let settled = false;
-    const release = () => {
-      settled = true;
-      chunks = [];
-      signal?.removeEventListener("abort", onAbort);
-    };
-    const onAbort = () => {
-      stream.pause();
-      release();
-      reject(abortError());
-    };
-    stream
-      .on("data", (chunk, metadata) => {
-        if (settled) return;
-        chunks.push(new Uint8Array(chunk));
-        onProgress?.(Math.floor(metadata.percent));
-      })
-      .on("error", (error) => {
-        release();
-        reject(error);
-      })
-      .on("end", () => {
-        if (settled) return;
-        const blob = new Blob(chunks, { type: "application/zip" });
-        release();
-        resolve(blob);
-      });
-    signal?.addEventListener("abort", onAbort, { once: true });
-    if (signal?.aborted) onAbort();
-    else stream.resume();
-  });
-}
-
 export async function convertPdfToImages(file: File, options: ImageOptions) {
   checkCancelled(options.signal);
   const pages = [...new Set(options.pages)].sort((a, b) => a - b);
@@ -225,7 +180,7 @@ export async function convertPdfToImages(file: File, options: ImageOptions) {
     }
     if (!zip) throw new Error("無法建立圖片檔案。");
     options.onPackingProgress?.(0);
-    const blob = await packImages(
+    const blob = await packImageZip(
       zip,
       options.signal,
       options.onPackingProgress
