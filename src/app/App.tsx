@@ -15,15 +15,12 @@ export default function App() {
   const [tool, setTool] = useState<Tool>(
     () => toolFromPath(window.location.pathname) ?? "merge"
   );
-  const [directToolRoute] = useState(
-    () => toolFromPath(window.location.pathname) !== null
-  );
   const [hasSwitchedTool, setHasSwitchedTool] = useState(false);
   const {
     ref: workspaceRef,
     reveal: workspaceReveal,
     setReveal: setWorkspaceReveal,
-  } = useScrollReveal<HTMLDivElement>(directToolRoute);
+  } = useScrollReveal<HTMLDivElement>();
 
   useEffect(() => {
     if (window.location.hash === "#top") {
@@ -64,12 +61,7 @@ export default function App() {
       <main>
         <LandingHero />
 
-        <ToolPicker
-          tool={tool}
-          onSelect={selectTool}
-          hrefForTool={toolHref}
-          skipEntrance={directToolRoute}
-        />
+        <ToolPicker tool={tool} onSelect={selectTool} hrefForTool={toolHref} />
 
         <div
           className="workspace"

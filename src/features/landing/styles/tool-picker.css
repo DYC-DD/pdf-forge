@@ -7,7 +7,7 @@
 }
 .tool-section[data-reveal="play"]
   :is(.section-kicker, .section-heading h2, .section-heading p, .tool-tab) {
-  animation: tool-section-enter 300ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  animation: tool-section-enter 360ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   animation-delay: var(--enter-delay, 0ms);
 }
 .tool-section[data-reveal="play"] .section-heading h2 {
@@ -20,13 +20,13 @@
   --enter-delay: 90ms;
 }
 .tool-section[data-reveal="play"] .tool-tab:nth-child(2) {
-  --enter-delay: 135ms;
+  --enter-delay: 190ms;
 }
 .tool-section[data-reveal="play"] .tool-tab:nth-child(3) {
-  --enter-delay: 180ms;
+  --enter-delay: 290ms;
 }
 .tool-section[data-reveal="play"] .tool-tab:nth-child(4) {
-  --enter-delay: 225ms;
+  --enter-delay: 390ms;
 }
 @keyframes tool-section-enter {
   from {

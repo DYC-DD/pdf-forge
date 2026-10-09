@@ -24,6 +24,10 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 - 工具選擇區調整為桌面四欄、平板兩欄與手機單欄，並使用提供的 photo.svg 作為轉換工具圖示。
 - 拆分與轉換共用頁面縮圖元件；輸出檔名欄位支援 PDF、JPG、PNG 與 ZIP 副檔名。
 
+### Fixed
+
+- PDF 放大預覽逐頁限制畫布為最多 400 萬像素、單邊 4,096 像素，納入螢幕像素密度與像素取整；特殊尺寸頁面自動降低預覽解析度，維持顯示尺寸、比例與完整內容，不影響下載輸出。
+
 ## [1.0.2] - 2026-10-07
 
 ### Added

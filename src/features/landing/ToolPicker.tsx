@@ -7,16 +7,14 @@ type ToolPickerProps = {
   tool: Tool;
   onSelect: (tool: Tool) => void;
   hrefForTool: (tool: Tool) => string;
-  skipEntrance: boolean;
 };
 
 export default function ToolPicker({
   tool,
   onSelect,
   hrefForTool,
-  skipEntrance,
 }: ToolPickerProps) {
-  const { ref, reveal } = useScrollReveal<HTMLElement>(skipEntrance);
+  const { ref, reveal } = useScrollReveal<HTMLElement>();
 
   function handleSelect(
     event: React.MouseEvent<HTMLAnchorElement>,
