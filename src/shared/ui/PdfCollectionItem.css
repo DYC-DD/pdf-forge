@@ -7,8 +7,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
-.pdf-collection--grid-small {
+.pdf-collection--grid-medium {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+.pdf-collection--grid-small {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 9px;
 }
 .pdf-item {
@@ -282,15 +286,22 @@
 .pdf-item--compact .pdf-item-status {
   font-size: 11px;
 }
+@container pdf-workspace (max-width: 699px) {
+  .pdf-collection--grid-small {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
 @container pdf-workspace (max-width: 599px) {
   .pdf-collection--grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .pdf-collection--grid-medium,
   .pdf-collection--grid-small {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @container pdf-workspace (max-width: 429px) {
+  .pdf-collection--grid-medium,
   .pdf-collection--grid-small {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -301,6 +312,7 @@
   }
 }
 @container pdf-workspace (max-width: 269px) {
+  .pdf-collection--grid-medium,
   .pdf-collection--grid-small {
     grid-template-columns: minmax(0, 1fr);
   }

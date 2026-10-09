@@ -4,7 +4,9 @@ import { degrees, PDFDocument, PDFName, PDFString } from "pdf-lib";
 import { OPS, type PDFDocumentProxy } from "pdfjs-dist";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PDF_PREVIEW_LIMITS } from "../shared/pdf/limits";
 import { openPdf, renderPageThumbnail } from "../shared/pdf/preview";
+import { configurePreviewCanvas } from "../shared/pdf/previewCanvas";
 
 // Use PDF.js's Node-compatible build while exercising real CMap loading.
 vi.mock("pdfjs-dist", () => import("pdfjs-dist/legacy/build/pdf.mjs"));
@@ -23,6 +25,147 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+
+describe("PDF preview canvas limits", () => {
+  function makeCanvas() {
+    return {
+      width: 0,
+      height: 0,
+      style: { width: "", height: "" },
+    } as HTMLCanvasElement;
+  }
+
+  function expectBoundedCanvas(canvas: HTMLCanvasElement) {
+    expect(canvas.width).toBeGreaterThanOrEqual(1);
+    expect(canvas.height).toBeGreaterThanOrEqual(1);
+    expect(canvas.width).toBeLessThanOrEqual(PDF_PREVIEW_LIMITS.canvasEdge);
+    expect(canvas.height).toBeLessThanOrEqual(PDF_PREVIEW_LIMITS.canvasEdge);
+    expect(canvas.width * canvas.height).toBeLessThanOrEqual(
+      PDF_PREVIEW_LIMITS.canvasPixels
+    );
+  }
+
+  it.each([
+    [1, 600, 800],
+    [1.5, 900, 1200],
+    [2, 1200, 1600],
+    [3, 1200, 1600],
+  ])(
+    "preserves ordinary page resolution at device pixel ratio %s",
+    (devicePixelRatio, expectedWidth, expectedHeight) => {
+      const canvas = makeCanvas();
+      configurePreviewCanvas(
+        canvas,
+        { width: 600, height: 800 },
+        devicePixelRatio
+      );
+      expect(canvas.width).toBe(expectedWidth);
+      expect(canvas.height).toBe(expectedHeight);
+      expect(canvas.style).toEqual({ width: "600px", height: "800px" });
+    }
+  );
+
+  it.each([
+    [600, 100_000],
+    [100_000, 600],
+    [10_000, 10_000],
+    [2000.25, 1999.75],
+    [0.000001, 1_000_000],
+    [1_000_000, 0.000001],
+  ])(
+    "bounds a %s × %s bitmap while preserving display size and the complete page",
+    (width, height) => {
+      const canvas = makeCanvas();
+      const transform = configurePreviewCanvas(canvas, { width, height }, 2);
+      expectBoundedCanvas(canvas);
+      expect(canvas.style).toEqual({
+        width: `${width}px`,
+        height: `${height}px`,
+      });
+      // Both page edges must map into the bitmap, including fractional rounding.
+      expect(width * transform[0]).toBeCloseTo(canvas.width);
+      expect(height * transform[3]).toBeCloseTo(canvas.height);
+      expect([transform[1], transform[2], transform[4], transform[5]]).toEqual([
+        0, 0, 0, 0,
+      ]);
+    }
+  );
+
+  it.each([
+    [4096, 900],
+    [2000, 2000],
+  ])("retains resolution exactly at the %s × %s boundary", (width, height) => {
+    const canvas = makeCanvas();
+    configurePreviewCanvas(canvas, { width, height });
+    expect(canvas.width).toBe(width);
+    expect(canvas.height).toBe(height);
+    expectBoundedCanvas(canvas);
+  });
+
+  it.each([0, -1, NaN, Infinity])(
+    "uses a safe density for device pixel ratio %s",
+    (devicePixelRatio) => {
+      const canvas = makeCanvas();
+      configurePreviewCanvas(
+        canvas,
+        { width: 600, height: 800 },
+        devicePixelRatio
+      );
+      expect(canvas.width).toBe(600);
+      expect(canvas.height).toBe(800);
+    }
+  );
+
+  it.each([
+    [0, 800],
+    [600, -1],
+    [NaN, 800],
+    [600, Infinity],
+  ])(
+    "rejects invalid %s × %s dimensions before allocation",
+    (width, height) => {
+      const canvas = makeCanvas();
+      expect(() => configurePreviewCanvas(canvas, { width, height })).toThrow(
+        "PDF 頁面尺寸不正確"
+      );
+      expect(canvas.width).toBe(0);
+      expect(canvas.height).toBe(0);
+    }
+  );
+
+  it.each([0, 90])(
+    "bounds a long second page rotated %s degrees independently of the first page",
+    async (rotation) => {
+      const document = await PDFDocument.create();
+      document.addPage([600, 800]);
+      document.addPage([600, 100_000]).setRotation(degrees(rotation));
+      const file = new File(
+        [new Uint8Array(await document.save())],
+        "mixed.pdf"
+      );
+      const task = await openPdf(file);
+      try {
+        const pdf = await task.promise;
+        const first = (await pdf.getPage(1)).getViewport({ scale: 1 });
+        const scale = 0.9;
+        const page = await pdf.getPage(2);
+        const original = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({
+          scale: Math.min(scale, (first.width * scale) / original.width),
+        });
+        const canvas = makeCanvas();
+        configurePreviewCanvas(canvas, viewport, 2);
+        expectBoundedCanvas(canvas);
+        expect(canvas.style).toEqual({
+          width: `${viewport.width}px`,
+          height: `${viewport.height}px`,
+        });
+      } finally {
+        await task.destroy();
+      }
+    }
+  );
 });
 
 it("applies the image decoding limit to compression previews", async () => {

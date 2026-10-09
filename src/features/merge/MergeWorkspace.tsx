@@ -39,7 +39,7 @@ import type { MergeItem } from "./types";
 
 export default function MergeWorkspace() {
   const [items, setItems] = useState<MergeItem[]>([]);
-  const [viewMode, setViewMode] = useViewMode("merge", "list");
+  const [viewMode, setViewMode] = useViewMode();
   const [sorting, setSorting] = useState(false);
   const [outputName, setOutputName] = useState("merged.pdf");
   const [message, setMessage] = useState("");

@@ -16,19 +16,19 @@ import { runSplitPdf } from "../../shared/pdf/runPdfOperation";
 import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
 import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
+import PdfPageThumbnail from "../../shared/ui/PdfPageThumbnail";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import RubberSegment from "../../shared/ui/RubberSegment";
 import useViewMode from "../../shared/ui/useViewMode";
 import ViewModeToggle from "../../shared/ui/ViewModeToggle";
-import PageThumbnail from "./components/PageThumbnail";
 import { parsePageRange } from "./lib/parsePageRange";
 import { resolveGroupFilenames } from "./lib/resolveGroupFilenames";
 import type { PageGroup } from "./types";
 
 export default function SplitWorkspace() {
   const [file, setFile] = useState<File | null>(null);
-  const [viewMode, setViewMode] = useViewMode("split", "grid");
+  const [viewMode, setViewMode] = useViewMode();
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -365,7 +365,7 @@ export default function SplitWorkspace() {
                 </div>
                 <div className={`pdf-collection pdf-collection--${viewMode}`}>
                   {pages.map((pageNumber) => (
-                    <PageThumbnail
+                    <PdfPageThumbnail
                       key={`${file.name}-${pageNumber}`}
                       pdf={pdf}
                       pageNumber={pageNumber}
@@ -374,6 +374,8 @@ export default function SplitWorkspace() {
                         mode === "every" || selectedPages.has(pageNumber)
                       }
                       disabled={mode === "every"}
+                      readOnly={mode === "every"}
+                      readOnlyLabel="每頁一檔"
                       groupCount={
                         mode === "custom"
                           ? (groupCounts.get(pageNumber) ?? 0)

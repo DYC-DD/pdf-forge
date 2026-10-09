@@ -16,9 +16,20 @@ import { fireButtonConfetti } from "../../shared/ui/buttonConfetti";
 import Counter, { ByteCounter } from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
 import OutputFilenameField from "../../shared/ui/OutputFilenameField";
+import PdfCollectionItem from "../../shared/ui/PdfCollectionItem";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
+import useViewMode from "../../shared/ui/useViewMode";
+import ViewModeToggle from "../../shared/ui/ViewModeToggle";
+import ImagePreviewDialog from "../convert/components/ImagePreviewDialog";
+import { rasterImage } from "../convert/lib/imageCanvas";
+import { conversionStem, displayedSize } from "../convert/lib/imageSource";
+import {
+  detectCompressionSource,
+  type CompressionSource,
+} from "./lib/compressionSource";
 import { compressPdf } from "./lib/compressPdf";
+import { runImageCompression } from "./lib/runImageCompression";
 import type { CompressionMode } from "./types";
 
 type CompressionResult = {
@@ -26,7 +37,7 @@ type CompressionResult = {
   smaller: boolean;
 };
 
-const compressionModes: Record<
+const pdfCompressionModes: Record<
   CompressionMode,
   { label: string; description: string }
 > = {
@@ -44,10 +55,42 @@ const compressionModes: Record<
   },
 };
 
+const jpgCompressionModes = {
+  high: {
+    label: "高壓縮",
+    description: "降低圖片品質，最長邊縮至 1,920 像素；不放大圖片。",
+  },
+  medium: {
+    label: "中壓縮",
+    description: "調整圖片品質，保留原始解析度；照片細節可能降低。",
+  },
+  low: {
+    label: "低壓縮",
+    description: "移除文字註解等附加資料，不重新編碼或改變尺寸。",
+  },
+};
+const pngCompressionModes = {
+  high: {
+    label: "高壓縮",
+    description: "最長邊縮至 1,920 像素，保留比例與透明背景；不放大圖片。",
+  },
+  medium: {
+    label: "中壓縮",
+    description: "無損最佳化圖片編碼，保留原始解析度與透明背景。",
+  },
+  low: {
+    label: "低壓縮",
+    description: "移除文字註解等附加資料，不重新編碼或改變尺寸。",
+  },
+};
+
 export default function CompressWorkspace() {
-  const [file, setFile] = useState<File | null>(null);
+  const [source, setSource] = useState<CompressionSource | null>(null);
+  const [detecting, setDetecting] = useState(false);
+  const [viewMode, setViewMode] = useViewMode();
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [thumbnail, setThumbnail] = useState("");
+  const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState<number>();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [mode, setMode] = useState<CompressionMode>("medium");
@@ -57,53 +100,110 @@ export default function CompressWorkspace() {
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const controllerRef = useRef<AbortController | null>(null);
+  const generation = useRef(0);
+  const file = source?.file ?? null;
+  const isImage = source?.kind === "image";
+  const extension = source?.kind === "image" ? source.info.format : "pdf";
+  const fileType = isImage ? "圖片" : "PDF";
+  const defaultName = file
+    ? `${conversionStem(file.name)}-compressed.${extension}`
+    : "compressed.pdf";
+  const compressionModes =
+    source?.kind === "image"
+      ? source.info.format === "png"
+        ? pngCompressionModes
+        : jpgCompressionModes
+      : pdfCompressionModes;
 
   useEffect(() => {
-    if (!file) return;
-    let cancelled = false;
+    if (!source) return;
+    const abort = new AbortController();
+    let thumbnailUrl = "";
     setLoading(true);
-    inspectPdf(file, pdfPageCountError, COMPRESSION_LIMITS.imagePixels)
-      .then((info) => {
-        if (cancelled) return;
-        setPageCount(info.pageCount);
-        setThumbnail(info.thumbnail);
-      })
+    const inspect =
+      source.kind === "image"
+        ? rasterImage(
+            source.file,
+            source.info,
+            0,
+            "image/png",
+            abort.signal,
+            720
+          ).then((blob) => {
+            if (abort.signal.aborted) return;
+            thumbnailUrl = URL.createObjectURL(blob);
+            const size = displayedSize(source.info);
+            setThumbnail(thumbnailUrl);
+            setThumbnailAspectRatio(size.width / size.height);
+          })
+        : inspectPdf(
+            source.file,
+            pdfPageCountError,
+            COMPRESSION_LIMITS.imagePixels
+          ).then((info) => {
+            if (abort.signal.aborted) return;
+            setPageCount(info.pageCount);
+            setThumbnail(info.thumbnail);
+            setThumbnailAspectRatio(info.thumbnailAspectRatio);
+          });
+    inspect
       .catch((error) => {
-        if (!cancelled) setLoadError(fileError(error));
+        if (!abort.signal.aborted) setLoadError(fileError(error));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!abort.signal.aborted) setLoading(false);
       });
     return () => {
-      cancelled = true;
+      abort.abort();
+      if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
     };
-  }, [file]);
+  }, [source]);
 
-  useEffect(() => () => controllerRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      generation.current++;
+      controllerRef.current?.abort();
+    },
+    []
+  );
 
-  function chooseFile(files: File[]) {
-    if (processing || files.length === 0) return;
-    const chosen = files[0];
-    const error = pdfFileError(chosen);
-    if (error) {
-      setMessage(error);
-      return;
-    }
-    setFile(chosen);
-    setPageCount(null);
-    setThumbnail("");
-    setLoadError("");
-    setResult(null);
-    setPreviewFile(null);
-    setOutputName(`${fileStem(chosen.name)}-compressed.pdf`);
+  async function chooseFile(files: File[]) {
+    if (processing || detecting || files.length === 0) return;
+    const current = ++generation.current;
+    setDetecting(true);
     setMessage("");
+    try {
+      const chosen = await detectCompressionSource(files);
+      if (current !== generation.current) return;
+      if (chosen.kind === "pdf") {
+        const error = pdfFileError(chosen.file);
+        if (error) throw new Error(error);
+      }
+      setSource(chosen);
+      setLoading(true);
+      setPageCount(null);
+      setThumbnail("");
+      setThumbnailAspectRatio(undefined);
+      setLoadError("");
+      setResult(null);
+      setPreviewFile(null);
+      const format = chosen.kind === "image" ? chosen.info.format : "pdf";
+      setOutputName(`${conversionStem(chosen.file.name)}-compressed.${format}`);
+    } catch (error) {
+      if (current === generation.current) setMessage(fileError(error));
+    } finally {
+      if (current === generation.current) setDetecting(false);
+    }
   }
 
   function clearFile() {
     if (processing) return;
-    setFile(null);
+    generation.current++;
+    setDetecting(false);
+    setSource(null);
     setPageCount(null);
     setThumbnail("");
+    setThumbnailAspectRatio(undefined);
     setLoading(false);
     setLoadError("");
     setResult(null);
@@ -120,7 +220,14 @@ export default function CompressWorkspace() {
   }
 
   async function handleCompress() {
-    if (!file || pageCount === null || loading || loadError || processing)
+    if (
+      !file ||
+      (!isImage && pageCount === null) ||
+      loading ||
+      loadError ||
+      processing ||
+      controllerRef.current
+    )
       return;
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -128,29 +235,40 @@ export default function CompressWorkspace() {
     setResult(null);
     setMessage("");
     try {
-      const { blob, appliedMode } = await compressPdf(
-        file,
-        mode,
-        controller.signal
-      );
+      const { blob, appliedMode } = await (isImage
+        ? runImageCompression(file, mode, controller.signal)
+        : compressPdf(file, mode, controller.signal));
+      if (controller.signal.aborted) return;
       if (blob.size >= file.size) {
         setResult({ file, smaller: false });
         setMessage(
-          "目前模式無法再縮小這份 PDF；內容可能已壓縮，或圖片格式不適用。"
+          isImage
+            ? "目前模式無法再縮小這張圖片；已保留原始檔案。"
+            : "目前模式無法再縮小這份 PDF；內容可能已壓縮，或圖片格式不適用。"
         );
       } else {
         setResult({
-          file: new File([blob], `${fileStem(outputName)}.pdf`, {
-            type: "application/pdf",
-          }),
+          file: new File(
+            [blob],
+            `${isImage ? conversionStem(outputName) : fileStem(outputName)}.${extension}`,
+            {
+              type: isImage
+                ? extension === "jpg"
+                  ? "image/jpeg"
+                  : "image/png"
+                : "application/pdf",
+            }
+          ),
           smaller: true,
         });
         setMessage(
-          appliedMode === mode
-            ? "壓縮完成，可以預覽或下載結果。"
-            : appliedMode === "low"
-              ? "圖片不適用、超出處理限制或沒有產生更小的結果；已採用 PDF 結構壓縮。"
-              : "高壓縮沒有比中壓縮更小；已採用較小的中壓縮結果。"
+          isImage && appliedMode !== mode
+            ? "壓縮完成；已採用檔案較小、畫質損失較少的結果，可預覽或下載。"
+            : appliedMode === mode
+              ? "壓縮完成，可以預覽或下載結果。"
+              : appliedMode === "low"
+                ? "圖片不適用、超出處理限制或沒有產生更小的結果；已採用 PDF 結構壓縮。"
+                : "高壓縮沒有比中壓縮更小；已採用較小的中壓縮結果。"
         );
       }
     } catch (error) {
@@ -178,63 +296,92 @@ export default function CompressWorkspace() {
         <div className="card-header file-card-header">
           <div>
             <div className="eyebrow">01 / 選擇檔案</div>
-            <h2 id="compress-heading">讓 PDF 更輕巧</h2>
-            <p>加入一份 PDF（最多 64 MB、600 頁），再選擇壓縮方式。</p>
+            <h2 id="compress-heading">
+              讓{fileType === "PDF" ? " PDF " : "圖片"}更輕巧
+            </h2>
+            <p>
+              {isImage
+                ? "一次壓縮一張圖片，保留原格式；單張最多 64 MB、4,000 萬像素。"
+                : "加入一份 PDF 或圖片，自動辨識壓縮模式；PDF 最多 64 MB、600 頁。"}
+            </p>
           </div>
           {file && (
             <div className="file-list-actions">
               <span className="count-badge">
                 <Counter value={1} /> 份檔案
               </span>
-              <button
-                type="button"
-                className="clear-files-button"
-                onClick={clearFile}
-                disabled={processing}
-                aria-label="清除 PDF"
-              >
-                <PublicIcon name="trash" size={15} />
-                清除
-              </button>
+              <div className="file-list-action-buttons">
+                <button
+                  type="button"
+                  className="clear-files-button"
+                  onClick={clearFile}
+                  disabled={processing}
+                  aria-label={`清除${fileType === "PDF" ? " PDF" : "圖片"}`}
+                >
+                  <PublicIcon name="trash" size={15} />
+                  清除
+                </button>
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  disabled={processing}
+                />
+              </div>
             </div>
           )}
         </div>
 
         {!file ? (
-          <DropZone multiple={false} onFiles={chooseFile} />
+          <DropZone
+            multiple={false}
+            onFiles={(files) => void chooseFile(files)}
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            label="選擇一份 PDF 或圖片"
+            title={detecting ? "正在辨識檔案…" : "拖曳一份 PDF 或圖片到這裡"}
+            description="點擊任意位置選取檔案，一次只能加入一個檔案"
+            disabled={detecting}
+          />
         ) : (
           <>
-            <div className="source-file compress-source-file">
-              {thumbnail ? (
-                <img className="compress-file-preview" src={thumbnail} alt="" />
-              ) : (
-                <div className="source-file-icon">
-                  <PublicIcon name="file-type-pdf" size={22} />
-                </div>
-              )}
-              <div>
-                <strong title={file.name}>{file.name}</strong>
-                <span>
-                  <ByteCounter size={file.size} />
-                  {pageCount !== null && (
-                    <>
-                      {" · "}
-                      <Counter value={pageCount} /> 頁
-                    </>
-                  )}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="button button--small button--outline"
-                onClick={() => setPreviewFile(file)}
-                disabled={loading || Boolean(loadError)}
-              >
-                <PublicIcon name="eye" size={15} />
-                預覽
-              </button>
+            <div className={`pdf-collection pdf-collection--${viewMode}`}>
+              <PdfCollectionItem
+                viewMode={viewMode}
+                position={<Counter value={1} minimumIntegerDigits={2} />}
+                thumbnail={thumbnail}
+                thumbnailAspectRatio={thumbnailAspectRatio}
+                title={file.name}
+                metadata={
+                  <>
+                    <ByteCounter size={file.size} />
+                    {source?.kind === "image" && (
+                      <>
+                        {" · "}
+                        {displayedSize(source.info).width} ×{" "}
+                        {displayedSize(source.info).height} px
+                      </>
+                    )}
+                    {pageCount !== null && (
+                      <>
+                        {" · "}
+                        <Counter value={pageCount} /> 頁
+                      </>
+                    )}
+                  </>
+                }
+                activateLabel={`預覽 ${file.name}`}
+                activateTitle={`預覽${fileType}`}
+                previewTitle={`預覽${fileType}`}
+                previewLabel={`預覽 ${file.name}`}
+                onActivate={() => setPreviewFile(file)}
+                onPreview={() => setPreviewFile(file)}
+                mainDisabled={loading || Boolean(loadError)}
+                previewDisabled={loading || Boolean(loadError)}
+                error={Boolean(loadError)}
+              />
             </div>
-            {loading && <div className="loading-panel">正在讀取 PDF…</div>}
+            {loading && (
+              <div className="loading-panel">正在讀取{fileType}…</div>
+            )}
             {loadError && (
               <p className="status-message" role="alert">
                 {loadError}
@@ -256,7 +403,11 @@ export default function CompressWorkspace() {
         <div className="compress-options">
           <div className="eyebrow">02 / 壓縮與匯出</div>
           <h2 id="compress-options-heading">設定壓縮方式</h2>
-          <p>選擇強度，文字與向量內容會保留；完成後可預覽結果再下載。</p>
+          <p>
+            {isImage
+              ? "選擇強度，輸出維持原圖片格式；完成後可預覽結果再下載。"
+              : "選擇強度，文字與向量內容會保留；完成後可預覽結果再下載。"}
+          </p>
           <FormControl className="compress-mode-field" fullWidth>
             <InputLabel id="compress-mode-label" shrink>
               壓縮方式
@@ -325,9 +476,8 @@ export default function CompressWorkspace() {
           id="compress-name"
           value={outputName}
           onChange={setOutputName}
-          defaultName={
-            file ? `${fileStem(file.name)}-compressed.pdf` : "compressed.pdf"
-          }
+          defaultName={defaultName}
+          extension={extension}
           disabled={processing}
           placeholder="compressed"
         />
@@ -336,7 +486,7 @@ export default function CompressWorkspace() {
           className="button button--accent button--full"
           disabled={
             !file ||
-            pageCount === null ||
+            (!isImage && pageCount === null) ||
             loading ||
             Boolean(loadError) ||
             processing
@@ -344,7 +494,9 @@ export default function CompressWorkspace() {
           onClick={handleCompress}
         >
           <PublicIcon name="compress" size={18} />
-          {processing ? "正在壓縮 PDF…" : "開始壓縮 PDF"}
+          {processing
+            ? `正在壓縮${fileType === "PDF" ? " PDF" : "圖片"}…`
+            : `開始壓縮${fileType === "PDF" ? " PDF" : "圖片"}`}
         </button>
         {processing && (
           <button
@@ -370,19 +522,24 @@ export default function CompressWorkspace() {
                 type="button"
                 className="button button--dark button--full"
                 onClick={(event) => {
-                  saveBlob(result.file, `${fileStem(outputName)}.pdf`);
+                  saveBlob(
+                    result.file,
+                    `${isImage ? conversionStem(outputName) : fileStem(outputName)}.${extension}`
+                  );
                   fireButtonConfetti(event.currentTarget);
                 }}
               >
                 <PublicIcon name="download" size={18} />
-                下載壓縮後 PDF
+                下載壓縮後{fileType === "PDF" ? " PDF" : "圖片"}
               </button>
             )}
           </div>
         )}
-        <p className="encryption-note">
-          若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
-        </p>
+        {!isImage && (
+          <p className="encryption-note">
+            若原檔只有編輯權限限制，輸出檔不會保留原加密設定。
+          </p>
+        )}
         {message && (
           <p
             className={`status-message ${result?.smaller ? "status-message--success" : ""}`}
@@ -392,14 +549,22 @@ export default function CompressWorkspace() {
           </p>
         )}
       </aside>
-      {previewFile && (
-        <PdfPreviewDialog
-          key={previewFile.name}
-          file={previewFile}
-          maxImagePixels={COMPRESSION_LIMITS.imagePixels}
-          onClose={() => setPreviewFile(null)}
-        />
-      )}
+      {previewFile &&
+        (isImage ? (
+          <ImagePreviewDialog
+            key={previewFile.name}
+            item={{ file: previewFile, rotation: 0 }}
+            description={previewFile === file ? "原始圖片預覽" : "壓縮結果預覽"}
+            onClose={() => setPreviewFile(null)}
+          />
+        ) : (
+          <PdfPreviewDialog
+            key={previewFile.name}
+            file={previewFile}
+            maxImagePixels={COMPRESSION_LIMITS.imagePixels}
+            onClose={() => setPreviewFile(null)}
+          />
+        ))}
     </div>
   );
 }

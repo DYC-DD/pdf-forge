@@ -1,6 +1,6 @@
 {
   "name": "pdf-forge",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,9 +26,13 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@jsquash/jpeg": "^1.6.0",
+    "@jsquash/webp": "^1.5.0",
     "@mui/material": "^9.4.0",
     "@neslinesli93/qpdf-wasm": "^0.3.0",
     "canvas-confetti": "^1.9.4",
+    "fast-png": "^8.0.0",
+    "fflate": "^0.8.3",
     "jszip": "^3.10.2",
     "lucide-react": "^1.48.0",
     "motion": "^13.4.4",

@@ -1,21 +1,20 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  renderPageThumbnail,
-  type PdfThumbnail,
-} from "../../../shared/pdf/preview";
-import Counter from "../../../shared/ui/Counter";
-import PdfCollectionItem from "../../../shared/ui/PdfCollectionItem";
-import type { ViewMode } from "../../../shared/ui/useViewMode";
+import { renderPageThumbnail, type PdfThumbnail } from "../pdf/preview";
+import Counter from "./Counter";
+import PdfCollectionItem from "./PdfCollectionItem";
+import type { ViewMode } from "./useViewMode";
 
-export default function PageThumbnail({
+export default function PdfPageThumbnail({
   pdf,
   pageNumber,
   viewMode,
   selected,
   disabled,
-  groupCount,
+  groupCount = 0,
+  readOnly = false,
+  readOnlyLabel = "已選取",
   onToggle,
   onPreview,
 }: {
@@ -24,7 +23,9 @@ export default function PageThumbnail({
   viewMode: ViewMode;
   selected: boolean;
   disabled: boolean;
-  groupCount: number;
+  groupCount?: number;
+  readOnly?: boolean;
+  readOnlyLabel?: string;
   onToggle: () => void;
   onPreview: () => void;
 }) {
@@ -78,7 +79,7 @@ export default function PageThumbnail({
       thumbnail={image?.src}
       thumbnailAspectRatio={image?.aspectRatio}
       title={`第 ${pageNumber} 頁`}
-      titleStatus={disabled ? "每頁一檔" : selected ? "已選取" : "未選取"}
+      titleStatus={readOnly ? readOnlyLabel : selected ? "已選取" : "未選取"}
       metadata={
         groupCount > 0 ? (
           <>已加入 {visible ? <Counter value={groupCount} /> : groupCount} 組</>
@@ -91,7 +92,7 @@ export default function PageThumbnail({
       onPreview={onPreview}
       mainDisabled={disabled}
       selected={selected}
-      readOnly={disabled}
+      readOnly={readOnly}
     />
   );
 }

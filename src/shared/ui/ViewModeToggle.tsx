@@ -7,8 +7,9 @@ import "./ViewModeToggle.css";
 
 const viewModes = {
   list: { label: "列表", icon: "list", next: "grid" },
-  grid: { label: "大網格", icon: "grid-3x3", next: "grid-small" },
-  "grid-small": { label: "小網格", icon: "grid-4x4", next: "list" },
+  grid: { label: "大網格", icon: "grid-3x3", next: "grid-medium" },
+  "grid-medium": { label: "中網格", icon: "grid-4x4", next: "grid-small" },
+  "grid-small": { label: "小網格", icon: "grid-5x5", next: "list" },
 } as const;
 
 export default function ViewModeToggle({

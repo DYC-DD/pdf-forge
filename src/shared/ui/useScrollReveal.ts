@@ -2,12 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 export type RevealState = "waiting" | "play" | "none";
 
-export default function useScrollReveal<T extends HTMLElement>(
-  initiallyVisible: boolean
-) {
+export default function useScrollReveal<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [reveal, setReveal] = useState<RevealState>(() =>
-    initiallyVisible ||
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? "none"
       : "waiting"
