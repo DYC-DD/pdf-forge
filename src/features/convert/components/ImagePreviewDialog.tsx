@@ -7,9 +7,11 @@ import type { ImageItem } from "../lib/imageSource";
 export default function ImagePreviewDialog({
   item,
   onClose,
+  description = "原始圖片預覽",
 }: {
-  item: ImageItem;
+  item: Pick<ImageItem, "file" | "rotation">;
   onClose: () => void;
+  description?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [url, setUrl] = useState("");
@@ -44,7 +46,8 @@ export default function ImagePreviewDialog({
           <div className="pdf-preview-title">
             <strong>{item.file.name}</strong>
             <span>
-              原始圖片預覽{item.rotation ? ` · 向右旋轉 ${item.rotation}°` : ""}
+              {description}
+              {item.rotation ? ` · 向右旋轉 ${item.rotation}°` : ""}
             </span>
           </div>
           <button

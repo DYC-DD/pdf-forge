@@ -39,7 +39,8 @@ export async function decodeJpeg(bytes: Uint8Array, signal?: AbortSignal) {
 export async function encodeJpeg(
   image: ImageData,
   grayscale: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  quality = 100
 ) {
   checkImageCancelled(signal);
   jpegEncoder ??= import("@jsquash/jpeg/codec/enc/mozjpeg_enc.js")
@@ -55,12 +56,12 @@ export async function encodeJpeg(
   checkImageCancelled(signal);
   const result = encoder.encode(image.data, image.width, image.height, {
     ...defaultOptions,
-    quality: 100,
+    quality,
     color_space: grayscale ? 1 : 3,
     auto_subsample: false,
     chroma_subsample: 1,
     separate_chroma_quality: true,
-    chroma_quality: 100,
+    chroma_quality: quality,
     smoothing: 0,
   });
   if (!result?.length) throw new Error("JPG 編碼失敗，請分批處理較少圖片。");

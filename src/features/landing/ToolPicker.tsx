@@ -103,7 +103,7 @@ export default function ToolPicker({
           <span className="tool-tab-copy">
             <small>03 / COMPRESS</small>
             <strong>壓縮 PDF</strong>
-            <span>縮小檔案，維持清晰品質。</span>
+            <span>PDF 與圖片，縮小檔案大小。</span>
           </span>
           <PublicIcon
             name="arrow-up-right"

@@ -6,6 +6,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Added
 
+- 壓縮工具新增 JPG／PNG 圖片壓縮，依檔案內容自動辨識 PDF 或圖片；一次只接受一個檔案，清除後恢復 PDF 模式。提供三種強度、原圖與結果預覽、大小比較、原格式下載及 Worker 取消／逾時處理；PNG 保留透明度與 16 位元資料。
 - 轉換工具自動辨識 PDF 或 JPG／PNG 圖片；圖片模式支援 PDF、JPG、PNG、SVG（嵌入圖片）及 WEBP，單張直接下載、多張圖片打包 ZIP，PDF 則依圖片順序合成一份。
 - 圖片模式沿用列表與各尺寸網格，支援拖曳與鍵盤排序、90° 旋轉、圖片放大預覽及合成 PDF 預覽；保留原始像素，PDF 直接嵌入圖片並處理 EXIF 方向，PNG 保留透明度，JPG 透明區域補白。
 - 圖片轉換提供 Worker 處理、取消與進度顯示；每次最多 100 張、單張 64 MB、總計 128 MB，單張最多 4,000 萬像素／單邊 16,384 像素，輸出上限 128 MB。
