@@ -13,6 +13,12 @@ export const PDF_LIMITS = {
   splitCopiedPages: 600,
 } as const;
 
+// Bound each preview bitmap to roughly 16 MB of RGBA pixels, including Retina.
+export const PDF_PREVIEW_LIMITS = {
+  canvasEdge: 4096,
+  canvasPixels: 4_000_000,
+} as const;
+
 export const COMPRESSION_LIMITS = {
   timeoutMs: 120_000,
   workingFileBytes: 128 * MiB,

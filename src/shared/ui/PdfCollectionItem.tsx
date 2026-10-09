@@ -23,6 +23,7 @@ export default function PdfCollectionItem({
   activateLabel,
   activateTitle,
   previewLabel,
+  previewTitle = "預覽 PDF",
   onActivate,
   onPreview,
   mainDragProps,
@@ -49,6 +50,7 @@ export default function PdfCollectionItem({
   activateLabel: string;
   activateTitle: string;
   previewLabel: string;
+  previewTitle?: string;
   onActivate?: () => void;
   onPreview: () => void;
   mainDragProps?: ButtonHTMLAttributes<HTMLButtonElement>;
@@ -65,6 +67,7 @@ export default function PdfCollectionItem({
   style?: CSSProperties;
 }) {
   const isGrid = viewMode !== "list";
+  const isCompact = viewMode === "grid-medium" || viewMode === "grid-small";
   const controls = (
     <div className="pdf-item-actions">
       {actions}
@@ -74,14 +77,14 @@ export default function PdfCollectionItem({
         onClick={onPreview}
         disabled={previewDisabled}
         aria-label={previewLabel}
-        title="預覽 PDF"
+        title={previewTitle}
       >
         <PublicIcon name="eye" size={17} />
       </button>
       {selected !== undefined && (
         <Checkbox
           className="pdf-item-select"
-          size={viewMode === "grid-small" ? "small" : "medium"}
+          size={isCompact ? "small" : "medium"}
           checked={selected}
           onChange={onActivate}
           slotProps={{ input: { "aria-label": activateLabel } }}
@@ -97,7 +100,7 @@ export default function PdfCollectionItem({
     <div
       ref={rootRef}
       className={`pdf-item pdf-item--${viewMode === "list" ? "list" : "grid"} ${
-        viewMode === "grid-small" ? "pdf-item--compact" : ""
+        isCompact ? "pdf-item--compact" : ""
       } ${
         selected ? "pdf-item--selected" : ""
       } ${readOnly ? "pdf-item--readonly" : ""} ${

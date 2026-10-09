@@ -1,25 +1,3 @@
-.compress-source-file {
-  gap: 10px;
-}
-
-.compress-file-preview {
-  width: 43px;
-  height: 56px;
-  flex: none;
-  border: 1px solid #65676d;
-  border-radius: 5px;
-  background: #fff;
-  object-fit: contain;
-}
-
-.compress-source-file > div:nth-child(2) {
-  flex: 1;
-}
-
-.compress-source-file .button {
-  margin-left: 0;
-}
-
 .compress-options {
   margin-top: 0;
 }
@@ -157,20 +135,6 @@
 
 .compress-cancel {
   margin-top: 10px;
-}
-
-@media (max-width: 650px) {
-  .compress-source-file {
-    flex-wrap: wrap;
-  }
-
-  .compress-source-file > div:nth-child(2) {
-    flex-basis: calc(100% - 55px);
-  }
-
-  .compress-source-file .button:first-of-type {
-    margin-left: auto;
-  }
 }
 
 @media (max-width: 355px) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import CompressWorkspace from "../features/compress/CompressWorkspace";
+import ConvertWorkspace from "../features/convert/ConvertWorkspace";
 import LandingHero from "../features/landing/LandingHero";
 import ToolPicker, { type Tool } from "../features/landing/ToolPicker";
 import MergeWorkspace from "../features/merge/MergeWorkspace";
@@ -14,15 +15,12 @@ export default function App() {
   const [tool, setTool] = useState<Tool>(
     () => toolFromPath(window.location.pathname) ?? "merge"
   );
-  const [directToolRoute] = useState(
-    () => toolFromPath(window.location.pathname) !== null
-  );
   const [hasSwitchedTool, setHasSwitchedTool] = useState(false);
   const {
     ref: workspaceRef,
     reveal: workspaceReveal,
     setReveal: setWorkspaceReveal,
-  } = useScrollReveal<HTMLDivElement>(directToolRoute);
+  } = useScrollReveal<HTMLDivElement>();
 
   useEffect(() => {
     if (window.location.hash === "#top") {
@@ -63,12 +61,7 @@ export default function App() {
       <main>
         <LandingHero />
 
-        <ToolPicker
-          tool={tool}
-          onSelect={selectTool}
-          hrefForTool={toolHref}
-          skipEntrance={directToolRoute}
-        />
+        <ToolPicker tool={tool} onSelect={selectTool} hrefForTool={toolHref} />
 
         <div
           className="workspace"
@@ -85,6 +78,9 @@ export default function App() {
           </div>
           <div id="compress-panel" hidden={tool !== "compress"}>
             {tool === "compress" && <CompressWorkspace />}
+          </div>
+          <div id="convert-panel" hidden={tool !== "convert"}>
+            {tool === "convert" && <ConvertWorkspace />}
           </div>
         </div>
       </main>

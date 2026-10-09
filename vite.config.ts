@@ -39,5 +39,6 @@ export default defineConfig(({ command, isPreview, mode }) => {
   return {
     base: command === "build" || isPreview ? `${pagesBasePath}/` : "/",
     plugins: [react(), pdfjsAssets()],
+    optimizeDeps: { exclude: ["@jsquash/jpeg", "@jsquash/webp"] },
   };
 });

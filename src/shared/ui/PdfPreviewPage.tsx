@@ -2,6 +2,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState } from "react";
 
 import { fileError } from "../pdf/errors";
+import { configurePreviewCanvas } from "../pdf/previewCanvas";
 
 type RenderTask = ReturnType<
   Awaited<ReturnType<PDFDocumentProxy["getPage"]>>["render"]
@@ -63,21 +64,21 @@ export default function PdfPreviewPage({
         const viewport = page.getViewport({
           scale: Math.min(scale, maxWidth / original.width),
         });
-        setSize({ width: viewport.width, height: viewport.height });
-
         const canvas = canvasRef.current;
-        const context = canvas?.getContext("2d");
-        if (!canvas || !context) throw new Error("無法建立 PDF 預覽畫面。");
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.ceil(viewport.width * pixelRatio);
-        canvas.height = Math.ceil(viewport.height * pixelRatio);
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
+        if (!canvas) throw new Error("無法建立 PDF 預覽畫面。");
+        const transform = configurePreviewCanvas(
+          canvas,
+          viewport,
+          window.devicePixelRatio
+        );
+        setSize({ width: viewport.width, height: viewport.height });
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("無法建立 PDF 預覽畫面。");
         renderTask = page.render({
           canvas,
           canvasContext: context,
           viewport,
-          transform: [pixelRatio, 0, 0, pixelRatio, 0, 0],
+          transform,
         });
         await renderTask.promise;
       } finally {
