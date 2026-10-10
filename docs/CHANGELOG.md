@@ -4,6 +4,12 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ## [Unreleased]
 
+### Changed
+
+- 合併、拆分、壓縮與轉換工具改為首次使用時按需載入，後續切換重用已載入的程式；載入中顯示置中的 MUI 圓形進度指示器與工具名稱，失敗後可重新載入頁面，切換工具仍重設工作區。
+
+## [1.1.0] - 2026-10-09
+
 ### Added
 
 - 壓縮工具新增 JPG／PNG 圖片壓縮，依檔案內容自動辨識 PDF 或圖片；一次只接受一個檔案，清除後恢復 PDF 模式。提供三種強度、原圖與結果預覽、大小比較、原格式下載及 Worker 取消／逾時處理；PNG 保留透明度與 16 位元資料。

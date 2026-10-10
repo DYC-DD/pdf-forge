@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 
-import CompressWorkspace from "../features/compress/CompressWorkspace";
-import ConvertWorkspace from "../features/convert/ConvertWorkspace";
 import LandingHero from "../features/landing/LandingHero";
 import ToolPicker, { type Tool } from "../features/landing/ToolPicker";
-import MergeWorkspace from "../features/merge/MergeWorkspace";
-import SplitWorkspace from "../features/split/SplitWorkspace";
 import useScrollReveal from "../shared/ui/useScrollReveal";
 import SiteFooter from "./components/SiteFooter";
 import SiteHeader from "./components/SiteHeader";
+import ToolWorkspace from "./components/ToolWorkspace";
 import { toolFromPath, toolHref } from "./toolRoutes";
 
 export default function App() {
@@ -71,16 +68,16 @@ export default function App() {
           data-switch={hasSwitchedTool}
         >
           <div id="merge-panel" hidden={tool !== "merge"}>
-            {tool === "merge" && <MergeWorkspace />}
+            {tool === "merge" && <ToolWorkspace tool="merge" />}
           </div>
           <div id="split-panel" hidden={tool !== "split"}>
-            {tool === "split" && <SplitWorkspace />}
+            {tool === "split" && <ToolWorkspace tool="split" />}
           </div>
           <div id="compress-panel" hidden={tool !== "compress"}>
-            {tool === "compress" && <CompressWorkspace />}
+            {tool === "compress" && <ToolWorkspace tool="compress" />}
           </div>
           <div id="convert-panel" hidden={tool !== "convert"}>
-            {tool === "convert" && <ConvertWorkspace />}
+            {tool === "convert" && <ToolWorkspace tool="convert" />}
           </div>
         </div>
       </main>
