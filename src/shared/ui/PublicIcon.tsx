@@ -11,6 +11,7 @@ export type PublicIconName =
   | "download"
   | "eye"
   | "feather"
+  | "file-type-docx"
   | "file-type-pdf"
   | "files"
   | "grid-3x3"
@@ -26,7 +27,8 @@ export type PublicIconName =
   | "shield-lock"
   | "trash"
   | "upload"
-  | "x";
+  | "x"
+  | "zoom-scan";
 
 export default function PublicIcon({
   name,

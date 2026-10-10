@@ -140,6 +140,7 @@ dist
 # Vite files
 # Generated PDF.js resources (copied from node_modules by vite.config.ts)
 public/pdfjs/
+public/ocr/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/

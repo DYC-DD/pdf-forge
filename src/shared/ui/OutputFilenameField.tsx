@@ -8,7 +8,7 @@ type OutputFilenameFieldProps = {
   defaultName: string;
   placeholder: string;
   disabled?: boolean;
-  extension?: "pdf" | "jpg" | "png" | "svg" | "webp" | "zip";
+  extension?: "pdf" | "jpg" | "png" | "svg" | "webp" | "zip" | "docx";
 };
 
 export default function OutputFilenameField({

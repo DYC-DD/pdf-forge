@@ -13,7 +13,8 @@ export function toolFromPath(pathname: string): Tool | null {
     route === "merge" ||
     route === "split" ||
     route === "compress" ||
-    route === "convert"
+    route === "convert" ||
+    route === "pdf2docx"
   ) {
     return route;
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import CompressWorkspace from "../features/compress/CompressWorkspace";
 import ConvertWorkspace from "../features/convert/ConvertWorkspace";
@@ -10,6 +10,10 @@ import useScrollReveal from "../shared/ui/useScrollReveal";
 import SiteFooter from "./components/SiteFooter";
 import SiteHeader from "./components/SiteHeader";
 import { toolFromPath, toolHref } from "./toolRoutes";
+
+const Pdf2DocxWorkspace = lazy(
+  () => import("../features/pdf2docx/Pdf2DocxWorkspace")
+);
 
 export default function App() {
   const [tool, setTool] = useState<Tool>(
@@ -81,6 +85,13 @@ export default function App() {
           </div>
           <div id="convert-panel" hidden={tool !== "convert"}>
             {tool === "convert" && <ConvertWorkspace />}
+          </div>
+          <div id="pdf2docx-panel" hidden={tool !== "pdf2docx"}>
+            {tool === "pdf2docx" && (
+              <Suspense fallback={<p role="status">正在載入 PDF2docx…</p>}>
+                <Pdf2DocxWorkspace />
+              </Suspense>
+            )}
           </div>
         </div>
       </main>

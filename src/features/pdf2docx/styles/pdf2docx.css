@@ -1,0 +1,291 @@
+.pdf2docx-workspace .workspace-main {
+  display: flex;
+  flex-direction: column;
+}
+.pdf2docx-workspace .privacy-note {
+  margin-top: auto;
+  padding-top: 22px;
+}
+.pdf2docx-source > div:nth-child(2) {
+  flex: 1;
+}
+.pdf2docx-field,
+.pdf2docx-range {
+  margin-bottom: 22px;
+}
+.pdf2docx-range .filename-field {
+  margin-bottom: 0;
+}
+.pdf2docx-range
+  .MuiOutlinedInput-root.Mui-error
+  .MuiOutlinedInput-notchedOutline {
+  border-color: #cb7e88;
+}
+.pdf2docx-field p,
+.pdf2docx-range p {
+  margin-top: 9px;
+  font-size: 12px;
+}
+.pdf2docx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 34px 20px;
+  border: 1px dashed #3d414b;
+  border-radius: 12px;
+  text-align: center;
+  color: #aabbe2;
+}
+.pdf2docx-empty p {
+  max-width: 420px;
+}
+.pdf2docx-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 24px 0;
+}
+.pdf2docx-stats div {
+  border: 1px solid #35373e;
+  border-radius: 9px;
+  padding: 13px 10px;
+}
+.pdf2docx-stats dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.pdf2docx-stats dd {
+  margin: 6px 0 0;
+  font-size: 21px;
+  font-weight: 700;
+}
+.pdf2docx-page-picker {
+  width: min(100%, 230px);
+}
+.pdf2docx-issues {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.pdf2docx-issues li {
+  padding: 9px 12px;
+  margin-top: 7px;
+  background: #1b1f28;
+  border-left: 2px solid #6f83aa;
+  border-radius: 3px;
+  color: #d6dbe6;
+}
+.pdf2docx-issues li[data-severity="review"] {
+  background: #28251c;
+  border-color: #b9a269;
+  color: #e9dcc1;
+}
+.pdf2docx-issues li[data-severity="error"] {
+  background: #302125;
+  border-color: #cb7e88;
+  color: #f0c6cd;
+}
+.pdf2docx-issues strong {
+  margin-right: 9px;
+}
+.pdf2docx-workspace .pdf2docx-preview-caption {
+  font-size: 11px;
+  margin: 20px 0 10px;
+}
+.pdf2docx-paper {
+  background: #fff;
+  color: #222;
+  border-radius: 3px;
+  padding: 28px;
+  overflow-wrap: anywhere;
+  max-height: 680px;
+  overflow: auto;
+}
+.pdf2docx-flow {
+  display: grid;
+  gap: 24px;
+}
+.pdf2docx-flow--columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pdf2docx-flow > div {
+  min-width: 0;
+}
+.pdf2docx-workspace .pdf2docx-paragraph {
+  color: #222;
+  font-size: 14px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  margin: 0 0 13px;
+}
+.pdf2docx-workspace .pdf2docx-paragraph--heading {
+  font-size: 18px;
+  font-weight: 700;
+}
+.pdf2docx-workspace .pdf2docx-paragraph--list {
+  padding-left: 12px;
+}
+.pdf2docx-table-scroll {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+.pdf2docx-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.pdf2docx-table td {
+  border: 1px solid #aaa;
+  padding: 6px 9px;
+  vertical-align: top;
+}
+.pdf2docx-table .pdf2docx-paragraph {
+  margin: 0;
+}
+.pdf2docx-figure {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+}
+.pdf2docx-image-row {
+  display: grid;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 13px;
+}
+.pdf2docx-image-row .pdf2docx-figure {
+  margin: 0;
+}
+.pdf2docx-paragraph-group {
+  display: flow-root;
+}
+.pdf2docx-wrapped-figure {
+  width: 35%;
+  margin: 0 12px 8px;
+}
+.pdf2docx-wrapped-figure .pdf2docx-figure {
+  margin: 0;
+}
+.pdf2docx-checkbox.MuiFormControlLabel-root {
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0 0 5px -4px;
+}
+.pdf2docx-checkbox .MuiFormControlLabel-label {
+  padding-top: 5px;
+  color: #d2d3d7;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.pdf2docx-checkbox .MuiCheckbox-root {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border-radius: 6px;
+  color: #a9b6d0;
+  flex: none;
+}
+.pdf2docx-checkbox .MuiCheckbox-root .MuiSvgIcon-root {
+  font-size: 17px;
+}
+.pdf2docx-checkbox .MuiCheckbox-root.Mui-checked {
+  color: var(--blue);
+}
+.pdf2docx-checkbox .MuiCheckbox-root.Mui-disabled,
+.pdf2docx-checkbox .MuiFormControlLabel-label.Mui-disabled {
+  color: #606673;
+}
+.pdf2docx-checkbox .MuiCheckbox-root:not(.Mui-disabled):hover {
+  background: #292e3b;
+}
+.pdf2docx-checkbox .MuiCheckbox-root.Mui-focusVisible {
+  outline: 3px solid #99add7;
+  outline-offset: 3px;
+}
+.pdf2docx-settings > .pdf2docx-option-hint {
+  font-size: 12px;
+  margin-bottom: 22px;
+}
+.pdf2docx-settings > .pdf2docx-result-note {
+  margin-bottom: 15px;
+}
+.pdf2docx-auto-layout {
+  margin-bottom: 22px;
+}
+.pdf2docx-auto-layout > strong {
+  color: #d2d3d7;
+  font-size: 13px;
+}
+.pdf2docx-auto-layout p {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.pdf2docx-auto-layout .pdf2docx-detected-layout {
+  color: #b7c9ee;
+}
+.pdf2docx-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 0;
+  color: #d2def4;
+  font-size: 13px;
+}
+.pdf2docx-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: #99add7;
+}
+.pdf2docx-progress span {
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 560px) {
+  .pdf2docx-source {
+    flex-wrap: wrap;
+  }
+  .pdf2docx-source > div:nth-child(2) {
+    flex-basis: calc(100% - 55px);
+  }
+  .pdf2docx-source > button {
+    margin-left: 55px;
+  }
+  .pdf2docx-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pdf2docx-paper {
+    padding: 18px;
+  }
+  .pdf2docx-page-picker {
+    width: 100%;
+  }
+  .pdf2docx-flow--columns {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0;
+  }
+}
+
+.pdf2docx-overlays {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pdf2docx-overlays > p {
+  flex-basis: 100%;
+}
+
+.pdf2docx-overlays .pdf2docx-figure {
+  max-width: 180px;
+  max-height: 180px;
+  object-fit: contain;
+}

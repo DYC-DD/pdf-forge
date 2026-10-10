@@ -1,7 +1,7 @@
 import PublicIcon from "../../shared/ui/PublicIcon";
 import useScrollReveal from "../../shared/ui/useScrollReveal";
 
-export type Tool = "merge" | "split" | "compress" | "convert";
+export type Tool = "merge" | "split" | "compress" | "convert" | "pdf2docx";
 
 type ToolPickerProps = {
   tool: Tool;
@@ -125,6 +125,27 @@ export default function ToolPicker({
             <small>04 / CONVERT</small>
             <strong>轉換 PDF</strong>
             <span>PDF 與圖片，轉成需要的格式。</span>
+          </span>
+          <PublicIcon
+            name="arrow-up-right"
+            size={20}
+            className="tool-tab-arrow"
+          />
+        </a>
+        <a
+          href={hrefForTool("pdf2docx")}
+          className={tool === "pdf2docx" ? "tool-tab active" : "tool-tab"}
+          onClick={(event) => handleSelect(event, "pdf2docx")}
+          aria-current={tool === "pdf2docx" ? "page" : undefined}
+          aria-controls="pdf2docx-panel"
+        >
+          <span className="tool-tab-icon">
+            <PublicIcon name="file-type-docx" size={25} />
+          </span>
+          <span className="tool-tab-copy">
+            <small>05 / PDF2docx</small>
+            <strong>PDF 轉 Word</strong>
+            <span>可編輯文件・開發預覽。</span>
           </span>
           <PublicIcon
             name="arrow-up-right"
