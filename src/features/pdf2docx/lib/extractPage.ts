@@ -112,8 +112,8 @@ export async function extractPage(
       baseline: matrix[5],
       size,
       font,
-      bold: /bold|black|heavy|semibold|demi/iu.test(font),
-      italic: /italic|oblique/iu.test(font),
+      bold: /bold|black|heavy|semibold|demi|Nimbus.*-Medi/iu.test(font),
+      italic: /italic|oblique|ital$|slant/iu.test(font),
       source: "pdf",
       fontScale: Math.round(
         (Math.hypot(matrix[0], matrix[1]) / Math.max(0.01, size)) * 100
@@ -142,6 +142,18 @@ export async function extractPage(
         )
       );
     }
+  }
+  for (let index = 1; index < raw.spans.length; index++) {
+    const space = raw.spans[index],
+      previous = raw.spans[index - 1];
+    if (
+      !space.text.trim() &&
+      space.width > 0 &&
+      space.width < Math.max(18, space.size * 2.5) &&
+      Math.abs(previous.baseline - space.baseline) < 1.5 &&
+      Math.abs(right(previous) - space.x) < 1.5
+    )
+      previous.spaceAfter = true;
   }
   applyTextAppearance(raw.spans, operators);
   const regular = raw.spans.filter(

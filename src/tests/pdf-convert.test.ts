@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { createCanvas, loadImage, type Canvas } from "@napi-rs/canvas";
 import JSZip from "jszip";
@@ -17,7 +18,7 @@ vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?url", () => ({
   default: new URL(
     "../../node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
     import.meta.url
-  ).pathname,
+  ).href,
 }));
 
 const canvases: Canvas[] = [];
@@ -28,7 +29,13 @@ const options = {
 };
 
 beforeEach(() => {
-  vi.stubEnv("BASE_URL", new URL("../../public/", import.meta.url).pathname);
+  vi.stubEnv(
+    "BASE_URL",
+    fileURLToPath(new URL("../../public/", import.meta.url)).replaceAll(
+      "\\",
+      "/"
+    )
+  );
   vi.stubGlobal("document", {
     createElement: (tag: string) => {
       expect(tag).toBe("canvas");

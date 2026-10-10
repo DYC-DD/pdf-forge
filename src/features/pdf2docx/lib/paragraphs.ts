@@ -16,6 +16,19 @@ const chineseList =
   /^(?:[一二三四五六七八九十百]+[、．.]|[（(][一二三四五六七八九十百]+[)）])\s*/u;
 const article = /^第[一二三四五六七八九十百\d]+條/u;
 
+function sameScriptRow(a: TextSpan, b: TextSpan): boolean {
+  if (a.source !== "pdf" || b.source !== "pdf") return false;
+  const [small, large] = a.size < b.size ? [a, b] : [b, a];
+  const shift = Math.abs(small.baseline - large.baseline);
+  return (
+    small.size <= large.size * 0.82 &&
+    shift >= large.size * 0.18 &&
+    shift <= large.size * 0.65 &&
+    Math.min(bottom(a), bottom(b)) - Math.max(a.y, b.y) >= small.height * 0.3 &&
+    Math.max(a.x, b.x) - Math.min(right(a), right(b)) <= large.size * 0.75
+  );
+}
+
 function sameOcrRow(a: TextSpan, b: TextSpan): boolean {
   if (a.source !== "ocr" || b.source !== "ocr") return false;
   const [small, large] = a.height < b.height ? [a, b] : [b, a];
@@ -42,6 +55,69 @@ export function paragraphText(paragraph: Paragraph): string {
   );
 }
 
+export function withPageNumber(paragraph: Paragraph): Paragraph {
+  const text = paragraph.runs.map((run) => run.text).join("");
+  // A total ("of 99", "共99頁") is literal source content. Only replace the
+  // current-page token, and split styled runs if that token shares a run.
+  const match =
+    /^(?:\s*(?:第\s*|page\s*)?)(\d{1,4})(?=\s*(?:頁|of\b|[\/／]|$))/iu.exec(
+      text
+    );
+  if (!match) {
+    // A company footer may put an isolated page number after a wide tab.
+    const trailing = paragraph.runs[paragraph.runs.length - 1];
+    return trailing?.tabBefore !== undefined &&
+      /^\d{1,4}$/u.test(trailing.text.trim())
+      ? {
+          ...paragraph,
+          runs: paragraph.runs.map((run, index) =>
+            index === paragraph.runs.length - 1
+              ? { ...run, pageNumber: true }
+              : run
+          ),
+        }
+      : paragraph;
+  }
+  const start = match[0].length - match[1].length,
+    end = start + match[1].length;
+  let offset = 0;
+  let field: TextRun | undefined;
+  const part = (run: TextRun, from: number, to: number): TextRun => ({
+    ...run,
+    text: run.text.slice(from, to),
+    width:
+      run.width === undefined
+        ? undefined
+        : (run.width * (to - from)) / run.text.length,
+    tabBefore: from ? undefined : run.tabBefore,
+    breakBefore: from ? undefined : run.breakBefore,
+    sourceLineStart: from ? undefined : run.sourceLineStart,
+  });
+  return {
+    ...paragraph,
+    runs: paragraph.runs.flatMap((run) => {
+      const from = offset;
+      offset += run.text.length;
+      if (offset <= start || from >= end) return [run];
+      const a = Math.max(0, start - from),
+        b = Math.min(run.text.length, end - from);
+      const token = part(run, a, b);
+      const first = !field;
+      if (!field) field = { ...token, text: match[1], pageNumber: true };
+      else
+        field.width =
+          field.width === undefined || token.width === undefined
+            ? undefined
+            : field.width + token.width;
+      return [
+        ...(a ? [part(run, 0, a)] : []),
+        ...(first ? [field] : []),
+        ...(b < run.text.length ? [part(run, b, run.text.length)] : []),
+      ];
+    }),
+  };
+}
+
 export function joinSeparator(previous: string, next: string): string {
   if (!previous || !next || /\s$/u.test(previous) || /^\s/u.test(next))
     return "";
@@ -49,6 +125,8 @@ export function joinSeparator(previous: string, next: string): string {
   if (/[，。！？；：、）》〉」』】]$/u.test(previous) && cjk.test(next[0]))
     return "";
   if (cjk.test(previous.slice(-1)) && cjk.test(next[0])) return "";
+  if (cjk.test(previous.slice(-1)) && /^[（「『【《〈]/u.test(next)) return "";
+  if (/\p{L}[-\u00ad]$/u.test(previous) && /^\p{Ll}/u.test(next)) return "";
   return " ";
 }
 
@@ -61,10 +139,7 @@ export function buildLines(
     (a, b) => a.baseline - b.baseline || a.x - b.x
   )) {
     const row = rows.slice(-4).find((candidate) => {
-      const reference =
-        span.source === "ocr"
-          ? candidate.reduce((a, b) => (b.height > a.height ? b : a))
-          : candidate[0];
+      const reference = candidate.reduce((a, b) => (b.size > a.size ? b : a));
       return (
         candidate.some(
           (entry) => entry.lineId && entry.lineId === span.lineId
@@ -75,7 +150,9 @@ export function buildLines(
           (reference.source === "ocr" && span.source === "ocr")) &&
           (Math.abs(reference.baseline - span.baseline) <=
             Math.max(1.5, Math.min(reference.size, span.size) * 0.28) ||
-            candidate.some((entry) => sameOcrRow(entry, span))))
+            candidate.some(
+              (entry) => sameOcrRow(entry, span) || sameScriptRow(entry, span)
+            )))
       );
     });
     if (row) row.push(span);
@@ -84,12 +161,14 @@ export function buildLines(
   const lines: TextLine[] = [];
   const add = (group: TextSpan[]) => {
     if (!group.length) return;
+    const maximum = Math.max(...group.map((span) => span.size));
+    const main = group.filter((span) => span.size >= maximum * 0.85);
     lines.push({
       kind: "line",
       ...bounds(group),
       spans: group,
-      size: median(group.map((span) => span.size)),
-      baseline: median(group.map((span) => span.baseline)),
+      size: median(main.map((span) => span.size)),
+      baseline: median(main.map((span) => span.baseline)),
     });
   };
   for (const row of rows) {
@@ -117,6 +196,12 @@ export function lineRuns(line: TextLine): TextRun[] {
   const runs: TextRun[] = [];
   let runStart = 0;
   for (const [index, span] of line.spans.entries()) {
+    const baselineShift =
+      span.source === "pdf" &&
+      span.size < line.size * 0.85 &&
+      Math.abs(line.baseline - span.baseline) > 1.5
+        ? Math.round((line.baseline - span.baseline) * 2) / 2
+        : undefined;
     const previousSpan = line.spans[index - 1];
     const tabBefore =
       previousSpan &&
@@ -127,8 +212,9 @@ export function lineRuns(line: TextLine): TextRun[] {
     if (
       previousSpan &&
       tabBefore === undefined &&
-      span.x - right(previousSpan) >
-        Math.min(span.size, previousSpan.size) * 0.16
+      (previousSpan.spaceAfter ||
+        span.x - right(previousSpan) >
+          Math.min(span.size, previousSpan.size) * 0.16)
     ) {
       text = joinSeparator(previousSpan.text, text) + text;
     }
@@ -143,6 +229,7 @@ export function lineRuns(line: TextLine): TextRun[] {
       previous.color === span.color &&
       previous.fontScale === span.fontScale &&
       previous.underline === span.underline &&
+      previous.baselineShift === baselineShift &&
       previous.font === span.font &&
       Math.abs(previous.size - span.size) < 0.1
     ) {
@@ -164,6 +251,7 @@ export function lineRuns(line: TextLine): TextRun[] {
         underline: span.underline,
         fraction: span.fraction,
         width: span.width,
+        baselineShift,
       });
     }
   }
@@ -195,14 +283,15 @@ export function makeParagraph(
                 entry.x + entry.width / 2 - (region.x + region.width / 2)
               ) < Math.max(3, size * 0.5)
           ));
+      const separator = breakBefore
+        ? ""
+        : joinSeparator(runs[runs.length - 1].text, next[0].text);
       next[0] = {
         ...next[0],
-        text:
-          (breakBefore
-            ? ""
-            : joinSeparator(runs[runs.length - 1].text, next[0].text)) +
-          next[0].text,
+        text: separator + next[0].text,
         breakBefore: breakBefore || undefined,
+        sourceLineStart: true,
+        lineSeparator: separator,
       };
     }
     runs.push(...next);
@@ -313,6 +402,13 @@ export function groupParagraphs(
         /[。！？.!?:：;；]$/u.test(previousText.trim());
       const previousParagraph = previous.spans[0].paragraphId;
       const currentParagraph = line.spans[0].paragraphId;
+      const firstText = lineRuns(current[0])
+        .map((run) => run.text)
+        .join("");
+      const hangingContinuation =
+        (listPattern.test(firstText) || chineseList.test(firstText)) &&
+        line.x >= current[0].x &&
+        line.x - current[0].x <= reference * 5;
       if (
         (previousParagraph &&
           currentParagraph &&
@@ -325,9 +421,9 @@ export function groupParagraphs(
         article.test(text) ||
         article.test(previousText) ||
         previousHeading ||
-        paragraphIndent ||
+        (paragraphIndent && !hangingContinuation) ||
         endOfParagraph ||
-        Math.abs(line.x - previous.x) > reference * 3
+        (Math.abs(line.x - previous.x) > reference * 3 && !hangingContinuation)
       )
         finish();
     }

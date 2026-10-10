@@ -22,6 +22,7 @@ export type TextSpan = Box & {
   advances?: number[];
   ids?: string[];
   fraction?: { numerator: string; denominator: string };
+  spaceAfter?: boolean;
 };
 export type Rule = {
   x1: number;
@@ -75,6 +76,10 @@ export type TextRun = {
   pageNumber?: boolean;
   fraction?: { numerator: string; denominator: string };
   width?: number;
+  /** Positive values raise the original-size glyph above the line baseline. */
+  baselineShift?: number;
+  sourceLineStart?: boolean;
+  lineSeparator?: string;
 };
 export type Paragraph = Box & {
   kind: "paragraph";
@@ -109,6 +114,8 @@ export type TableModel = Box & {
   rows: number[];
   cells: TableCellModel[];
   border?: { color: string; thickness: number };
+  borderless?: boolean;
+  horizontalBorders?: { boundary: number; color: string; thickness: number }[];
 };
 export type ImageBlock = Figure & { kind: "image"; before: number };
 export type ImageRow = Box & {

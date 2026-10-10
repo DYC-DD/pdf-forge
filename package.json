@@ -8,6 +8,8 @@
     "build": "tsc --noEmit && vite build && node scripts/copy-tool-pages.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "fixtures:pdf2docx": "node scripts/pdf2docx-public.mjs download",
+    "test:pdf2docx-public": "node scripts/pdf2docx-public.mjs test",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

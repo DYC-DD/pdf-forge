@@ -36,7 +36,7 @@ export default function Pdf2DocxWorkspace() {
   const [range, setRange] = useState("");
   const [ocr, setOcr] = useState<OcrMode>("auto");
   const [language, setLanguage] = useState<OcrLanguage>("chi_tra+eng");
-  const [preservePageBreaks, setPreservePageBreaks] = useState(false);
+  const [preservePageBreaks, setPreservePageBreaks] = useState(true);
   const [name, setName] = useState("document");
   const [model, setModel] = useState<DocumentModel | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -500,10 +500,10 @@ export default function Pdf2DocxWorkspace() {
               }}
             />
           }
-          label="在原稿頁面之間加入分頁"
+          label="保留原稿分頁"
         />
         <p id="pdf2docx-breaks-hint" className="pdf2docx-option-hint">
-          預設讓內容自然流動，方便編輯。加入分頁也可能因字型差異增加 Word 頁數。
+          依原稿換行與頁面邊界排版；取消勾選可讓段落跨頁接續。字型差異或編輯仍可能改變分頁。
         </p>
         <OutputFilenameField
           id="pdf2docx-name"

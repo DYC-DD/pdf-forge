@@ -65,7 +65,7 @@
 
 邊界以常見設定作為優先候選：窄邊界四邊 1.27 公分，標準邊界上下 2.54、左右 3.18 公分。以相同紙張與方向的頁面共同判斷，長正文、表格與分欄優先提供證據，短行與未寫滿的頁面不作為右／下邊界證據；稀疏頁會沿用同組正文頁的判斷。證據不足時採常見邊界，有明確非典型內容範圍時保留推估邊界。這是從 PDF 幾何位置推估，並非取回原 Word 的頁面設定；界面只顯示辨識結果。
 
-目前界面顯示的是內容結構，並非 Word 實際分頁預覽。Word 會依可用字型重新換行；使用者可選擇在來源頁面之間加入分頁。
+目前界面顯示的是內容結構，並非 Word 實際分頁預覽。預設保留原稿分頁與原生正文換行；取消勾選可讓段落跨頁接續。Word 仍會依可用字型及編輯內容重新排版。
 
 ## 管線與程式位置
 
@@ -129,3 +129,45 @@ PDF2DOCX_QA_DIR=/tmp/pdf2docx-qa npx vitest run src/tests/pdf2docx-*.test.ts
 4. **正式品質驗證**：Word 與 LibreOffice 都檢查分頁、合併儲存格、缺字與編輯後重排；補齊主流瀏覽器、手機記憶體及斷線情境，再評估與 04 整合。
 
 可持續參考 [pdf2docx](https://github.com/ArtifexSoftware/pdf2docx)、[PdfPig](https://github.com/UglyToad/PdfPig) 與 [Docling](https://github.com/docling-project/docling) 的結構推斷與文件模型；引入實際程式碼或新模型時，另行核對相應版本的授權與瀏覽器依賴。
+
+## 2026-10-10 公開 PDF 分頁回歸
+
+本輪針對「同一頁被拆成數頁」下載四份公開 PDF，選取 11 頁，透過真正的 PDF.js 擷取、結構分析、DOCX 匯出及本機 Microsoft Word 渲染驗證。檔案只留在被 Git 忽略的 `.cache/`；原始碼僅收錄來源 URL、選頁與 SHA-256，未重新散布原稿。這些資料沒有完整人工逐字標註，不能用文字量或頁數宣稱正確率。
+
+| 公開原稿                                                                                                      | 選取來源頁     | 修正前 Word 頁數 | 修正後 Word 頁數 |
+| ------------------------------------------------------------------------------------------------------------- | -------------- | ---------------: | ---------------: |
+| [W3C 表格範例](https://www.w3.org/WAI/WCAG22/working-examples/pdf-table-headers/table-example-repaired.pdf)   | 1              |                1 |                1 |
+| [W3C 雙欄範例](https://www.w3.org/WAI/WCAG22/working-examples/pdf-reading-order/reading-order-2cols-word.pdf) | 1              |                1 |                1 |
+| [PDF.js 使用的 TraceMonkey 論文](https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf)     | 1、2、8、12    |    Word 無法開啟 |                4 |
+| [臺北市更新單元申請書表（112 年 4 月版本）](https://uract.nlma.gov.tw/uploads/rule/B400133-11204.pdf)         | 1、2、6、7、12 |                8 |                5 |
+
+實際修正如下：
+
+- 分欄切回通欄時更新已用高度，避免重複加入數百點的上方空白。置中的短標題不再掩蓋下方雙欄間隙；大面積表格不再把表頭標籤拆成雙欄正文。
+- 原稿分頁模式保留原生正文的行邊界，校準替代字型字寬，並停用可能把整段推到下一頁的孤行／標題接續設定。清單保留懸掛縮排與右縮排，續行由 Word 換行，避免自動换行再疊加來源換行。文字仍是原生可編輯段落。
+- 相近的雙框線採中央位置，修復密集 A3 表格被誤判成非矩形合併儲存格的情況。只有橫線的數字表格，在欄位完整、至少三列數字對齊且有表頭／底線證據時，輸出為無垂直框線的原生表格；論文第 12 頁的 27 列、10 欄已保持逐列順序。一般無框線表格仍未完整支援。
+- 保留上／下標的基線位移，補上 Nimbus／Computer Modern 字型對應，保留 PDF 明確的詞間空白。頁尾只將目前頁碼轉為 PAGE 欄位，來源總頁數「共 99 頁」保持文字。
+- 段落定位點排序、去重並限制最多 64 個，避免 Word 拒絕開啟含密集定位點的 DOCX。Windows 測試路徑改用 `fileURLToPath`，避免 `/C:/…` 導致 WASM／CMap 載入失敗。
+
+重現方式（需 Node.js 與已安裝的專案依賴）：
+
+```sh
+npm run fixtures:pdf2docx
+npm run test:pdf2docx-public
+```
+
+只有第一個指令會下載檔案；每檔最多 32 MB，並驗證 PDF 檔頭與 SHA-256。測試不連網，來源變動或檔案缺失會失敗，不能靜默替換基準。一般 `npm test` 會略過四個公開 PDF 案例；設定 `PDF2DOCX_PUBLIC_DIR` 或使用上述專用指令才執行。
+
+在 Windows 輸出 QA 文件並用已安裝的 Word 核對實際頁數：
+
+```powershell
+$env:PDF2DOCX_QA_DIR = Join-Path (Get-Location) '.cache/pdf2docx-public/after'
+npm run test:pdf2docx-public
+powershell -NoProfile -File scripts/verify-pdf2docx-word.ps1
+```
+
+Word 腳本以隱藏程序唯讀開啟生成的文件，輸出 PDF 與 `word-pagination.json`。頁數不符會失敗；頁數相符仍須逐頁視覺比對。本輪以 Word 渲染及 Poppler 頁面影像檢查；此 Windows 環境缺少文件技能所需的 LibreOffice 編譯器，未重跑 LibreOffice。
+
+新增的合成測試涵蓋分欄高度、清單續行、來源換行、上標、定位點上限、雙框線、頁尾總數及橫線數字表格；公開案例另檢查固定檔案雜湊、表格數值、欄位順序、A3 尺寸及頁尾。全套測試含公開案例共 325 項通過。
+
+目前仍需核對論文第 2 頁的複雜流程圖標籤、第 8 頁的文字型開放表格，以及繁中表單的部分合併區域／框線。這輪未改善 OCR 辨識模型，也尚未以全部 99 頁表單或整份論文完成品質驗收；11 頁分頁通過不代表所有 PDF 都能精確還原。

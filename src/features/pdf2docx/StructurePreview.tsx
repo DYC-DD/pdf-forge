@@ -23,6 +23,12 @@ function ParagraphPreview({ paragraph }: { paragraph: Paragraph }) {
               fontStyle: run.italic ? "italic" : undefined,
               color: run.color ? `#${run.color}` : undefined,
               textDecoration: run.underline ? "underline" : undefined,
+              verticalAlign: run.baselineShift
+                ? run.baselineShift > 0
+                  ? "super"
+                  : "sub"
+                : undefined,
+              fontSize: run.baselineShift ? "0.75em" : undefined,
             }}
           >
             {run.breakBefore && <br />}
@@ -92,6 +98,12 @@ function BlockPreview({ block }: { block: FlowBlock }) {
                     colSpan={cell.columnSpan}
                     style={{
                       backgroundColor: cell.fill ? `#${cell.fill}` : undefined,
+                      border: block.borderless ? "none" : undefined,
+                      borderBottom: block.horizontalBorders?.some(
+                        (rule) => rule.boundary === row + cell.rowSpan
+                      )
+                        ? "1px solid currentColor"
+                        : undefined,
                     }}
                   >
                     {cell.paragraphs.map((paragraph, index) => (

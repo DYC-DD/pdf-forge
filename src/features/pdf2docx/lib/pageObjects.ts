@@ -1,6 +1,7 @@
 import type { RawPage, RuleBlock } from "../types";
 import { reconstructFractions } from "./fractions";
 import { containsCenter, horizontal, median } from "./geometry";
+import { detectOpenTables } from "./openTables";
 import { buildLines } from "./paragraphs";
 import { detectTables } from "./tables";
 
@@ -56,6 +57,13 @@ export function classifyPage(
     bodySize,
     page.fills
   );
+  const openTables = detectOpenTables(
+    page.rules,
+    spans.filter((span) => !used.has(span.id)),
+    bodySize
+  );
+  tables.push(...openTables.tables);
+  openTables.used.forEach((id) => used.add(id));
   const unclaimed = spans.filter((span) => !used.has(span.id));
   const footerLine =
     page.source === "ocr"
@@ -75,13 +83,16 @@ export function classifyPage(
       : buildLines(unclaimed, true).find(
           (line) =>
             line.y > page.height * 0.92 &&
-            line.spans.every(
-              (span) =>
-                recurring.has(span.id) ||
-                (/^\d{1,4}$/u.test(span.text.trim()) &&
-                  span.width < page.width * 0.08 &&
-                  span.size <= bodySize * 1.4)
-            )
+            (/^\s*(?:第\s*\d{1,4}\s*頁(?:[，,]?\s*共\s*\d{1,4}\s*頁)?|page\s+\d{1,4}(?:\s+of\s+\d{1,4})?|\d{1,4}\s*[\/／]\s*\d{1,4})\s*$/iu.test(
+              line.spans.map((span) => span.text).join("")
+            ) ||
+              line.spans.every(
+                (span) =>
+                  recurring.has(span.id) ||
+                  (/^\d{1,4}$/u.test(span.text.trim()) &&
+                    span.width < page.width * 0.08 &&
+                    span.size <= bodySize * 1.4)
+              ))
         );
   const footerIds = new Set(footerLine?.spans.map((span) => span.id));
   const fractions = reconstructFractions(

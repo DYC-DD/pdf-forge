@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { PDFDocument, PDFName, PDFNumber, PDFRawStream } from "pdf-lib";
 import { afterEach, expect, it, vi } from "vitest";
@@ -16,10 +17,12 @@ import {
 import { recompressJpegImages } from "../features/compress/lib/recompressImages";
 import { COMPRESSION_LIMITS, PDF_LIMITS } from "../shared/pdf/limits";
 
-const wasmPath = new URL(
-  "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
-  import.meta.url
-).pathname;
+const wasmPath = fileURLToPath(
+  new URL(
+    "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
+    import.meta.url
+  )
+);
 const sourceJpeg = readFileSync(
   new URL("./fixtures/source.jpg", import.meta.url)
 );

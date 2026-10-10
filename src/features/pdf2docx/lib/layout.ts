@@ -14,6 +14,7 @@ import {
   buildLines,
   groupParagraphs,
   makeParagraph,
+  withPageNumber,
   type TextLine,
 } from "./paragraphs";
 
@@ -142,41 +143,77 @@ function findColumnGap(
   size: number
 ): [number, number] | null {
   const lines = nodes.filter((node): node is TextLine => node.kind === "line");
+  if (
+    nodes.some(
+      (node) =>
+        node.kind === "table" &&
+        node.width > region.width * 0.8 &&
+        node.height > region.height * 0.5
+    )
+  )
+    return null;
   const narrow = lines.filter((line) => line.width < region.width * 0.62);
   if (narrow.length < 4 || lines.length - narrow.length > narrow.length * 0.4)
     return null;
-  const intervals = narrow
-    .map((line) => [line.x, right(line)])
-    .sort((a, b) => a[0] - b[0]);
-  const merged: number[][] = [];
-  for (const [start, end] of intervals) {
-    const last = merged[merged.length - 1];
-    if (last && start <= last[1] + 1) last[1] = Math.max(end, last[1]);
-    else merged.push([start, end]);
+  // Infer a gutter from rows that actually coexist. Projecting every line
+  // onto the x axis lets a short centered title/affiliation bridge both columns
+  // and erase the gutter for the entire page.
+  const candidates = new Map<string, [number, number]>();
+  for (let i = 0; i < narrow.length; i++) {
+    const a = narrow[i];
+    for (let j = i + 1; j < narrow.length; j++) {
+      const b = narrow[j];
+      if (b.y - bottom(a) > size * 1.5) break;
+      if (Math.abs(a.baseline - b.baseline) > size * 1.5) continue;
+      const [left, rightLine] = a.x < b.x ? [a, b] : [b, a];
+      const start = right(left),
+        end = rightLine.x;
+      if (
+        end - start >= Math.max(18, size * 1.5) &&
+        start > region.x + region.width * 0.2 &&
+        end < right(region) - region.width * 0.2
+      )
+        candidates.set(`${Math.round(start)}:${Math.round(end)}`, [start, end]);
+    }
   }
-  const gaps = merged
-    .slice(1)
-    .map((interval, index) => [merged[index][1], interval[0]])
-    .filter(
-      ([a, b]) =>
-        b - a >= Math.max(18, size * 1.5) &&
-        a > region.x + region.width * 0.2 &&
-        b < right(region) - region.width * 0.2
-    )
-    .sort((a, b) => b[1] - b[0] - (a[1] - a[0]));
-  for (const gap of gaps) {
+  let best: { gap: [number, number]; score: number } | undefined;
+  for (const gap of candidates.values()) {
     const left = narrow.filter((line) => right(line) <= gap[0] + 1);
     const rightLines = narrow.filter((line) => line.x >= gap[1] - 1);
     if (left.length < 2 || rightLines.length < 2) continue;
     const a = bounds(left),
       b = bounds(rightLines);
+    const top = Math.max(a.y, b.y),
+      end = Math.min(bottom(a), bottom(b));
+    if (end - top <= Math.min(a.height, b.height) * 0.4) continue;
+    const crossing = lines.filter(
+      (line) =>
+        line.y >= top &&
+        bottom(line) <= end &&
+        line.x < gap[1] - 1 &&
+        right(line) > gap[0] + 1
+    ).length;
+    if (crossing > Math.max(2, (left.length + rightLines.length) * 0.15))
+      continue;
+    const score =
+      Math.min(left.length, rightLines.length) * 4 +
+      left.length +
+      rightLines.length -
+      crossing * 8;
     if (
-      Math.min(bottom(a), bottom(b)) - Math.max(a.y, b.y) >
-      Math.min(a.height, b.height) * 0.4
+      !best ||
+      score > best.score ||
+      (score === best.score && gap[1] - gap[0] < best.gap[1] - best.gap[0])
     )
-      return gap as [number, number];
+      best = {
+        gap: [
+          Math.max(...left.map(right)),
+          Math.min(...rightLines.map((line) => line.x)),
+        ],
+        score,
+      };
   }
-  return null;
+  return best?.gap ?? null;
 }
 
 function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
@@ -184,7 +221,11 @@ function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
   if (!gap) return [{ columns: [flow(nodes, region, bodySize)], gap: 0 }];
   const [leftEnd, rightStart] = gap;
   const crossing = nodes
-    .filter((node) => node.x < rightStart && right(node) > leftEnd)
+    .filter(
+      (node) =>
+        node.x < rightStart - Math.max(2, bodySize * 0.3) &&
+        right(node) > leftEnd + Math.max(2, bodySize * 0.3)
+    )
     .sort((a, b) => a.y - b.y);
   const remaining = new Set(nodes.filter((node) => !crossing.includes(node)));
   const groups: FlowGroup[] = [];
@@ -229,17 +270,35 @@ function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
         gap: rightStart - leftEnd,
         widths: [leftEnd - region.x, right(region) - rightStart],
       });
+    cursor = Math.max(
+      cursor,
+      ...entries.map((entry) =>
+        entry.kind === "line"
+          ? entry.y + Math.max(entry.height, entry.size * 1.25)
+          : bottom(entry)
+      )
+    );
   };
-  for (const node of crossing) {
+  for (let index = 0; index < crossing.length; index++) {
+    const node = crossing[index];
     band(node.y);
+    const spanning = [node];
+    // Keep consecutive full-width lines in one flow so title paragraphs and
+    // the vertical spacing above the following columns survive section breaks.
+    while (
+      index + 1 < crossing.length &&
+      ![...remaining].some((entry) => entry.y < crossing[index + 1].y)
+    )
+      spanning.push(crossing[++index]);
     groups.push({
-      columns: [flow([node], { ...region, y: node.y }, bodySize)],
+      columns: [flow(spanning, { ...region, y: cursor }, bodySize)],
       gap: 0,
     });
+    const last = spanning[spanning.length - 1];
     cursor =
-      node.kind === "line"
-        ? node.y + Math.max(node.height, node.size * 1.25)
-        : bottom(node);
+      last.kind === "line"
+        ? last.y + Math.max(last.height, last.size * 1.25)
+        : bottom(last);
   }
   band(bottom(region) + 1);
   return groups;
@@ -396,19 +455,13 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
       },
       footer: footerLine
         ? {
-            ...makeParagraph(
-              [footerLine],
-              { x: 0, y: 0, width: page.width, height: page.height },
-              bodySize
+            ...withPageNumber(
+              makeParagraph(
+                [footerLine],
+                { x: 0, y: 0, width: page.width, height: page.height },
+                bodySize
+              )
             ),
-            runs: makeParagraph(
-              [footerLine],
-              { x: 0, y: 0, width: page.width, height: page.height },
-              bodySize
-            ).runs.map((run) => ({
-              ...run,
-              pageNumber: /^\d{1,4}$/u.test(run.text.trim()),
-            })),
             before: 0,
           }
         : undefined,

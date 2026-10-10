@@ -8,10 +8,13 @@ const kai = /DFKai|KaiShu|BiauKai|標楷|Kaiti|KaiTi/iu;
 const ming = /ming|song|宋|明體|serif/iu;
 
 export function fontName(font: string): string {
-  if (/times|serif/iu.test(font) && !/sans/iu.test(font))
+  if (
+    /times|serif|NimbusRom|^CM(?:R|MI|SY)\d/iu.test(font) &&
+    !/sans/iu.test(font)
+  )
     return "Times New Roman";
-  if (/courier|mono/iu.test(font)) return "Courier New";
-  if (/^(?:sans-serif|Arial|Helvetica|Noto Sans CJK)/iu.test(font))
+  if (/courier|mono|^CMTT\d/iu.test(font)) return "Courier New";
+  if (/^(?:sans-serif|Arial|Helvetica|NimbusSans|Noto Sans CJK)/iu.test(font))
     return "Arial";
   return (
     font

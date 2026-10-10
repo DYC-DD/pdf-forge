@@ -5,10 +5,22 @@ import {
   horizontal,
   median,
   right,
-  uniquePositions,
   vertical,
 } from "./geometry";
 import { buildLines, groupParagraphs } from "./paragraphs";
+
+// Double borders and repeated segment endpoints describe one grid edge. Using
+// the first stroke biases the edge outwards and can turn a 2.04 pt corner gap
+// into a missing border, merging an entire header into an impossible L shape.
+function gridPositions(values: number[], tolerance: number): number[] {
+  const groups: number[][] = [];
+  for (const value of values.sort((a, b) => a - b)) {
+    const group = groups[groups.length - 1];
+    if (group && value - group[0] <= tolerance) group.push(value);
+    else groups.push([value]);
+  }
+  return groups.map((group) => median(group));
+}
 
 function ruleBox(rule: Rule): Box {
   return {
@@ -62,11 +74,11 @@ export function detectTables(
     const hs = group.filter(horizontal);
     const vs = group.filter(vertical);
     const tolerance = spans[0]?.source === "ocr" ? 4 : 2;
-    const xs = uniquePositions(
+    const xs = gridPositions(
       vs.map((rule) => (rule.x1 + rule.x2) / 2),
       tolerance
     );
-    const ys = uniquePositions(
+    const ys = gridPositions(
       hs.map((rule) => (rule.y1 + rule.y2) / 2),
       tolerance
     );

@@ -153,6 +153,7 @@ function textRun(
           ? Math.max(10, Math.min(300, (scale ?? run.fontScale)!))
           : undefined,
       underline: run.underline ? {} : undefined,
+      position: run.baselineShift ? `${run.baselineShift}pt` : undefined,
     },
     width,
     id
@@ -161,6 +162,7 @@ function textRun(
 
 type NumberingConfig = { reference: string; levels: ILevelsOptions[] };
 class Writer {
+  constructor(private preserveSourceLines = false) {}
   numbering: NumberingConfig[] = [];
   private listReference = "";
   private listNumber = -1;
@@ -183,12 +185,34 @@ class Writer {
             text
           )
         : null;
-    let runs = paragraph.runs.map((run) => ({ ...run }));
+    let runs = paragraph.runs.map((run) =>
+      this.preserveSourceLines &&
+      paragraph.source === "pdf" &&
+      paragraph.role !== "list" &&
+      run.sourceLineStart &&
+      !run.breakBefore
+        ? {
+            ...run,
+            breakBefore: true,
+            text: run.text.slice(run.lineSeparator?.length ?? 0),
+          }
+        : { ...run }
+    );
     let numbering: { reference: string; level: number } | undefined;
+    let listIndent:
+      { left: number; hanging: number; right: number } | undefined;
     if (marker) {
       const bullet = !!marker[1];
       const start = bullet ? 1 : Number(marker[3]);
       const format = bullet ? marker[1] : `${marker[2]}%1${marker[4]}`;
+      const listLeft =
+        paragraph.firstIndent < 0 ? paragraph.indent : paragraph.indent + 15;
+      const hanging = listLeft - paragraph.indent - paragraph.firstIndent;
+      listIndent = {
+        left: twips(listLeft),
+        hanging: positive(hanging),
+        right: twips(paragraph.rightIndent ?? 0),
+      };
       if (
         !this.listReference ||
         this.listFormat !== format ||
@@ -207,8 +231,8 @@ class Writer {
               style: {
                 paragraph: {
                   indent: {
-                    left: positive(paragraph.indent + 15),
-                    hanging: 300,
+                    left: positive(listLeft),
+                    hanging: positive(hanging),
                   },
                 },
               },
@@ -223,7 +247,15 @@ class Writer {
       runs = runs.map((run) => {
         const count = Math.min(remaining, run.text.length);
         remaining -= count;
-        return { ...run, text: run.text.slice(count) };
+        return {
+          ...run,
+          text: run.text.slice(count),
+          width:
+            run.width === undefined
+              ? undefined
+              : (run.width * (run.text.length - count)) /
+                Math.max(1, run.text.length),
+        };
       });
     } else {
       this.listReference = "";
@@ -275,19 +307,29 @@ class Writer {
           const fonts = this.fonts.resolve(run.font);
           let width: number | undefined;
           if (
-            ((inCell && paragraph.source === "pdf") ||
-              paragraph.source === "ocr") &&
+            (paragraph.source === "pdf" || paragraph.source === "ocr") &&
             run.width !== undefined
           ) {
             let start = index,
               end = index + 1;
-            while (start > 0 && !runs[start].breakBefore) start--;
-            while (end < runs.length && !runs[end].breakBefore) end++;
+            while (
+              start > 0 &&
+              !runs[start].breakBefore &&
+              !runs[start].sourceLineStart
+            )
+              start--;
+            while (
+              end < runs.length &&
+              !runs[end].breakBefore &&
+              !runs[end].sourceLineStart
+            )
+              end++;
             const lineWidth = runs
               .slice(start, end)
               .reduce((sum, item) => sum + (item.width ?? 0), 0);
-            const indent =
-              paragraph.indent + (start === 0 ? paragraph.firstIndent : 0);
+            const indent = listIndent
+              ? listIndent.left / 20
+              : paragraph.indent + (start === 0 ? paragraph.firstIndent : 0);
             const available = Math.max(
               1,
               availableWidth - indent - (paragraph.rightIndent ?? 0) - 1.5
@@ -302,7 +344,8 @@ class Writer {
             run,
             fonts,
             scale,
-            scale === undefined && paragraph.source === "pdf"
+            paragraph.source === "pdf" &&
+              (scale === undefined || this.preserveSourceLines)
               ? width
               : undefined,
             ++this.fitId
@@ -319,14 +362,23 @@ class Writer {
         : undefined,
       alignment: alignment[paragraph.align],
       numbering,
-      tabStops: paragraph.runs
-        .filter((run) => run.tabBefore !== undefined)
-        .map((run) => ({
+      // Word rejects paragraphs with more than 64 tab definitions. Repeated
+      // source rows reuse stops; keep a sorted, unique, bounded definition.
+      tabStops: [
+        ...new Set(
+          paragraph.runs
+            .filter((run) => run.tabBefore !== undefined)
+            .map((run) => twips(run.tabBefore! - left))
+        ),
+      ]
+        .sort((a, b) => a - b)
+        .slice(0, 64)
+        .map((position) => ({
           type: TabStopType.LEFT,
-          position: twips(run.tabBefore! - left),
+          position,
         })),
       indent: marker
-        ? undefined
+        ? listIndent
         : {
             left: twips(paragraph.indent),
             right: twips(paragraph.rightIndent ?? 0),
@@ -357,8 +409,9 @@ class Writer {
         ),
         lineRule: LineRuleType.EXACT,
       },
-      keepNext: !inCell && paragraph.role === "heading",
-      widowControl: paragraph.source !== "ocr",
+      keepNext:
+        !this.preserveSourceLines && !inCell && paragraph.role === "heading",
+      widowControl: !this.preserveSourceLines && paragraph.source !== "ocr",
       contextualSpacing: false,
       autoSpaceEastAsianText: false,
     });
@@ -427,13 +480,15 @@ class Writer {
 
   table(table: TableModel, left: number): Table {
     this.listReference = "";
-    const tableBorder = table.border
-      ? {
-          style: BorderStyle.SINGLE,
-          color: table.border.color,
-          size: Math.max(2, Math.round(table.border.thickness * 8)),
-        }
-      : border;
+    const tableBorder = table.borderless
+      ? noBorder
+      : table.border
+        ? {
+            style: BorderStyle.SINGLE,
+            color: table.border.color,
+            size: Math.max(2, Math.round(table.border.thickness * 8)),
+          }
+        : border;
     return new Table({
       width: { size: twips(table.width), type: WidthType.DXA },
       indent: { size: positive(table.x - left), type: WidthType.DXA },
@@ -472,6 +527,30 @@ class Writer {
                     },
                     columnSpan: cell.columnSpan,
                     rowSpan: cell.rowSpan,
+                    borders: table.borderless
+                      ? Object.fromEntries(
+                          ["top", "bottom"].map((edge) => {
+                            const rule = table.horizontalBorders?.find(
+                              (rule) =>
+                                rule.boundary ===
+                                (edge === "top" ? row : row + cell.rowSpan)
+                            );
+                            return [
+                              edge,
+                              rule
+                                ? {
+                                    style: BorderStyle.SINGLE,
+                                    color: rule.color,
+                                    size: Math.max(
+                                      2,
+                                      Math.round(rule.thickness * 8)
+                                    ),
+                                  }
+                                : noBorder,
+                            ];
+                          })
+                        )
+                      : undefined,
                     shading: cell.fill ? { fill: cell.fill } : undefined,
                     verticalAlign:
                       cell.verticalAlign === "center"
@@ -632,7 +711,7 @@ export async function exportDocx(
     throw new Error("仍有未能完整讀取的頁面，請調整頁碼或辨識模式後重新分析。");
   if (!model.stats.characters && !model.stats.images)
     throw new Error("沒有可輸出的文字，請啟用 OCR 或改用文字型 PDF。");
-  const writer = new Writer();
+  const writer = new Writer(options.preservePageBreaks);
   const sections: ISectionOptions[] = [];
   const setups = detectPageSetups(model.pages);
   const pages = prepareExportPages(model, options).map((page, index) =>
@@ -839,6 +918,7 @@ export async function exportDocx(
     previousPage = page;
   }
   const document = new Document({
+    compatibility: { noColumnBalance: true },
     creator: "PDF Forge",
     title: "",
     description: "",
