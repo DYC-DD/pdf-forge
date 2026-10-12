@@ -51,6 +51,23 @@
   background: #fff;
   box-shadow: 0 8px 25px #1b31550a;
 }
+.workspace-loading {
+  display: grid;
+  min-height: 575px;
+  place-items: center;
+  padding: 31px;
+  color: var(--muted);
+  text-align: center;
+}
+.workspace-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.workspace-loading-spinner {
+  color: var(--blue);
+}
 .workspace-main {
   container: pdf-workspace / inline-size;
   min-height: 508px;
