@@ -10,6 +10,7 @@ const loads = vi.hoisted(() => ({
   split: vi.fn(),
   compress: vi.fn(),
   convert: vi.fn(),
+  pdf2docx: vi.fn(),
 }));
 
 vi.mock("../features/merge/MergeWorkspace", () => {
@@ -28,6 +29,10 @@ vi.mock("../features/convert/ConvertWorkspace", () => {
   loads.convert();
   return { default: () => "convert workspace" };
 });
+vi.mock("../features/pdf2docx/Pdf2DocxWorkspace", () => {
+  loads.pdf2docx();
+  return { default: () => "pdf2docx workspace" };
+});
 
 async function renderTool(tool: Tool) {
   const stream = await renderToReadableStream(
@@ -38,7 +43,7 @@ async function renderTool(tool: Tool) {
 }
 
 it("loads only the selected tool, shows a pending state and reuses loaded modules", async () => {
-  const tools: Tool[] = ["merge", "split", "compress", "convert"];
+  const tools: Tool[] = ["merge", "split", "compress", "convert", "pdf2docx"];
   for (const tool of tools) expect(loads[tool]).not.toHaveBeenCalled();
 
   const pending = renderToString(
@@ -47,9 +52,17 @@ it("loads only the selected tool, shows a pending state and reuses loaded module
   expect(pending.replaceAll("<!-- -->", "")).toContain("正在載入合併工具");
   expect(pending).toContain('role="status"');
   expect(pending).toContain('aria-busy="true"');
+  expect(pending).toContain('role="progressbar"');
 
   for (let index = 0; index < tools.length; index += 1) {
     const tool = tools[index];
+    if (tool === "pdf2docx") {
+      const pendingDocx = renderToString(
+        createElement(ToolWorkspace, { tool })
+      );
+      expect(pendingDocx).toContain('aria-label="正在載入PDF 轉 Word 工具"');
+      expect(pendingDocx).toContain('role="progressbar"');
+    }
     expect(await renderTool(tool)).toContain(`${tool} workspace`);
     for (const [otherIndex, other] of tools.entries()) {
       expect(loads[other]).toHaveBeenCalledTimes(otherIndex <= index ? 1 : 0);

@@ -7,6 +7,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 ### Changed
 
 - 合併、拆分、壓縮與轉換工具改為首次使用時按需載入，後續切換重用已載入的程式；載入中顯示置中的 MUI 圓形進度指示器與工具名稱，失敗後可重新載入頁面，切換工具仍重設工作區。
+- 「05／PDF2docx」沿用共用的首次按需載入、MUI 圓形進度指示器與載入失敗提示；開啟 PDF、讀取與辨識內容、重建版面及產生 Word 時，皆顯示置中的 MUI 圓形進度指示器，保留處理階段與頁數提示。
 
 ## [1.1.0] - 2026-10-09
 

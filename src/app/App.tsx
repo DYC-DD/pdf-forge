@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import LandingHero from "../features/landing/LandingHero";
 import ToolPicker, { type Tool } from "../features/landing/ToolPicker";
@@ -7,10 +7,6 @@ import SiteFooter from "./components/SiteFooter";
 import SiteHeader from "./components/SiteHeader";
 import ToolWorkspace from "./components/ToolWorkspace";
 import { toolFromPath, toolHref } from "./toolRoutes";
-
-const Pdf2DocxWorkspace = lazy(
-  () => import("../features/pdf2docx/Pdf2DocxWorkspace")
-);
 
 export default function App() {
   const [tool, setTool] = useState<Tool>(
@@ -84,11 +80,7 @@ export default function App() {
             {tool === "convert" && <ToolWorkspace tool="convert" />}
           </div>
           <div id="pdf2docx-panel" hidden={tool !== "pdf2docx"}>
-            {tool === "pdf2docx" && (
-              <Suspense fallback={<p role="status">正在載入 PDF2docx…</p>}>
-                <Pdf2DocxWorkspace />
-              </Suspense>
-            )}
+            {tool === "pdf2docx" && <ToolWorkspace tool="pdf2docx" />}
           </div>
         </div>
       </main>

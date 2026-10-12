@@ -1,3 +1,4 @@
+import CircularProgress from "@mui/material/CircularProgress";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
@@ -239,12 +240,7 @@ export default function Pdf2DocxWorkspace() {
                 </button>
               )}
             </div>
-            {loading && (
-              <div className="loading-panel" role="status">
-                正在開啟 PDF…
-              </div>
-            )}
-            {!model && !busy && (
+            {!model && !loading && !busy && (
               <div className="pdf2docx-empty">
                 <PublicIcon name="list" size={26} />
                 <strong>準備好後，掃描文件內容</strong>
@@ -253,11 +249,16 @@ export default function Pdf2DocxWorkspace() {
             )}
           </>
         )}
-        {busy && (
-          <div className="pdf2docx-progress" role="status">
-            <progress aria-label="文件處理中" />
-            <strong>{progressText}</strong>
-            <span>全部在本機處理，共 {progress?.total} 頁。</span>
+        {(loading || busy) && (
+          <div className="pdf2docx-progress" role="status" aria-busy="true">
+            <CircularProgress
+              className="workspace-loading-spinner"
+              color="inherit"
+              size={40}
+              aria-label={loading ? "正在開啟 PDF" : "文件處理中"}
+            />
+            <strong>{loading ? "正在開啟 PDF…" : progressText}</strong>
+            {busy && <span>全部在本機處理，共 {progress?.total} 頁。</span>}
           </div>
         )}
         {model && currentPage && (

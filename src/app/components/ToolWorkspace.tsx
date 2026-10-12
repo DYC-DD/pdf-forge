@@ -9,6 +9,7 @@ const workspaces = {
   split: lazy(() => import("../../features/split/SplitWorkspace")),
   compress: lazy(() => import("../../features/compress/CompressWorkspace")),
   convert: lazy(() => import("../../features/convert/ConvertWorkspace")),
+  pdf2docx: lazy(() => import("../../features/pdf2docx/Pdf2DocxWorkspace")),
 };
 
 const labels: Record<Tool, string> = {
@@ -16,6 +17,7 @@ const labels: Record<Tool, string> = {
   split: "拆分工具",
   compress: "壓縮工具",
   convert: "轉換工具",
+  pdf2docx: "PDF 轉 Word 工具",
 };
 
 class WorkspaceBoundary extends Component<
