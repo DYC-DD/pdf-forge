@@ -45,7 +45,9 @@ function FigurePreview({ figure }: { figure: ImageBlock }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
     const next = URL.createObjectURL(
-      new Blob([new Uint8Array(figure.data)], { type: "image/png" })
+      new Blob([new Uint8Array(figure.data)], {
+        type: figure.format === "jpg" ? "image/jpeg" : "image/png",
+      })
     );
     setUrl(next);
     return () => URL.revokeObjectURL(next);
@@ -146,7 +148,11 @@ export default function StructurePreview({ page }: { page: PageModel }) {
       ))}
       {!!page.overlays?.length && (
         <div className="pdf2docx-overlays">
-          <p className="pdf2docx-paragraph">原稿圖章、浮水印與頁面圖像</p>
+          <p className="pdf2docx-paragraph">
+            {page.overlays.some((figure) => figure.role === "scan-background")
+              ? "保留的原稿影像（此區文字無法直接編輯）"
+              : "原稿圖章、浮水印與頁面圖像"}
+          </p>
           {page.overlays.map((figure) => (
             <FigurePreview key={figure.id} figure={figure} />
           ))}

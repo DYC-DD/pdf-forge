@@ -9,23 +9,6 @@
 .pdf2docx-source > div:nth-child(2) {
   flex: 1;
 }
-.pdf2docx-field,
-.pdf2docx-range {
-  margin-bottom: 22px;
-}
-.pdf2docx-range .filename-field {
-  margin-bottom: 0;
-}
-.pdf2docx-range
-  .MuiOutlinedInput-root.Mui-error
-  .MuiOutlinedInput-notchedOutline {
-  border-color: #cb7e88;
-}
-.pdf2docx-field p,
-.pdf2docx-range p {
-  margin-top: 9px;
-  font-size: 12px;
-}
 .pdf2docx-empty {
   display: flex;
   flex-direction: column;
@@ -170,63 +153,28 @@
 .pdf2docx-wrapped-figure .pdf2docx-figure {
   margin: 0;
 }
-.pdf2docx-checkbox.MuiFormControlLabel-root {
-  align-items: flex-start;
-  gap: 5px;
-  margin: 0 0 5px -4px;
-}
-.pdf2docx-checkbox .MuiFormControlLabel-label {
-  padding-top: 5px;
-  color: #d2d3d7;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.7;
-}
-.pdf2docx-checkbox .MuiCheckbox-root {
-  width: 32px;
-  height: 32px;
-  padding: 4px;
-  border-radius: 6px;
-  color: #a9b6d0;
-  flex: none;
-}
-.pdf2docx-checkbox .MuiCheckbox-root .MuiSvgIcon-root {
-  font-size: 17px;
-}
-.pdf2docx-checkbox .MuiCheckbox-root.Mui-checked {
-  color: var(--blue);
-}
-.pdf2docx-checkbox .MuiCheckbox-root.Mui-disabled,
-.pdf2docx-checkbox .MuiFormControlLabel-label.Mui-disabled {
-  color: #606673;
-}
-.pdf2docx-checkbox .MuiCheckbox-root:not(.Mui-disabled):hover {
-  background: #292e3b;
-}
-.pdf2docx-checkbox .MuiCheckbox-root.Mui-focusVisible {
-  outline: 3px solid #99add7;
-  outline-offset: 3px;
-}
-.pdf2docx-settings > .pdf2docx-option-hint {
+.pdf2docx-output > .pdf2docx-result-note {
+  margin-bottom: 15px;
   font-size: 12px;
-  margin-bottom: 22px;
 }
-.pdf2docx-settings > .pdf2docx-result-note {
+.pdf2docx-output > .pdf2docx-filename {
+  overflow-wrap: anywhere;
+  color: #d2d3d7;
+  font-size: 13px;
   margin-bottom: 15px;
 }
-.pdf2docx-auto-layout {
-  margin-bottom: 22px;
+.pdf2docx-analysis {
+  margin-top: 22px;
 }
-.pdf2docx-auto-layout > strong {
-  color: #d2d3d7;
-  font-size: 13px;
-}
-.pdf2docx-auto-layout p {
-  margin-top: 8px;
-  font-size: 12px;
-}
-.pdf2docx-auto-layout .pdf2docx-detected-layout {
+.pdf2docx-analysis > summary {
+  cursor: pointer;
   color: #b7c9ee;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.pdf2docx-analysis > summary:focus-visible {
+  outline: 2px solid #99add7;
+  outline-offset: 3px;
 }
 .pdf2docx-progress {
   display: flex;

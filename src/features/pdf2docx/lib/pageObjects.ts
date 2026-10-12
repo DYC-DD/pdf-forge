@@ -163,6 +163,11 @@ export function classifyPage(
   const overlay = (figure: RawPage["figures"][number]) =>
     figure.overlay ||
     (page.source === "pdf" &&
+      figure.width < page.width * 0.1 &&
+      figure.height > figure.width * 1.5 &&
+      (figure.x < page.width * 0.035 ||
+        figure.x + figure.width > page.width * 0.965)) ||
+    (page.source === "pdf" &&
       (tables.some((table) => containsCenter(table, figure)) ||
         (figure.width * figure.height > page.width * page.height * 0.15 &&
           body.some(

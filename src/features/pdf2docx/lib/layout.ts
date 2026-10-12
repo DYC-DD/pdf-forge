@@ -120,6 +120,17 @@ function flow(nodes: Node[], region: Box, bodySize: number): FlowBlock[] {
   }
   flush();
   const arranged = attachWrappedImages(output);
+  for (const [index, block] of arranged.entries()) {
+    const next = arranged[index + 1];
+    if (block.kind !== "paragraph" || !next || next.y <= block.y) continue;
+    // A standalone source line has no measured leading. The default 1.25 em
+    // must not accumulate when tightly set form rows are only one em apart.
+    const count = block.lineCount ?? 1;
+    const available = (next.y - block.y) / count;
+    const minimum = Math.max(...block.runs.map((run) => run.size));
+    if (available >= minimum && available < block.lineHeight)
+      block.lineHeight = available;
+  }
   let cursor = region.y;
   for (const block of arranged) {
     block.before = Math.max(0, block.y - cursor);
@@ -181,6 +192,27 @@ function findColumnGap(
     const left = narrow.filter((line) => right(line) <= gap[0] + 1);
     const rightLines = narrow.filter((line) => line.x >= gap[1] - 1);
     if (left.length < 2 || rightLines.length < 2) continue;
+    // Paired one-line form labels do not establish independent reading columns.
+    // Require consecutive source rows on both sides with a stable left edge.
+    const hasProse = (entries: TextLine[]) =>
+      entries.some((line, index) =>
+        entries
+          .slice(index + 1)
+          .some(
+            (next) =>
+              next.baseline - line.baseline > size * 0.6 &&
+              next.baseline - line.baseline <
+                size *
+                  (line.width > region.width * 0.32 &&
+                  next.width > region.width * 0.32
+                    ? 5
+                    : 1.8) &&
+              Math.abs(next.x - line.x) < size &&
+              line.width > region.width * 0.2 &&
+              next.width > region.width * 0.2
+          )
+      );
+    if (!hasProse(left) || !hasProse(rightLines)) continue;
     const a = bounds(left),
       b = bounds(rightLines);
     const top = Math.max(a.y, b.y),
@@ -217,8 +249,28 @@ function findColumnGap(
 }
 
 function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
-  const gap = findColumnGap(nodes, region, bodySize);
+  let gap = findColumnGap(nodes, region, bodySize);
   if (!gap) return [{ columns: [flow(nodes, region, bodySize)], gap: 0 }];
+  // Long source rows can narrow an established gutter below buildLines' wide
+  // gap threshold. Split those rows at their actual span boundary before
+  // treating them as full-width headings. Never cut a span or a larger title.
+  const rightEdge = gap[1];
+  nodes = nodes
+    .flatMap((node) => {
+      if (node.kind !== "line" || node.size > bodySize * 1.25) return [node];
+      const left = node.spans.filter((span) => span.x < rightEdge - 2);
+      const rightSpans = node.spans.filter((span) => span.x >= rightEdge - 2);
+      if (
+        !left.length ||
+        !rightSpans.length ||
+        right(bounds(left)) + Math.max(12, bodySize * 0.6) >
+          bounds(rightSpans).x
+      )
+        return [node];
+      return [...buildLines(left, true), ...buildLines(rightSpans, true)];
+    })
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  gap = findColumnGap(nodes, region, bodySize) ?? gap;
   const [leftEnd, rightStart] = gap;
   const crossing = nodes
     .filter(
@@ -379,7 +431,11 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
       width: page.width - margins.left - margins.right,
       height: page.height - margins.top - margins.bottom,
     };
-    const groups = pageGroups(nodes, region, bodySize);
+    const groups = page.figures.some(
+      (figure) => figure.role === "scan-background"
+    )
+      ? [{ columns: [flow(nodes, region, bodySize)], gap: 0 }]
+      : pageGroups(nodes, region, bodySize);
     const represented = new Set<string>([
       ...footerIds,
       ...page.spans

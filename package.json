@@ -10,6 +10,7 @@
     "test": "vitest run",
     "fixtures:pdf2docx": "node scripts/pdf2docx-public.mjs download",
     "test:pdf2docx-public": "node scripts/pdf2docx-public.mjs test",
+    "check:pdf2docx-pages": "node scripts/pdf2docx-check-rendered.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

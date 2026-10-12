@@ -2,11 +2,16 @@ import type { PDFPageProxy } from "pdfjs-dist";
 import { createWorker, OEM, PSM, type Worker } from "tesseract.js";
 
 import type { AnalyzeOptions, RawPage } from "../types";
+import { retainEditableScan, scanColorRegions } from "./editableScan";
 import { renderPage } from "./extractPage";
 import { checkAbort, DOCX_LIMITS } from "./limits";
-import { ocrSpans } from "./ocrGeometry";
+import { normalizeOcrLineSizes, ocrSpans } from "./ocrGeometry";
 import { horizontalTextPage, preferHorizontalText } from "./ocrLayout";
-import { retainScanGraphics } from "./scanGraphics";
+import { refineScanLines } from "./ocrLines";
+import { refineScanTables } from "./ocrTables";
+import { deskewScan } from "./scanDeskew";
+import { retainUncertainScan } from "./scanFallback";
+import { normalizeOversizedScan } from "./scanPageSize";
 import { scanRules } from "./scanRules";
 
 export class LocalOcr {
@@ -76,14 +81,58 @@ export class LocalOcr {
   ): Promise<void> {
     this.currentPage = page.pageNumber;
     this.totalPages = total;
-    const { canvas, scale } = await renderPage(page, 3, this.options.signal);
+    const { canvas, scale: renderScale } = await renderPage(
+      page,
+      3,
+      this.options.signal
+    );
+    const originalWidth = raw.width;
+    raw.source = "ocr";
+    // Scanner pixel dimensions are sometimes stored as PDF points. Normalize
+    // before grid detection; otherwise individual glyph strokes become rules.
+    normalizeOversizedScan(raw);
+    const scale = (renderScale * originalWidth) / raw.width;
+    if (deskewScan(canvas))
+      raw.issues.push({
+        page: raw.number,
+        code: "scan-deskew",
+        severity: "info",
+        message: "已自動校正掃描傾斜，再辨識文字與表格。",
+      });
     const context = canvas.getContext("2d", { willReadFrequently: true });
     const original = context?.getImageData(0, 0, canvas.width, canvas.height);
-    if (context) {
-      raw.rules = scanRules(
-        context.getImageData(0, 0, canvas.width, canvas.height),
-        scale
-      );
+    if (context && original) {
+      const input = context.getImageData(0, 0, canvas.width, canvas.height);
+      // Keep the black glyphs crossing a colored watermark, while preventing
+      // the artwork from competing with those glyphs during OCR.
+      for (const box of scanColorRegions(original, scale, []))
+        for (
+          let y = Math.floor(box.y * scale);
+          y < Math.min(input.height, (box.y + box.height) * scale);
+          y++
+        )
+          for (
+            let x = Math.floor(box.x * scale);
+            x < Math.min(input.width, (box.x + box.width) * scale);
+            x++
+          ) {
+            const i = (y * input.width + x) * 4;
+            const rgb = [input.data[i], input.data[i + 1], input.data[i + 2]];
+            if (
+              Math.max(...rgb) - Math.min(...rgb) > 40 &&
+              Math.min(...rgb) > 65
+            )
+              input.data[i] = input.data[i + 1] = input.data[i + 2] = 255;
+          }
+      context.putImageData(input, 0, 0);
+    }
+    const textInput = context?.getImageData(0, 0, canvas.width, canvas.height);
+    if (context && textInput) {
+      raw.rules = scanRules(textInput, scale);
+      // Color removal is only an alternative for uncertain local crops.
+      // Scanned black type can have colored fringes; bleaching the primary
+      // page can silently remove whole words near a watermark.
+      if (original) context.putImageData(original, 0, 0);
       // Keep the grid as geometry, then remove its long strokes from the OCR
       // input. Otherwise lines are read as |, _, or very tall character boxes.
       context.save();
@@ -105,7 +154,7 @@ export class LocalOcr {
     this.options.signal?.addEventListener("abort", abort, { once: true });
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const data = await Promise.race([
+      await Promise.race([
         (async () => {
           const worker = await this.getWorker();
           checkAbort(this.options.signal);
@@ -171,13 +220,39 @@ export class LocalOcr {
             if (preferHorizontalText(primary, fallback)) return fallback;
           }
           return primary;
-        })(),
+        })().then(async (result) => {
+          raw.spans = ocrSpans(result.blocks ?? [], scale, raw.number);
+          if (
+            original &&
+            this.worker &&
+            this.options.preserveUncertainScan !== true
+          ) {
+            await refineScanTables(
+              this.worker,
+              canvas,
+              original,
+              scale,
+              raw,
+              this.options.signal
+            );
+            await refineScanLines(
+              this.worker,
+              canvas,
+              scale,
+              raw,
+              this.options.signal,
+              textInput
+            );
+            normalizeOcrLineSizes(raw.spans);
+          }
+          return result;
+        }),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             void this.dispose();
             reject(
               new Error(
-                `第 ${raw.number} 頁 OCR 超過 2 分鐘，請減少頁面或改用較清晰的原稿。`
+                `第 ${raw.number} 頁 OCR 超過 2 分鐘，請重試或改用較清晰的原稿。`
               )
             );
           }, DOCX_LIMITS.ocrTimeoutMs);
@@ -187,15 +262,12 @@ export class LocalOcr {
         }),
       ]);
       checkAbort(this.options.signal);
-      raw.spans = ocrSpans(data.blocks ?? [], scale, raw.number);
       if (original)
-        await retainScanGraphics(
-          canvas,
-          original,
-          scale,
-          raw,
-          this.options.signal
-        );
+        await (
+          this.options.preserveUncertainScan === true
+            ? retainUncertainScan
+            : retainEditableScan
+        )(canvas, original, scale, raw, this.options.signal);
       raw.source = "ocr";
       raw.issues = raw.issues.filter(
         (issue) => issue.code !== "encoding" && issue.code !== "annotations"
@@ -207,12 +279,12 @@ export class LocalOcr {
         message:
           "此頁使用本機 OCR，請核對文字、數字、表格及圖像範圍；掃描字型可能不同，複雜圖文仍可能誤判。",
       });
-      if (!raw.spans.length)
+      if (!raw.spans.length && !raw.figures.length)
         raw.issues.push({
           page: raw.number,
           code: "ocr-empty",
           severity: "error",
-          message: "未辨識到可編輯文字，請確認原稿是否清晰或選擇正確語言。",
+          message: "未能讀取此頁內容，請確認原稿是否清晰後重試。",
         });
       const low = raw.spans.filter(
         (span) => (span.confidence ?? 0) < 75

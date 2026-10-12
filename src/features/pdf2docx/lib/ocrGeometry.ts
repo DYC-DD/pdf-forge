@@ -87,7 +87,12 @@ export function ocrSpans(
     // when estimating type. A single unusual glyph must not resize a whole row.
     const heights = line.words
       .filter((word) => /[\p{L}\p{N}]/u.test(word.text))
-      .map((word) => (word.bbox.y1 - word.bbox.y0) / scale)
+      .map(
+        (word) =>
+          (Math.min(word.bbox.y1, line.bbox.y1) -
+            Math.max(word.bbox.y0, line.bbox.y0)) /
+          scale
+      )
       .filter((value) => value >= 2 && value <= height * 1.25);
     const cluster =
       heights
@@ -131,7 +136,11 @@ export function ocrSpans(
         throw new Error(`第 ${page} 頁辨識文字超過目前上限，請減少頁面內容。`);
       const { x0, x1 } = word.bbox;
       const y0 = Math.max(word.bbox.y0, line.bbox.y0);
-      const y1 = Math.max(y0 + 1, Math.min(word.bbox.y1, line.bbox.y1));
+      const y1 = Math.min(word.bbox.y1, line.bbox.y1);
+      // Some CJK hypotheses sit entirely outside their own text line (often
+      // on an erased grid stroke). Clamping them to a fabricated one-pixel
+      // height would turn that noise into extra cell rows and paragraphs.
+      if (y1 <= y0 || x1 <= x0) continue;
       const dx = line.baseline.x1 - line.baseline.x0;
       const ratio = dx
         ? Math.max(0, Math.min(1, ((x0 + x1) / 2 - line.baseline.x0) / dx))
@@ -158,5 +167,54 @@ export function ocrSpans(
       });
     }
   }
+  normalizeOcrLineSizes(spans);
   return spans;
+}
+
+/** A swollen OCR word box must not enlarge one line in otherwise tightly set
+ * prose. Real headings retain their size when their baselines leave room.
+ */
+export function normalizeOcrLineSizes(spans: TextSpan[]): void {
+  const grouped = new Map<string, TextSpan[]>();
+  for (const span of spans) {
+    const id = span.lineId ?? span.id;
+    grouped.set(id, [...(grouped.get(id) ?? []), span]);
+  }
+  const lines = [...grouped.values()]
+    .map((items) => ({
+      items,
+      x: Math.min(...items.map((s) => s.x)),
+      right: Math.max(...items.map((s) => s.x + s.width)),
+      baseline: median(items.map((s) => s.baseline)),
+      size: median(items.map((s) => s.size)),
+    }))
+    .sort((a, b) => a.baseline - b.baseline);
+  for (const [index, line] of lines.entries()) {
+    const overlap = (other: typeof line) =>
+      Math.min(line.right, other.right) - Math.max(line.x, other.x) >
+      Math.min(line.right - line.x, other.right - other.x) * 0.5;
+    const before = lines
+      .slice(Math.max(0, index - 6), index)
+      .reverse()
+      .find((other) => line.baseline - other.baseline > 2 && overlap(other));
+    const after = lines
+      .slice(index + 1, index + 7)
+      .find((other) => other.baseline - line.baseline > 2 && overlap(other));
+    if (
+      !before ||
+      !after ||
+      Math.max(before.size, after.size) >
+        Math.min(before.size, after.size) * 1.25
+    )
+      continue;
+    const normal = (before.size + after.size) / 2;
+    if (
+      line.size > normal * 1.4 &&
+      line.baseline - before.baseline < normal * 1.6 &&
+      after.baseline - line.baseline < normal * 1.6
+    )
+      line.items.forEach((span) => {
+        span.size = normal;
+      });
+  }
 }

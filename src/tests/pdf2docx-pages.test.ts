@@ -124,6 +124,42 @@ async function document(
 }
 
 describe("PDF2docx standard page setup", () => {
+  it("reserves writing height for OCR line boxes without shrinking editable type", () => {
+    const raw = page(
+      Array.from({ length: 48 }, (_, i) =>
+        span("掃描正文應保持可編輯", 90, 72 + i * 13, 390, {
+          source: "ocr",
+          lineId: `line-${i}`,
+          paragraphId: `p-${i}`,
+        })
+      )
+    );
+    raw.source = "ocr";
+    const model = analyzeLayout([raw]);
+    const source = model.pages[0];
+    const blocks = source.groups
+      .flatMap((g) => g.columns.flat())
+      .filter((b) => b.kind === "paragraph");
+    // Emulate a scan whose visible glyph boxes fit, but Word's full line boxes
+    // need a little more of the blank bottom margin.
+    blocks.forEach((p) => {
+      p.lineHeight = 14.5;
+      p.before = 0;
+    });
+    const setup = detectPageSetups([source])[0];
+    expect(setup.margins.bottom).toBeLessThan(36);
+    expect(source.height - setup.margins.bottom).toBeGreaterThan(
+      72 + 48 * 14.5
+    );
+    const mapped = applyPageSetup(source, setup);
+    expect(
+      mapped.groups
+        .flatMap((g) => g.columns.flat())
+        .filter((b) => b.kind === "paragraph")
+        .flatMap((p) => p.runs)
+        .every((r) => r.size === 12)
+    ).toBe(true);
+  });
   it("keeps clearance below a table that nearly touches a common bottom margin", () => {
     const raw = page([span("A", 40, 45, 20), span("B", 300, 45, 20)]);
     raw.width = 842;

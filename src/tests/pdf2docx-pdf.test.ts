@@ -483,7 +483,7 @@ describe("PDF2docx with real PDF.js input", () => {
     expect(read).not.toHaveBeenCalled();
     await expect(
       analyzePdf(await makeDocument(), [], { ocr: "off", language: "eng" })
-    ).rejects.toThrow("1～50");
+    ).rejects.toThrow("沒有可分析");
     await expect(
       analyzePdf(await makeDocument(), [3], { ocr: "off", language: "eng" })
     ).rejects.toThrow("超出");
@@ -496,6 +496,28 @@ describe("PDF2docx with real PDF.js input", () => {
         signal: controller.signal,
       })
     ).rejects.toMatchObject({ name: "AbortError" });
+  });
+  it("scans every page of a document beyond the old fifty-page selection limit", async () => {
+    const pdf = await PDFDocument.create();
+    for (let number = 1; number <= 51; number++)
+      pdf
+        .addPage()
+        .drawText(`Document content ${number}`, { x: 50, y: 700, size: 12 });
+    const model = await analyzePdf(
+      new File([new Uint8Array(await pdf.save())], "whole.pdf")
+    );
+    expect(model.pages.map((page) => page.number)).toEqual(
+      Array.from({ length: 51 }, (_, index) => index + 1)
+    );
+    expect(model.stats).toMatchObject({ pages: 51, ocrPages: 0 });
+    expect(model.issues.filter((issue) => issue.severity === "error")).toEqual(
+      []
+    );
+    const blob = await exportDocx(model, { preservePageBreaks: true });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toContain("Document content 51");
+    expect(xml.match(/<w:sectPr>/gu)).toHaveLength(51);
   });
   it("can cancel between pages before layout starts", async () => {
     const controller = new AbortController();

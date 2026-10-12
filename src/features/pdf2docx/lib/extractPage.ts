@@ -183,7 +183,7 @@ export async function extractPage(
   )
     issue(
       "encoding",
-      "文字層含無法確認的字元，建議改用「整頁重新辨識」並核對原稿。",
+      "文字層含無法確認的字元，需要重新辨識並核對原稿。",
       "error"
     );
   const annotations = await page.getAnnotations({ intent: "display" });
@@ -197,7 +197,7 @@ export async function extractPage(
   )
     issue(
       "annotations",
-      "此頁含表單值或文字註解，文字層未包含全部可見內容；請改用「整頁重新辨識」並核對。",
+      "此頁含表單值或文字註解，文字層未包含全部可見內容，需要重新辨識並核對。",
       "error"
     );
   // Embedded fonts cannot be reused directly as Word fonts.
@@ -634,8 +634,14 @@ export function figureRegions(
         overlapY >= -0.5 &&
         Math.abs(a.x - b.x) < 1 &&
         Math.abs(a.width - b.width) < 1;
-      if (overlapping || horizontalTile || verticalTile) {
-        regions[index] = bounds([a, b]);
+      const union = bounds([a, b]);
+      // An edge stamp touching a thin, page-wide address strip is not one
+      // rectangular picture. Its bounding rectangle would cover unrelated text.
+      const compact =
+        union.width * union.height <=
+        (a.width * a.height + b.width * b.height) * 1.15;
+      if ((overlapping && compact) || horizontalTile || verticalTile) {
+        regions[index] = union;
         regions.splice(other, 1);
         other = index + 1;
       } else other++;
@@ -718,8 +724,7 @@ export async function captureFigures(
       page: raw.number,
       code: "image-text",
       severity: "info",
-      message:
-        "獨立圖片以圖片保留；其中的文字不會變成可編輯文字，必要時改用「整頁重新辨識」。",
+      message: "獨立圖片已保留原稿外觀，其中的文字無法直接編輯。",
     });
   if (!candidates.length) return;
   const sharedComposite = candidates.every(
@@ -808,7 +813,7 @@ export async function captureFigures(
         );
         total += blob.size;
         if (total > DOCX_LIMITS.imageBytes)
-          throw new Error("圖片內容超過 32 MB，請減少選取頁面。");
+          throw new Error("圖片內容超過 32 MB，請先拆分 PDF 後再轉換。");
         raw.figures.push({
           x,
           y,

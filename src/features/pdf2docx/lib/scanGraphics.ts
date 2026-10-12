@@ -6,10 +6,11 @@ import { checkAbort } from "./limits";
 // Large connected residuals with little text evidence are pictures/diagrams,
 // rather than another paragraph. Keep their original pixels, including labels.
 export function scanGraphics(
-  image: Pick<ImageData, "data" | "width" | "height">,
+  image: { data: Uint8ClampedArray; width: number; height: number },
   scale: number,
   spans: readonly TextSpan[],
-  rules: readonly Rule[]
+  rules: readonly Rule[],
+  excluded: readonly Box[] = []
 ): Box[] {
   const step = Math.max(4, Math.round(4 * scale));
   const width = Math.ceil(image.width / step),
@@ -23,6 +24,9 @@ export function scanGraphics(
       y1 = Math.min(height, Math.ceil((bottom(box) * scale) / step));
     for (let y = y0; y < y1; y++) mask.fill(1, y * width + x0, y * width + x1);
   };
+  // Transparent stamps/watermarks are handled separately; never crop their
+  // overlapping body text into an opaque, flowing illustration.
+  for (const box of excluded) cover(box);
   for (const span of spans)
     cover({
       x: span.x - 1,
@@ -134,11 +138,12 @@ export async function retainScanGraphics(
   image: ImageData,
   scale: number,
   page: import("../types").RawPage,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  excluded: readonly Box[] = []
 ): Promise<void> {
   const context = canvas.getContext("2d");
   if (!context) return;
-  const regions = scanGraphics(image, scale, page.spans, page.rules);
+  const regions = scanGraphics(image, scale, page.spans, page.rules, excluded);
   if (!regions.length) return;
   context.putImageData(image, 0, 0);
   for (const [index, box] of regions.entries()) {

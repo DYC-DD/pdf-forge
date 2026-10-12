@@ -6,13 +6,20 @@ type Segment = { position: number; from: number; to: number; count: number };
 // Find long, nearly straight strokes in the local scan. Perpendicular dilation
 // tolerates scanner skew and broken ink; character strokes are too short to pass.
 export function scanRules(
-  image: Pick<ImageData, "data" | "width" | "height">,
+  image: { data: Uint8ClampedArray; width: number; height: number },
   scale: number
 ): Rule[] {
   const { data, width, height } = image;
   const ink = new Uint8Array(width * height);
-  for (let i = 0; i < ink.length; i++)
-    ink[i] = data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2] < 420 ? 1 : 0;
+  for (let i = 0; i < ink.length; i++) {
+    const r = data[i * 4],
+      g = data[i * 4 + 1],
+      b = data[i * 4 + 2];
+    // Pale gray grid lines still count. Colored stamps/watermarks must not
+    // become hundreds of false horizontal/vertical strokes or be erased.
+    ink[i] =
+      r + g + b < 600 && Math.max(r, g, b) - Math.min(r, g, b) < 40 ? 1 : 0;
+  }
   const radius = Math.max(1, Math.round(scale * 0.65));
   const detect = (horizontal: boolean): Segment[] => {
     const length = horizontal ? width : height;
@@ -65,10 +72,32 @@ export function scanRules(
       } else merged.push({ ...candidate });
       if (merged.length > DOCX_LIMITS.rulesPerPage) return [];
     }
+    // Dilation of a thick or curved stroke can produce nested segments whose
+    // running centroids drift apart; consolidate them before OCR erasure.
+    for (let i = 0; i < merged.length; i++)
+      for (let j = merged.length - 1; j > i; j--) {
+        const a = merged[i],
+          b = merged[j];
+        if (
+          Math.abs(a.position - b.position) > scale * 2.5 ||
+          Math.min(a.to, b.to) - Math.max(a.from, b.from) <=
+            Math.min(a.to - a.from, b.to - b.from) * 0.5
+        )
+          continue;
+        a.position =
+          (a.position * a.count + b.position * b.count) / (a.count + b.count);
+        a.count += b.count;
+        a.from = Math.min(a.from, b.from);
+        a.to = Math.max(a.to, b.to);
+        merged.splice(j, 1);
+      }
     return merged;
   };
-  const horizontal = detect(true),
-    vertical = detect(false);
+  // Scanner bed shadows and cropped paper edges are not document borders.
+  const interior = (line: Segment, extent: number) =>
+    line.position > extent * 0.015 && line.position < extent * 0.985;
+  const horizontal = detect(true).filter((line) => interior(line, height)),
+    vertical = detect(false).filter((line) => interior(line, width));
   // Underlines and form boxes alone are not a grid. The table detector checks
   // intersections and rectangular merged cells before consuming any text.
   if (horizontal.length < 3 || vertical.length < 3) return [];

@@ -50,6 +50,7 @@ export type Figure = Box & {
   behindText?: boolean;
   format?: "png" | "jpg";
   inFooter?: boolean;
+  role?: "scan-background" | "scan-region";
 };
 export type RawPage = {
   number: number;
@@ -178,6 +179,8 @@ export type ConversionProgress = {
 export type AnalyzeOptions = {
   ocr: OcrMode;
   language: OcrLanguage;
+  /** Retain uncertain scan regions as pixels instead of exporting OCR guesses. */
+  preserveUncertainScan?: boolean;
   signal?: AbortSignal;
   onProgress?: (progress: ConversionProgress) => void;
 };

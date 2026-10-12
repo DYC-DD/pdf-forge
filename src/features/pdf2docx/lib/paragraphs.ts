@@ -216,7 +216,12 @@ export function lineRuns(line: TextLine): TextRun[] {
         span.x - right(previousSpan) >
           Math.min(span.size, previousSpan.size) * 0.16)
     ) {
-      text = joinSeparator(previousSpan.text, text) + text;
+      text =
+        (previousSpan.spaceAfter &&
+        !/\s$/u.test(previousSpan.text) &&
+        !/^\s/u.test(text)
+          ? " "
+          : joinSeparator(previousSpan.text, text)) + text;
     }
     const previous = runs[runs.length - 1];
     if (

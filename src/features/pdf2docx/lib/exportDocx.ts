@@ -188,7 +188,7 @@ class Writer {
     let runs = paragraph.runs.map((run) =>
       this.preserveSourceLines &&
       paragraph.source === "pdf" &&
-      paragraph.role !== "list" &&
+      !marker &&
       run.sourceLineStart &&
       !run.breakBefore
         ? {
@@ -632,13 +632,53 @@ class Writer {
       });
     this.listReference = "";
     const indent = Math.max(0, Math.min(block.x - left, availableWidth - 1));
+    if (block.role === "scan-region") {
+      // An inline drawing inherits a font baseline/descent, which accumulates
+      // across mixed text/image rows. Exact inline line height clips the image.
+      // Anchor the crop to its own flowing paragraph and reserve its full height
+      // instead; moving the paragraph in Word still moves the crop with it.
+      const height =
+        block.height * Math.min(1, (availableWidth - indent) / block.width);
+      return new WordParagraph({
+        run: { size: 2 },
+        keepNext: false,
+        widowControl: false,
+        children: [
+          ...(columnBreak ? [new ColumnBreak()] : []),
+          this.image(block, availableWidth - indent, {
+            horizontalPosition: {
+              relative: HorizontalPositionRelativeFrom.COLUMN,
+              offset: emu(indent),
+            },
+            verticalPosition: {
+              relative: VerticalPositionRelativeFrom.PARAGRAPH,
+              offset: emu(block.before),
+            },
+            allowOverlap: true,
+            layoutInCell: true,
+            behindDocument: false,
+            wrap: { type: TextWrappingType.NONE },
+          }),
+          new WordRun({ text: "", size: 2 }),
+        ],
+        spacing: {
+          before: positive(block.before),
+          after: 0,
+          line: positive(height),
+          lineRule: LineRuleType.EXACT,
+        },
+      });
+    }
     return new WordParagraph({
       children: [
         ...(columnBreak ? [new ColumnBreak()] : []),
         this.image(block, availableWidth - indent),
       ],
       indent: { left: positive(indent) },
-      spacing: { before: positive(block.before), after: 0 },
+      spacing: {
+        before: positive(block.before),
+        after: 0,
+      },
     });
   }
 }
@@ -664,6 +704,8 @@ export function prepareExportPages(
     const previous = pages[index - 1],
       current = pages[index];
     if (
+      previous.overlays?.some((image) => image.role === "scan-background") ||
+      current.overlays?.some((image) => image.role === "scan-background") ||
       !samePage(previous, current) ||
       current.number !== previous.number + 1 ||
       previous.groups.length !== 1 ||
@@ -708,7 +750,7 @@ export async function exportDocx(
   options: ExportOptions
 ): Promise<Blob> {
   if (model.issues.some((issue) => issue.severity === "error"))
-    throw new Error("仍有未能完整讀取的頁面，請調整頁碼或辨識模式後重新分析。");
+    throw new Error("仍有未能完整讀取的頁面，請重新掃描或查看掃描結果。");
   if (!model.stats.characters && !model.stats.images)
     throw new Error("沒有可輸出的文字，請啟用 OCR 或改用文字型 PDF。");
   const writer = new Writer(options.preservePageBreaks);
@@ -719,6 +761,10 @@ export async function exportDocx(
   );
   let previousPage: PageModel | undefined;
   for (const page of pages) {
+    const preservePage =
+      options.preservePageBreaks ||
+      page.overlays?.some((image) => image.role === "scan-background") ||
+      previousPage?.overlays?.some((image) => image.role === "scan-background");
     const footer = page.footer;
     // Numeric OCR footers need no extra leading. Keep their bottom anchor and
     // type size, but do not reserve blank leading above the final body line.
@@ -825,7 +871,7 @@ export async function exportDocx(
         last &&
         previousPage &&
         samePage(previousPage, page) &&
-        !options.preservePageBreaks &&
+        !preservePage &&
         groupIndex === 0 &&
         columns === 1 &&
         last.properties?.column?.count === 1;
@@ -837,7 +883,7 @@ export async function exportDocx(
             type:
               sections.length === 0 ||
               (groupIndex === 0 &&
-                (options.preservePageBreaks ||
+                (preservePage ||
                   (previousPage && !samePage(previousPage, page))))
                 ? SectionType.NEXT_PAGE
                 : SectionType.CONTINUOUS,

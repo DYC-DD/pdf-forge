@@ -36,7 +36,7 @@ async function runJob(
     };
     const abort = () => finish(new DOMException("已取消處理。", "AbortError"));
     const timer = setTimeout(
-      () => finish(new Error("文件處理超過 2 分鐘，請減少選取頁面。")),
+      () => finish(new Error("文件處理超過 2 分鐘，請先拆分 PDF 後再轉換。")),
       DOCX_LIMITS.workerTimeoutMs
     );
     signal?.addEventListener("abort", abort, { once: true });

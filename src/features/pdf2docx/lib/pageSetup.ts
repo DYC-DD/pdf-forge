@@ -60,6 +60,53 @@ function detectPaper(
 type MarginEvidence = Partial<PageModel["margins"]> & {
   reliableWidth: boolean;
 };
+
+// OCR boxes describe ink, while Word lays out complete lines and table rows.
+// Allow that measured flow to use the blank bottom margin without shrinking
+// type or clipping a table cell merely to hit the source page count.
+function scanFlowBottom(page: PageModel): number {
+  let cursor = page.margins.top;
+  const leading = page.groups
+    .flatMap((g) => g.columns.flat())
+    .filter((b): b is Paragraph => b.kind === "paragraph")
+    .map((p) => p.lineHeight);
+  const paragraphHeight = (p: Paragraph) =>
+    (p.lineCount ?? 1) * Math.max(p.lineHeight, ...p.runs.map((r) => r.size));
+  for (const group of page.groups) {
+    cursor += Math.max(
+      0,
+      ...group.columns.map((blocks) =>
+        blocks.reduce((height, block) => {
+          let extent = block.height;
+          if (block.kind === "paragraph") extent = paragraphHeight(block);
+          if (block.kind === "rule") extent = 0.05 + block.thickness;
+          if (block.kind === "table") {
+            const rows = block.rows.map((row) =>
+              Math.max(0, row - (block.border?.thickness ?? 0.5))
+            );
+            for (const cell of block.cells) {
+              const content =
+                cell.paragraphs.reduce(
+                  (sum, p) => sum + paragraphHeight(p),
+                  0
+                ) + (block.border?.thickness ?? 0.5);
+              const room = rows
+                .slice(cell.row, cell.row + cell.rowSpan)
+                .reduce((a, b) => a + b, 0);
+              if (content > room)
+                rows[cell.row + cell.rowSpan - 1] += content - room;
+            }
+            extent = rows.reduce((a, b) => a + b, 0) + 0.1;
+          }
+          return height + block.before + extent;
+        }, 0)
+      )
+    );
+  }
+  // Word also keeps a terminal paragraph mark and cell-border clearance.
+  return cursor + Math.max(4, median(leading) || 0);
+}
+
 function marginEvidence(page: PageModel): MarginEvidence {
   const blocks = page.groups.flatMap((group) => group.columns.flat());
   const text = blocks
@@ -105,7 +152,10 @@ function marginEvidence(page: PageModel): MarginEvidence {
   const rightEdges = [...wide, ...columnEdges].map(right);
   const first = Math.min(...blocks.map((block) => block.y));
   const last = Math.max(
-    ...anchors.map((block) =>
+    ...(page.source === "ocr" ? [scanFlowBottom(page) + 4] : []),
+    // A centered continuation marker still occupies the bottom of the page.
+    // Alignment can weaken width evidence, never the required writing height.
+    ...blocks.map((block) =>
       block.kind === "paragraph"
         ? block.y +
           4 +
@@ -212,7 +262,7 @@ function chooseMargins(
       margins[edge] =
         Math.round(
           Math.min(
-            observed[edge]!,
+            Math.max(0, observed[edge]! - (edge === "bottom" ? 3 : 0)),
             edge === "left" || edge === "right" ? width * 0.35 : height * 0.2
           ) * 2
         ) / 2;

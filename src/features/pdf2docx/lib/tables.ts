@@ -45,7 +45,8 @@ export function detectTables(
   rules: Rule[],
   spans: TextSpan[],
   bodySize: number,
-  fills: readonly Fill[] = []
+  fills: readonly Fill[] = [],
+  includeEmpty = false
 ): { tables: TableModel[]; used: Set<string> } {
   const axisRules = rules.filter(
     (rule) =>
@@ -147,7 +148,7 @@ export function detectTables(
         });
         return pieces.filter((piece) => piece.text.trim());
       });
-    if (!content.length) continue;
+    if (!content.length && !includeEmpty) continue;
     const gridSize = median(content.map((span) => span.size));
     const columns = xs.length - 1;
     const rows = ys.length - 1;
@@ -242,10 +243,7 @@ export function detectTables(
       // type estimate that cannot fit its row should not enlarge the whole row.
       if (
         cellSpans.some(
-          (span) =>
-            span.source === "ocr" &&
-            span.size > gridSize * 1.5 &&
-            span.size * 1.25 > cellBox.height
+          (span) => span.source === "ocr" && span.size > gridSize * 1.5
         )
       )
         cellSpans = cellSpans.map((span) =>

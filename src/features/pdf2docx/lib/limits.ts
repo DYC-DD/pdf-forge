@@ -1,7 +1,8 @@
 export const DOCX_LIMITS = {
   fileBytes: 32 * 1024 * 1024,
-  pages: 50,
-  ocrPages: 10,
+  // OCR workers are recycled automatically; this is not a document page cap.
+  ocrBatchPages: 10,
+  layoutItems: 250_000,
   spansPerPage: 25_000,
   operatorsPerPage: 100_000,
   rulesPerPage: 2_000,
