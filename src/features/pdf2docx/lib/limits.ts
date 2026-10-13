@@ -21,6 +21,6 @@ export function docxInputError(file: File): string | null {
   if (!/\.pdf$/i.test(file.name)) return "請選擇 PDF 檔案。";
   if (!file.size) return "這份 PDF 是空的。";
   if (file.size > DOCX_LIMITS.fileBytes)
-    return "PDF2docx 一次最多處理 32 MB，請先拆分較大的文件。";
+    return "PDF 轉 Word 一次最多處理 32 MB，請先拆分較大的文件。";
   return null;
 }

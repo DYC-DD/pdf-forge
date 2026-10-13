@@ -20,6 +20,17 @@ export default function App() {
   } = useScrollReveal<HTMLDivElement>();
 
   useEffect(() => {
+    if (
+      toolFromPath(window.location.pathname) === "convert" &&
+      /\/pdf2docx\/?$/.test(window.location.pathname)
+    ) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        toolHref("convert") + window.location.search + window.location.hash
+      );
+    }
+
     if (window.location.hash === "#top") {
       window.history.replaceState(
         window.history.state,
@@ -78,9 +89,6 @@ export default function App() {
           </div>
           <div id="convert-panel" hidden={tool !== "convert"}>
             {tool === "convert" && <ToolWorkspace tool="convert" />}
-          </div>
-          <div id="pdf2docx-panel" hidden={tool !== "pdf2docx"}>
-            {tool === "pdf2docx" && <ToolWorkspace tool="pdf2docx" />}
           </div>
         </div>
       </main>

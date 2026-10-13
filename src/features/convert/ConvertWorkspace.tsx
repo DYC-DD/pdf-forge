@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { fileError } from "../../shared/pdf/errors";
 import ImagesWorkspace from "./ImagesWorkspace";
 import { detectSources, imageInputsError } from "./lib/imageSource";
-import PdfToImagesWorkspace from "./PdfToImagesWorkspace";
+import PdfConversionWorkspace from "./PdfConversionWorkspace";
 
 type Source =
   { kind: "pdf"; file: File } | { kind: "images"; files: File[] } | null;
@@ -59,7 +59,7 @@ export default function ConvertWorkspace() {
   return source?.kind === "images" ? (
     <ImagesWorkspace initialFiles={source.files} onClear={clear} />
   ) : (
-    <PdfToImagesWorkspace
+    <PdfConversionWorkspace
       file={source?.file ?? null}
       onFiles={(files) => void chooseFiles(files)}
       onClear={clear}

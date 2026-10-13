@@ -9,12 +9,13 @@ export function toolFromPath(pathname: string): Tool | null {
   if (!pathname.startsWith(base)) return null;
 
   const route = pathname.slice(base.length).replace(/\/$/, "");
+  // Preserve links to the former standalone Word tool.
+  if (route === "pdf2docx") return "convert";
   if (
     route === "merge" ||
     route === "split" ||
     route === "compress" ||
-    route === "convert" ||
-    route === "pdf2docx"
+    route === "convert"
   ) {
     return route;
   }
