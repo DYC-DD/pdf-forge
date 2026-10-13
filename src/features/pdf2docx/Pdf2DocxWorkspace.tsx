@@ -1,30 +1,33 @@
 import CircularProgress from "@mui/material/CircularProgress";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
+import TextField from "@mui/material/TextField";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fileStem, formatBytes, saveBlob } from "../../shared/files/file";
 import { fileError } from "../../shared/pdf/errors";
 import { pdfPageCountError } from "../../shared/pdf/limits";
 import { openPdf } from "../../shared/pdf/preview";
+import Counter from "../../shared/ui/Counter";
 import DropZone from "../../shared/ui/DropZone";
+import PdfPageThumbnail from "../../shared/ui/PdfPageThumbnail";
 import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
+import useViewMode from "../../shared/ui/useViewMode";
+import ViewModeToggle from "../../shared/ui/ViewModeToggle";
+import { parsePageRange } from "../split/lib/parsePageRange";
 import { analyzePdf } from "./lib/analyzePdf";
 import { DOCX_LIMITS, docxInputError } from "./lib/limits";
 import { runDocxExport } from "./lib/runDocxJob";
-import StructurePreview from "./StructurePreview";
 import type { ConversionProgress, DocumentModel } from "./types";
 
 export default function Pdf2DocxWorkspace() {
   const [file, setFile] = useState<File | null>(null);
+  const [viewMode, setViewMode] = useViewMode();
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [rangeInput, setRangeInput] = useState("");
   const [model, setModel] = useState<DocumentModel | null>(null);
-  const [pageIndex, setPageIndex] = useState(0);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [progress, setProgress] = useState<ConversionProgress | null>(null);
   const [message, setMessage] = useState("");
@@ -55,7 +58,10 @@ export default function Pdf2DocxWorkspace() {
         const source = await opened.promise;
         const error = pdfPageCountError(source.numPages);
         if (error) throw new Error(error);
-        if (!cancelled) setPdf(source);
+        if (!cancelled) {
+          setPdf(source);
+          setSelected(Array.from({ length: source.numPages }, (_, i) => i + 1));
+        }
       })
       .catch((error) => {
         if (task) {
@@ -83,6 +89,8 @@ export default function Pdf2DocxWorkspace() {
     setFile(null);
     setPdf(null);
     setLoading(false);
+    setSelected([]);
+    setRangeInput("");
     setPreviewPage(null);
     invalidate();
   }
@@ -100,17 +108,44 @@ export default function Pdf2DocxWorkspace() {
     }
     setPdf(null);
     setFile(files[0]);
+    setSelected([]);
+    setRangeInput("");
+    setPreviewPage(null);
     invalidate();
   }
 
+  function selectPages(pages: number[]) {
+    if (!pdf || controllerRef.current) return;
+    setSelected(pages);
+    invalidate();
+  }
+
+  function togglePage(page: number) {
+    selectPages(
+      selected.includes(page)
+        ? selected.filter((entry) => entry !== page)
+        : [...selected, page].sort((a, b) => a - b)
+    );
+  }
+
+  function applyRange() {
+    if (!pdf || controllerRef.current) return;
+    try {
+      selectPages(parsePageRange(rangeInput, pdf.numPages));
+    } catch (error) {
+      setMessage(fileError(error));
+      setSuccess(false);
+    }
+  }
+
   async function analyze() {
-    if (!file || !pdf || controllerRef.current) return;
+    if (!file || !pdf || !selected.length || controllerRef.current) return;
     const controller = new AbortController();
     controllerRef.current = controller;
     invalidate();
-    setProgress({ stage: "read", page: 1, total: pdf.numPages });
+    setProgress({ stage: "read", page: selected[0], total: selected.length });
     try {
-      const result = await analyzePdf(file, undefined, {
+      const result = await analyzePdf(file, selected, {
         signal: controller.signal,
         onProgress: (value) => {
           if (
@@ -123,7 +158,6 @@ export default function Pdf2DocxWorkspace() {
       });
       if (mountedRef.current && !controller.signal.aborted) {
         setModel(result);
-        setPageIndex(0);
       }
     } catch (error) {
       if (mountedRef.current)
@@ -166,6 +200,11 @@ export default function Pdf2DocxWorkspace() {
   }
 
   const busy = !!progress;
+  const pages = useMemo(
+    () => Array.from({ length: pdf?.numPages ?? 0 }, (_, i) => i + 1),
+    [pdf]
+  );
+  const selectedPages = useMemo(() => new Set(selected), [selected]);
   const blocked =
     model?.issues.some((issue) => issue.severity === "error") ||
     (!model?.stats.characters && !model?.stats.images);
@@ -174,9 +213,6 @@ export default function Pdf2DocxWorkspace() {
       .filter((issue) => issue.severity === "review")
       .map((issue) => issue.page)
   ).size;
-  const currentPage = model?.pages[pageIndex];
-  const currentIssues =
-    model?.issues.filter((issue) => issue.page === currentPage?.number) ?? [];
   const progressText =
     progress?.stage === "export"
       ? "正在建立 Word…"
@@ -192,21 +228,34 @@ export default function Pdf2DocxWorkspace() {
         className="workspace-card workspace-main"
         aria-labelledby="pdf2docx-heading"
       >
-        <div className="card-header">
+        <div className="card-header file-card-header">
           <div>
-            <div className="eyebrow">01 / 加入 PDF</div>
-            <h2 id="pdf2docx-heading">加入要轉換的文件</h2>
-            <p>掃描整份文件，自動處理文字、圖片與原稿分頁。</p>
+            <div className="eyebrow">01 / {file ? "選擇頁面" : "加入 PDF"}</div>
+            <h2 id="pdf2docx-heading">
+              {file ? "選擇要轉成 Word 的頁面" : "加入要轉換的文件"}
+            </h2>
+            <p>選取要轉換的頁面，點眼睛圖示可放大預覽。</p>
           </div>
           {file && (
-            <button
-              className="clear-files-button"
-              onClick={clear}
-              disabled={busy}
-            >
-              <PublicIcon name="trash" size={15} />
-              清除
-            </button>
+            <div className="file-list-actions">
+              <div className="file-list-action-buttons">
+                <button
+                  type="button"
+                  className="clear-files-button"
+                  onClick={clear}
+                  disabled={busy}
+                  aria-label="清除 PDF"
+                >
+                  <PublicIcon name="trash" size={15} />
+                  清除
+                </button>
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  disabled={busy}
+                />
+              </div>
+            </div>
           )}
         </div>
         {!file ? (
@@ -233,19 +282,77 @@ export default function Pdf2DocxWorkspace() {
                 <button
                   type="button"
                   className="button button--outline button--small"
-                  onClick={() => setPreviewPage(currentPage?.number ?? 1)}
+                  onClick={() => setPreviewPage(1)}
                 >
                   <PublicIcon name="eye" size={16} />
                   原稿預覽
                 </button>
               )}
             </div>
-            {!model && !loading && !busy && (
-              <div className="pdf2docx-empty">
-                <PublicIcon name="list" size={26} />
-                <strong>準備好後，掃描文件內容</strong>
-                <p>自動掃描全部頁面，完成後即可下載 Word。</p>
-              </div>
+            {pdf && (
+              <>
+                <div className="split-toolbar split-toolbar--custom">
+                  <div className="range-form">
+                    <div>
+                      <TextField
+                        id="pdf2docx-page-range"
+                        className="page-range-field"
+                        label="快速選取頁碼"
+                        size="small"
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        value={rangeInput}
+                        onChange={(event) => setRangeInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") applyRange();
+                        }}
+                        disabled={busy}
+                        placeholder="例如 1-3, 5, 8"
+                      />
+                      <button
+                        type="button"
+                        className="button button--small button--dark"
+                        onClick={applyRange}
+                        disabled={busy}
+                      >
+                        套用
+                      </button>
+                    </div>
+                  </div>
+                  <div className="selection-actions">
+                    <span>
+                      已選 <Counter value={selected.length} /> 頁
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => selectPages(pages)}
+                    >
+                      全選
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => selectPages([])}
+                    >
+                      清除
+                    </button>
+                  </div>
+                </div>
+                <div className={`pdf-collection pdf-collection--${viewMode}`}>
+                  {pages.map((pageNumber) => (
+                    <PdfPageThumbnail
+                      key={pageNumber}
+                      pdf={pdf}
+                      pageNumber={pageNumber}
+                      viewMode={viewMode}
+                      selected={selectedPages.has(pageNumber)}
+                      disabled={busy}
+                      onToggle={() => togglePage(pageNumber)}
+                      onPreview={() => setPreviewPage(pageNumber)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </>
         )}
@@ -261,70 +368,6 @@ export default function Pdf2DocxWorkspace() {
             {busy && <span>全部在本機處理，共 {progress?.total} 頁。</span>}
           </div>
         )}
-        {model && currentPage && (
-          <details className="pdf2docx-analysis">
-            <summary>查看掃描結果 · 共 {model.stats.pages} 頁</summary>
-            <dl className="pdf2docx-stats">
-              <div>
-                <dt>可編輯字元</dt>
-                <dd>{model.stats.characters.toLocaleString()}</dd>
-              </div>
-              <div>
-                <dt>段落</dt>
-                <dd>{model.stats.paragraphs}</dd>
-              </div>
-              <div>
-                <dt>表格</dt>
-                <dd>{model.stats.tables}</dd>
-              </div>
-              <div>
-                <dt>圖片</dt>
-                <dd>{model.stats.images}</dd>
-              </div>
-              <div>
-                <dt>獨立線條</dt>
-                <dd>{model.stats.rules ?? 0}</dd>
-              </div>
-              <div>
-                <dt>OCR 頁數</dt>
-                <dd>{model.stats.ocrPages}</dd>
-              </div>
-            </dl>
-            <div className="pdf2docx-page-picker">
-              <DocxSelectField<number>
-                id="pdf2docx-page"
-                label="檢查原稿頁面"
-                value={pageIndex}
-                onChange={setPageIndex}
-                options={model.pages.map((page, index) => ({
-                  value: index,
-                  label: `第 ${page.number} 頁 · ${page.source === "ocr" ? "OCR" : page.classification?.source === "image" ? "圖片" : "文字層"}`,
-                }))}
-              />
-            </div>
-            {currentIssues.length > 0 && (
-              <ul className="pdf2docx-issues">
-                {currentIssues.map((issue, index) => (
-                  <li key={index} data-severity={issue.severity}>
-                    <strong>
-                      {issue.severity === "error"
-                        ? "無法完整讀取"
-                        : issue.severity === "review"
-                          ? "請核對"
-                          : "提示"}
-                    </strong>
-                    {issue.message}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="pdf2docx-preview-caption">
-              內容結構預覽 · 用來核對文字與閱讀順序，Word
-              中的換行與分頁會依字型重新排版。
-            </p>
-            <StructurePreview page={currentPage} />
-          </details>
-        )}
         <div className="privacy-note">
           <PublicIcon name="lock" size={16} />
           PDF、文字與圖片只在瀏覽器中處理，不會上傳。
@@ -336,11 +379,18 @@ export default function Pdf2DocxWorkspace() {
       >
         <div className="eyebrow">02 / Word 輸出</div>
         <h2 id="pdf2docx-output-heading">建立 Word 文件</h2>
-        <p>掃描文件內容，完成後直接下載。無需調整設定。</p>
+        <p>所選頁面依原稿順序合併成一份 Word。</p>
+        {pdf && (
+          <p className="pdf2docx-result-note" role="status">
+            {selected.length
+              ? `已選 ${selected.length} / ${pdf.numPages} 頁，掃描完成後即可下載。`
+              : "請先從左側選取至少一頁。"}
+          </p>
+        )}
         <button
           type="button"
           className="button button--dark button--full"
-          disabled={!pdf || loading || busy}
+          disabled={!pdf || !selected.length || loading || busy}
           onClick={() => void analyze()}
         >
           <PublicIcon name="zoom-scan" size={18} />
@@ -358,10 +408,10 @@ export default function Pdf2DocxWorkspace() {
         {model && (
           <p className="pdf2docx-result-note">
             {blocked
-              ? "有頁面未能完整讀取，請重新掃描或查看掃描結果。"
+              ? "有頁面未能完整讀取，請重新掃描文件內容。"
               : reviewCount
-                ? `已掃描全部 ${model.stats.pages} 頁；${reviewCount} 頁有核對提示，可展開掃描結果查看。`
-                : `已掃描全部 ${model.stats.pages} 頁，可以下載 Word。`}
+                ? `已掃描所選 ${model.stats.pages} 頁；${reviewCount} 頁需核對，下載 Word 後請對照原稿檢查。`
+                : `已掃描所選 ${model.stats.pages} 頁，可以下載 Word。`}
           </p>
         )}
         {model && !blocked && (
@@ -409,52 +459,5 @@ export default function Pdf2DocxWorkspace() {
         />
       )}
     </div>
-  );
-}
-
-// Reuse the conversion tool's field and menu styles, including its portal menu.
-function DocxSelectField<Value extends string | number>({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-  disabled = false,
-  describedBy,
-}: {
-  id: string;
-  label: string;
-  value: Value;
-  options: { value: Value; label: string }[];
-  onChange: (value: Value) => void;
-  disabled?: boolean;
-  describedBy?: string;
-}) {
-  return (
-    <FormControl className="convert-format-field" fullWidth disabled={disabled}>
-      <InputLabel id={`${id}-label`} shrink>
-        {label}
-      </InputLabel>
-      <Select<Value>
-        id={id}
-        labelId={`${id}-label`}
-        label={label}
-        aria-describedby={describedBy}
-        className="convert-format-select"
-        variant="outlined"
-        value={value}
-        onChange={(event) => onChange(event.target.value as Value)}
-        MenuProps={{
-          disableScrollLock: true,
-          slotProps: { paper: { className: "convert-format-menu" } },
-        }}
-      >
-        {options.map((option) => (
-          <MenuItem key={option.value} value={option.value}>
-            {option.label}
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
   );
 }

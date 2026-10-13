@@ -750,7 +750,7 @@ export async function exportDocx(
   options: ExportOptions
 ): Promise<Blob> {
   if (model.issues.some((issue) => issue.severity === "error"))
-    throw new Error("仍有未能完整讀取的頁面，請重新掃描或查看掃描結果。");
+    throw new Error("仍有未能完整讀取的頁面，請重新掃描文件內容。");
   if (!model.stats.characters && !model.stats.images)
     throw new Error("沒有可輸出的文字，請啟用 OCR 或改用文字型 PDF。");
   const writer = new Writer(options.preservePageBreaks);

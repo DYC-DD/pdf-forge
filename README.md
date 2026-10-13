@@ -10,7 +10,7 @@
 | [拆分 PDF](https://dyc-dd.github.io/pdf-forge/split/)    | 加入一份 PDF，點選縮圖或輸入頁碼範圍（例如 `1-3, 5, 8`），將選取的頁面加入輸出清單；也可選擇「每頁一檔」。                        | 一份結果下載 PDF；多份結果下載 ZIP               |
 | [壓縮 PDF](https://dyc-dd.github.io/pdf-forge/compress/) | 一次加入一份 PDF 或 JPG／PNG，自動辨識壓縮模式；選擇強度，完成後比較大小並預覽結果。                                              | 結果較小時可下載 PDF 或原格式圖片                |
 | [轉換 PDF](https://dyc-dd.github.io/pdf-forge/convert/)  | 自動辨識 PDF 或 JPG／PNG。PDF 可選頁轉 JPG／PNG；圖片可排序、旋轉、預覽並轉 PDF、JPG、PNG、SVG（嵌入圖片）或 WEBP，保留原始像素。 | 圖片合成一份 PDF；單張直接下載圖片、多張打包 ZIP |
-| 05 PDF2docx（開發預覽，`/pdf2docx/`）                    | 加入 PDF、選頁並分析，在結構預覽核對文字、段落與表格，再下載可編輯文件；支援瀏覽器本機繁中／英文 OCR。                            | 一份可編輯 DOCX                                  |
+| 05 PDF2docx（開發預覽，`/pdf2docx/`）                    | 加入 PDF，點選縮圖或輸入頁碼範圍，掃描所選頁面後下載可編輯文件；支援原稿預覽與瀏覽器本機繁中／英文 OCR。                          | 一份可編輯 DOCX                                  |
 
 ## 本機執行
 
