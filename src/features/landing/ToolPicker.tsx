@@ -124,7 +124,7 @@ export default function ToolPicker({
           <span className="tool-tab-copy">
             <small>04 / CONVERT</small>
             <strong>轉換 PDF</strong>
-            <span>PDF 與圖片，轉成需要的格式。</span>
+            <span>PDF 轉圖片與 Word。</span>
           </span>
           <PublicIcon
             name="arrow-up-right"

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "pcc-service",
+    "url": "https://www.pcc.gov.tw/upload/Upload/old/oldupload/upload/article/2_c_10_2.pdf",
+    "sha256": "ba4e331f5260501a7f3895b5632bbc500d365b47daf5aefb32a377cdf6b209ea",
+    "sourcePageCount": 21,
+    "title": "公共工程委員會勞務採購契約範本（歷史版本，僅作格式測試）",
+    "expectedText": ["勞務採購契約範本"]
+  },
+  {
+    "id": "hsinchu-manual",
+    "url": "https://odm.hsinchu.gov.tw/boxes/att/202207280838172760R6k.pdf",
+    "sha256": "2ebf2587c70937d4976eda6df957c2e005e41b85f4cc7ef7bd811caf3eab1ce7",
+    "pages": [1, 20, 41, 81, 181, 255],
+    "sourcePageCount": 255,
+    "title": "新竹縣災害防救深耕第3期111年期中報告",
+    "expectedText": ["新竹縣災害防救"]
+  },
+  {
+    "id": "tourism-brochure",
+    "url": "https://eng.taiwan.net.tw/att/files/201908-%E8%A7%80%E5%85%89%E5%B1%80%E7%B0%A1%E4%BB%8B-%E4%B8%AD%E8%8B%B1%E6%96%87%E7%89%88.pdf",
+    "sha256": "74407f7a543509079500ebc75a9c97022737923af585bb74e9e212b57a2dd66f",
+    "pages": [1, 3, 5, 10, 19],
+    "sourcePageCount": 19,
+    "title": "交通部觀光局簡介中英文版（2019）",
+    "expectedText": []
+  },
+  {
+    "id": "w3c-ocr",
+    "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-ocr/ocr-example.pdf",
+    "sha256": "7a161be656c7e82986a1959890eadbdcd0876e15e01b28fd00900190de15eed5",
+    "sourcePageCount": 1,
+    "title": "W3C PDF7 OCR recipe example",
+    "expectedText": ["Schnitzelbank Pot"]
+  },
+  {
+    "id": "ntpc-services",
+    "url": "https://www-ws.land.ntpc.gov.tw/001/Upload/407/relfile/9040/4016/79a5687c-6891-47b3-bd23-6a57f2cfe28d.pdf",
+    "sha256": "2acdc6760bbeb1d954babb9e95d9c2f779e3683890b63e3ecde0338b7e013ea7",
+    "sourcePageCount": 25,
+    "title": "新北市新莊地政事務所地政水電瓦斯好厝邊成果分析報告",
+    "expectedText": ["新北市新莊地政事務所"]
+  }
+]

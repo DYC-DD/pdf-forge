@@ -19,6 +19,7 @@ import PdfPreviewDialog from "../../shared/ui/PdfPreviewDialog";
 import PublicIcon from "../../shared/ui/PublicIcon";
 import useViewMode from "../../shared/ui/useViewMode";
 import ViewModeToggle from "../../shared/ui/ViewModeToggle";
+import WordOutput from "../pdf2docx/WordOutput";
 import { parsePageRange } from "../split/lib/parsePageRange";
 import {
   convertPdfToImages,
@@ -26,7 +27,18 @@ import {
   type ImageFormat,
 } from "./lib/convertPdfToImages";
 
-export default function PdfToImagesWorkspace({
+type PdfOutputFormat = ImageFormat | "word";
+
+function WordFormatLabel() {
+  return (
+    <span className="convert-word-label">
+      Word <span className="convert-beta-badge">beta</span>
+      <span>：可編輯文件</span>
+    </span>
+  );
+}
+
+export default function PdfConversionWorkspace({
   file,
   onFiles,
   onClear,
@@ -45,15 +57,17 @@ export default function PdfToImagesWorkspace({
   const [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
   const [rangeInput, setRangeInput] = useState("");
-  const [format, setFormat] = useState<ImageFormat>("jpg");
+  const [format, setFormat] = useState<PdfOutputFormat>("jpg");
   const [outputName, setOutputName] = useState("images");
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [wordBusy, setWordBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [packingProgress, setPackingProgress] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
+  const busy = processing || wordBusy;
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
@@ -96,7 +110,7 @@ export default function PdfToImagesWorkspace({
   }, [file]);
 
   function clearFile() {
-    if (processing) return;
+    if (busy) return;
     onClear();
     setPdf(null);
     setLoading(false);
@@ -105,13 +119,15 @@ export default function PdfToImagesWorkspace({
     setRangeInput("");
     setPreviewPage(null);
     setOutputName("images");
+    setFormat("jpg");
     setMessage("");
+    setSuccess(false);
     setProgress(0);
     setPackingProgress(null);
   }
 
   function togglePage(page: number) {
-    if (processing) return;
+    if (busy) return;
     setSelected((current) =>
       current.includes(page)
         ? current.filter((entry) => entry !== page)
@@ -121,7 +137,7 @@ export default function PdfToImagesWorkspace({
   }
 
   function applyRange() {
-    if (!pdf || processing) return;
+    if (!pdf || busy) return;
     try {
       setSelected(parsePageRange(rangeInput, pdf.numPages));
       setMessage("");
@@ -132,7 +148,14 @@ export default function PdfToImagesWorkspace({
   }
 
   async function handleExport() {
-    if (!file || !pdf || processing || controllerRef.current || planError)
+    if (
+      !file ||
+      !pdf ||
+      busy ||
+      format === "word" ||
+      controllerRef.current ||
+      planError
+    )
       return;
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -174,8 +197,13 @@ export default function PdfToImagesWorkspace({
   );
   const selectedPages = useMemo(() => new Set(selected), [selected]);
   const outputCount = selected.length;
-  const planError = pdf ? imagePageCountError(outputCount) : null;
-  const extension = outputCount > 1 ? "zip" : format;
+  const planError =
+    pdf && format !== "word" ? imagePageCountError(outputCount) : null;
+  const extension =
+    format === "word" ? "docx" : outputCount > 1 ? "zip" : format;
+  const defaultName = file
+    ? `${fileStem(file.name)}${format === "word" ? "" : "-images"}`
+    : "images";
 
   return (
     <div className="workspace-grid">
@@ -187,7 +215,7 @@ export default function PdfToImagesWorkspace({
           <div>
             <div className="eyebrow">01 / {file ? "選擇頁面" : "加入檔案"}</div>
             <h2 id="convert-heading">
-              {file ? "把 PDF 變成圖片" : "轉換 PDF 與圖片"}
+              {file ? "選擇要轉換的 PDF 頁面" : "轉換 PDF 與圖片"}
             </h2>
             <p>
               {file
@@ -205,7 +233,7 @@ export default function PdfToImagesWorkspace({
                   type="button"
                   className="clear-files-button"
                   onClick={clearFile}
-                  disabled={processing}
+                  disabled={busy}
                   aria-label="清除 PDF"
                 >
                   <PublicIcon name="trash" size={15} /> 清除
@@ -213,7 +241,7 @@ export default function PdfToImagesWorkspace({
                 <ViewModeToggle
                   value={viewMode}
                   onChange={setViewMode}
-                  disabled={processing}
+                  disabled={busy}
                 />
               </div>
             </div>
@@ -270,14 +298,14 @@ export default function PdfToImagesWorkspace({
                         onKeyDown={(event) => {
                           if (event.key === "Enter") applyRange();
                         }}
-                        disabled={processing}
+                        disabled={busy}
                         placeholder="例如 1-3, 5, 8"
                       />
                       <button
                         type="button"
                         className="button button--small button--dark"
                         onClick={applyRange}
-                        disabled={processing}
+                        disabled={busy}
                       >
                         套用
                       </button>
@@ -288,7 +316,7 @@ export default function PdfToImagesWorkspace({
                       已選 <Counter value={outputCount} /> 頁
                     </span>
                     <button
-                      disabled={processing}
+                      disabled={busy}
                       onClick={() => {
                         setSelected(pages);
                         setMessage("");
@@ -297,7 +325,7 @@ export default function PdfToImagesWorkspace({
                       全選
                     </button>
                     <button
-                      disabled={processing}
+                      disabled={busy}
                       onClick={() => {
                         setSelected([]);
                         setMessage("");
@@ -315,7 +343,7 @@ export default function PdfToImagesWorkspace({
                       pageNumber={pageNumber}
                       viewMode={viewMode}
                       selected={selectedPages.has(pageNumber)}
-                      disabled={processing}
+                      disabled={busy}
                       onToggle={() => togglePage(pageNumber)}
                       onPreview={() => setPreviewPage(pageNumber)}
                     />
@@ -337,14 +365,16 @@ export default function PdfToImagesWorkspace({
       </section>
 
       <aside
-        className="workspace-card output-card convert-output-card"
+        className={`workspace-card output-card convert-output-card${format === "word" ? " pdf2docx-output" : ""}`}
         aria-labelledby="convert-output-heading"
       >
         <div className="eyebrow">02 / 轉換與匯出</div>
         <h2 id="convert-output-heading">設定輸出格式</h2>
         <p>
           {file
-            ? "每頁輸出一張圖片，多張圖片會打包為 ZIP。"
+            ? format === "word"
+              ? "所選頁面依原稿順序合併成一份 Word。"
+              : "每頁輸出一張圖片，多張圖片會打包為 ZIP。"
             : "加入檔案後，自動顯示可用的輸出格式。"}
         </p>
         <div className="convert-format">
@@ -352,7 +382,7 @@ export default function PdfToImagesWorkspace({
             <InputLabel id="convert-format-label" shrink>
               輸出格式
             </InputLabel>
-            <Select<ImageFormat | "">
+            <Select<PdfOutputFormat | "">
               id="convert-format"
               labelId="convert-format-label"
               label="輸出格式"
@@ -362,19 +392,32 @@ export default function PdfToImagesWorkspace({
               value={file ? format : ""}
               displayEmpty
               renderValue={(value) =>
-                value === ""
-                  ? detecting
-                    ? "正在辨識檔案…"
-                    : "加入檔案後自動顯示"
-                  : value === "jpg"
-                    ? "JPG：適用於照片與日常分享"
-                    : "PNG：適用於文字、圖表與線條"
+                value === "" ? (
+                  detecting ? (
+                    "正在辨識檔案…"
+                  ) : (
+                    "加入檔案後自動顯示"
+                  )
+                ) : value === "jpg" ? (
+                  "JPG：適用於照片與日常分享"
+                ) : value === "png" ? (
+                  "PNG：適用於文字、圖表與線條"
+                ) : (
+                  <WordFormatLabel />
+                )
               }
               onChange={(event) => {
-                setFormat(event.target.value as ImageFormat);
+                const nextFormat = event.target.value as PdfOutputFormat;
+                if (file && outputName === defaultName) {
+                  setOutputName(
+                    `${fileStem(file.name)}${nextFormat === "word" ? "" : "-images"}`
+                  );
+                }
+                setFormat(nextFormat);
                 setMessage("");
+                setSuccess(false);
               }}
-              disabled={processing || !file}
+              disabled={busy || !file}
               MenuProps={{
                 disableScrollLock: true,
                 slotProps: { paper: { className: "convert-format-menu" } },
@@ -382,14 +425,25 @@ export default function PdfToImagesWorkspace({
             >
               <MenuItem value="jpg">JPG：適用於照片與日常分享</MenuItem>
               <MenuItem value="png">PNG：適用於文字、圖表與線條</MenuItem>
+              <MenuItem value="word">
+                <WordFormatLabel />
+              </MenuItem>
             </Select>
           </FormControl>
           <p id="convert-format-hint" className="convert-format-hint">
-            {!file
-              ? "PDF 可轉圖片；圖片可轉 PDF、JPG、PNG、SVG 或 WEBP。"
-              : format === "jpg"
-                ? "最高畫質 JPG，適合照片與日常分享。"
-                : "無損 PNG，適合文字、圖表與線條。"}
+            {!file ? (
+              <>
+                PDF 可轉 JPG、PNG 或 Word（beta）
+                <br />
+                圖片可轉 PDF、JPG、PNG、SVG 或 WEBP
+              </>
+            ) : format === "word" ? (
+              "Word beta：此功能仍在開發與優化中，轉換後請核對內容與排版。"
+            ) : format === "jpg" ? (
+              "最高畫質 JPG，適合照片與日常分享。"
+            ) : (
+              "無損 PNG，適合文字、圖表與線條。"
+            )}
           </p>
         </div>
         <div className="output-divider" />
@@ -397,9 +451,15 @@ export default function PdfToImagesWorkspace({
           <span>準備輸出</span>
           <strong>
             {file ? (
-              <>
-                <Counter value={outputCount} /> 張 {format.toUpperCase()}
-              </>
+              format === "word" ? (
+                <>
+                  1 份 Word · <Counter value={outputCount} /> 頁
+                </>
+              ) : (
+                <>
+                  <Counter value={outputCount} /> 張 {format.toUpperCase()}
+                </>
+              )
             ) : (
               "等待加入檔案"
             )}
@@ -410,12 +470,14 @@ export default function PdfToImagesWorkspace({
             id="convert-name"
             value={outputName}
             onChange={(value) =>
-              setOutputName(value.replace(/\.(?:pdf|jpg|jpeg|png|zip)$/i, ""))
+              setOutputName(
+                value.replace(/\.(?:pdf|jpg|jpeg|png|zip|docx)$/i, "")
+              )
             }
-            defaultName={`${fileStem(file.name)}-images`}
-            placeholder="images"
+            defaultName={defaultName}
+            placeholder={format === "word" ? "document" : "images"}
             extension={extension}
-            disabled={processing}
+            disabled={busy}
           />
         ) : (
           <TextField
@@ -429,45 +491,58 @@ export default function PdfToImagesWorkspace({
             slotProps={{ inputLabel: { shrink: true } }}
           />
         )}
-        {planError && (
-          <p className="status-message" role="status">
-            {planError}
-          </p>
+        {file && format === "word" ? (
+          <WordOutput
+            file={file}
+            pages={selected}
+            pageCount={pdf?.numPages ?? 0}
+            loading={loading}
+            outputName={outputName}
+            onBusyChange={setWordBusy}
+          />
+        ) : (
+          <>
+            {planError && (
+              <p className="status-message" role="status">
+                {planError}
+              </p>
+            )}
+            <button
+              type="button"
+              className="button button--accent button--full"
+              disabled={!pdf || loading || busy || !!planError}
+              onClick={(event) => {
+                void handleExport();
+                fireButtonConfetti(event.currentTarget);
+              }}
+            >
+              <PublicIcon name="download" size={18} />
+              {!file
+                ? "轉換並下載"
+                : processing
+                  ? packingProgress === null
+                    ? `轉換中 ${progress}/${outputCount}`
+                    : `建立 ZIP 中 ${packingProgress}%`
+                  : outputCount > 1
+                    ? "下載 ZIP 檔"
+                    : `下載 ${format.toUpperCase()} 圖片`}
+            </button>
+            {processing && (
+              <button
+                type="button"
+                className="button button--outline button--full operation-cancel"
+                onClick={() => controllerRef.current?.abort()}
+              >
+                取消處理
+              </button>
+            )}
+            <p className="encryption-note">
+              {file
+                ? "圖片會保留頁面外觀與白色背景，文字轉為圖片後無法選取。"
+                : "單張圖片直接下載，多張圖片打包為 ZIP，圖片轉 PDF 合併為一份。"}
+            </p>
+          </>
         )}
-        <button
-          type="button"
-          className="button button--accent button--full"
-          disabled={!pdf || loading || processing || !!planError}
-          onClick={(event) => {
-            void handleExport();
-            fireButtonConfetti(event.currentTarget);
-          }}
-        >
-          <PublicIcon name="download" size={18} />
-          {!file
-            ? "轉換並下載"
-            : processing
-              ? packingProgress === null
-                ? `轉換中 ${progress}/${outputCount}`
-                : `建立 ZIP 中 ${packingProgress}%`
-              : outputCount > 1
-                ? "下載 ZIP 檔"
-                : `下載 ${format.toUpperCase()} 圖片`}
-        </button>
-        {processing && (
-          <button
-            type="button"
-            className="button button--outline button--full operation-cancel"
-            onClick={() => controllerRef.current?.abort()}
-          >
-            取消處理
-          </button>
-        )}
-        <p className="encryption-note">
-          {file
-            ? "圖片會保留頁面外觀與白色背景，文字轉為圖片後無法選取。"
-            : "單張圖片直接下載，多張圖片打包為 ZIP，圖片轉 PDF 合併為一份。"}
-        </p>
         {message && (
           <p
             className={`status-message ${success ? "status-message--success" : ""}`}

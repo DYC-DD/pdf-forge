@@ -1,0 +1,30 @@
+[
+  {
+    "id": "w3c-table",
+    "title": "W3C PDF6 table header example",
+    "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-table-headers/table-example-repaired.pdf",
+    "sha256": "45defa986c7f576d1243928126ad7dddc5deb915490a4b42d31c963076cffbe6",
+    "pages": [1]
+  },
+  {
+    "id": "w3c-columns",
+    "title": "W3C PDF3 two-column reading order example",
+    "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-reading-order/reading-order-2cols-word.pdf",
+    "sha256": "9a3a38c444fa165d2b33af41fb2c90502c52def5c560f5d543afe01d937d6e80",
+    "pages": [1]
+  },
+  {
+    "id": "tracemonkey",
+    "title": "Trace-based Just-in-Time Type Specialization for Dynamic Languages (PDF.js example)",
+    "url": "https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf",
+    "sha256": "3662ff519e485810520552bf301d8c3b2b917fd2f83303f4965d7abed367e113",
+    "pages": [1, 2, 8, 12]
+  },
+  {
+    "id": "tw-urban",
+    "title": "臺北市受理民間申請自行劃定更新單元重建區段申請書表格式（112年4月14日）",
+    "url": "https://uract.nlma.gov.tw/uploads/rule/B400133-11204.pdf",
+    "sha256": "1ffb0007283739a50972494f8a7ab77acd873669fb59856d5a7fc587fe39bd85",
+    "pages": [1, 2, 6, 7, 12]
+  }
+]

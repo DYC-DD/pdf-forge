@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
@@ -134,10 +136,12 @@ describe("PDF output", () => {
     });
     await unlockPdfWithEmptyPassword(
       restricted,
-      new URL(
-        "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
-        import.meta.url
-      ).pathname
+      fileURLToPath(
+        new URL(
+          "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
+          import.meta.url
+        )
+      )
     );
     const output = await splitPdf(restricted, [
       { id: "a", name: "page-1", pages: [1] },
@@ -149,10 +153,12 @@ describe("PDF output", () => {
 });
 
 describe("PDF compression", () => {
-  const wasmPath = new URL(
-    "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
-    import.meta.url
-  ).pathname;
+  const wasmPath = fileURLToPath(
+    new URL(
+      "../../node_modules/@neslinesli93/qpdf-wasm/dist/qpdf.wasm",
+      import.meta.url
+    )
+  );
 
   it.each(["low", "medium", "high"] as const)(
     "%s mode makes an inefficient PDF smaller while retaining its pages",
