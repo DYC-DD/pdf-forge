@@ -1,6 +1,8 @@
-import { createCanvas } from "@napi-rs/canvas";
+import { createRequire } from "node:module";
+
+import { createCanvas, GlobalFonts } from "@napi-rs/canvas";
 import JSZip from "jszip";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { exportDocx } from "../features/pdf2docx/lib/exportDocx";
 import { figureRegions } from "../features/pdf2docx/lib/extractPage";
@@ -246,6 +248,27 @@ describe("mixed artwork and dense source page fidelity", () => {
 });
 
 describe("scan region fidelity", () => {
+  beforeAll(() => {
+    // Ubuntu has no Arial. Load PDF.js's bundled fonts for the fixture and both
+    // generic fallback probes so matching never depends on system fonts.
+    const require = createRequire(import.meta.url);
+    const fonts = [
+      ["LiberationSans-Regular.ttf", "Arial"],
+      ["FoxitSerif.pfb", "serif"],
+      ["FoxitFixed.pfb", "monospace"],
+    ].map(([file, family]) => {
+      const font = GlobalFonts.registerFromPath(
+        require.resolve(`pdfjs-dist/standard_fonts/${file}`),
+        family
+      );
+      if (!font)
+        throw new Error(`Unable to register scan fixture font: ${file}`);
+      return font;
+    });
+    return () => {
+      GlobalFonts.removeBatch(fonts);
+    };
+  });
   afterEach(() => vi.unstubAllGlobals());
   const fixture = () => {
     const canvas = createCanvas(600, 800),

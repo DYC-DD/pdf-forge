@@ -40,6 +40,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Fixed
 
+- 修正 Ubuntu 缺少 Arial 導致 PDF2docx 掃描保真測試失敗、阻擋 CI 與 GitHub Pages 部署的問題；測試明確載入 PDF.js 隨附字型，避免依賴系統字型。
 - 修正掃描頁局部標誌／簽章提示的 OCR 文字與原圖重複，以及並排標誌和可編輯表格上下堆疊造成的額外分頁；在瀏覽器完成 25 頁文件掃描、下載與實際渲染驗證。
 - PDF2docx 將有框圖表與數值標籤完整保留，修正表單線條使並排圖片變成上下兩列，以及 OCR 遺漏彩色標題帶時只剩底色的問題。
 - 修正 PDF.js 最佳化後操作索引不同造成圖片依賴未載入、圖層擷取失敗；文字層含未指派 Unicode 字元時自動重新辨識。
