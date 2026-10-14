@@ -20,6 +20,17 @@ export default function App() {
   } = useScrollReveal<HTMLDivElement>();
 
   useEffect(() => {
+    if (
+      toolFromPath(window.location.pathname) === "convert" &&
+      /\/pdf2docx\/?$/.test(window.location.pathname)
+    ) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        toolHref("convert") + window.location.search + window.location.hash
+      );
+    }
+
     if (window.location.hash === "#top") {
       window.history.replaceState(
         window.history.state,

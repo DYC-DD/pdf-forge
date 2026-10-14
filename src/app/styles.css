@@ -12,5 +12,6 @@
 @import "../features/convert/styles/convert.css";
 @import "./styles/footer.css";
 @import "./styles/midnight.css";
+@import "../features/pdf2docx/styles/pdf2docx.css";
 @import "./styles/pdf-preview.css";
 @import "./styles/responsive.css";

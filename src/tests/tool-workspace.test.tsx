@@ -47,6 +47,7 @@ it("loads only the selected tool, shows a pending state and reuses loaded module
   expect(pending.replaceAll("<!-- -->", "")).toContain("正在載入合併工具");
   expect(pending).toContain('role="status"');
   expect(pending).toContain('aria-busy="true"');
+  expect(pending).toContain('role="progressbar"');
 
   for (let index = 0; index < tools.length; index += 1) {
     const tool = tools[index];
