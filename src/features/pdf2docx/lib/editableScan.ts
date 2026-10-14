@@ -82,7 +82,14 @@ export function scanColorRegions(
       width: ((x1 - x0 - 1) * step) / scale + 2,
       height: ((y1 - y0 - 1) * step) / scale + 2,
     };
-    if (box.width >= 20 && box.height >= Math.max(25, textHeight * 2.3)) {
+    const banner =
+      box.width >= (image.width / scale) * 0.35 &&
+      box.height >= 8 &&
+      box.width >= box.height * 8;
+    if (
+      box.width >= 20 &&
+      (box.height >= Math.max(25, textHeight * 2.3) || banner)
+    ) {
       // Logos and stamps have a small color palette. Photographs need all
       // their pixels, including grayscale detail, so leave those to graphics.
       const palette = new Map<number, number>();
@@ -110,7 +117,14 @@ export function scanColorRegions(
         .sort((a, b) => b - a)
         .slice(0, 8)
         .reduce((a, b) => a + b, 0);
-      if (count && dominant / count >= 0.75) regions.push(box);
+      const solidBanner =
+        banner && (count * 9) / (box.width * box.height * scale * scale) >= 0.4;
+      if (
+        count &&
+        dominant / count >= 0.75 &&
+        (box.height >= Math.max(25, textHeight * 2.3) || solidBanner)
+      )
+        regions.push(box);
     }
     if (regions.length >= 24) break;
   }
@@ -188,6 +202,17 @@ export async function retainEditableScan(
     colorRegions,
     signal
   );
+  // If every recognized word was rejected, local crops would only fragment
+  // the artwork and can duplicate embedded photos. Preserve the complete
+  // original page once; do not resurrect text rejected at paragraph level.
+  if (
+    !page.spans.some(
+      (span) => !span.rasterized && /[\p{L}\p{N}]/u.test(span.text)
+    )
+  ) {
+    await retainUncertainScan(canvas, original, scale, page, signal);
+    return;
+  }
   const fontCandidates = page.spans.filter(
     (span) =>
       !span.rasterized &&

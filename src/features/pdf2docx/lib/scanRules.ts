@@ -96,8 +96,40 @@ export function scanRules(
   // Scanner bed shadows and cropped paper edges are not document borders.
   const interior = (line: Segment, extent: number) =>
     line.position > extent * 0.015 && line.position < extent * 0.985;
-  const horizontal = detect(true).filter((line) => interior(line, height)),
-    vertical = detect(false).filter((line) => interior(line, width));
+  // A grid stroke borders paper. Long dark runs inside photographs are not
+  // rules: erasing them before OCR damages the photo and invents huge tables.
+  // One light side is enough for shaded table headers and filled cells.
+  const bordersPaper = (line: Segment, horizontal: boolean) => {
+    let lightBefore = 0,
+      lightAfter = 0,
+      count = 0;
+    const distance = Math.max(3, Math.round(scale * 3));
+    for (
+      let offset = line.from;
+      offset <= line.to;
+      offset += Math.max(2, Math.round(scale * 2))
+    ) {
+      count++;
+      for (const side of [-1, 1]) {
+        const position = Math.round(line.position) + side * distance;
+        const x = horizontal ? offset : position;
+        const y = horizontal ? position : offset;
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+        const i = (y * width + x) * 4;
+        if (data[i] + data[i + 1] + data[i + 2] > 645) {
+          if (side < 0) lightBefore++;
+          else lightAfter++;
+        }
+      }
+    }
+    return Math.max(lightBefore, lightAfter) > count * 0.5;
+  };
+  const horizontal = detect(true).filter(
+      (line) => interior(line, height) && bordersPaper(line, true)
+    ),
+    vertical = detect(false).filter(
+      (line) => interior(line, width) && bordersPaper(line, false)
+    );
   // Underlines and form boxes alone are not a grid. The table detector checks
   // intersections and rectangular merged cells before consuming any text.
   if (horizontal.length < 3 || vertical.length < 3) return [];

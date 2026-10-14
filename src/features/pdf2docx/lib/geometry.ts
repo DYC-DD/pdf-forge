@@ -2,6 +2,14 @@ import type { Box, Rule } from "../types";
 
 export const right = (box: Box) => box.x + box.width;
 export const bottom = (box: Box) => box.y + box.height;
+export function containsBox(outer: Box, inner: Box, tolerance = 0): boolean {
+  return (
+    outer.x <= inner.x + tolerance &&
+    outer.y <= inner.y + tolerance &&
+    right(outer) >= right(inner) - tolerance &&
+    bottom(outer) >= bottom(inner) - tolerance
+  );
+}
 export function median(values: readonly number[], fallback = 12): number {
   if (!values.length) return fallback;
   const sorted = [...values].sort((a, b) => a - b);

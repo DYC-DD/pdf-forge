@@ -306,6 +306,7 @@ class Writer {
         ...runs.map((run, index) => {
           const fonts = this.fonts.resolve(run.font);
           let width: number | undefined;
+          let fallbackWidth: number | undefined;
           if (
             (paragraph.source === "pdf" || paragraph.source === "ocr") &&
             run.width !== undefined
@@ -334,12 +335,44 @@ class Writer {
               1,
               availableWidth - indent - (paragraph.rightIndent ?? 0) - 1.5
             );
+            const lineText = runs
+              .slice(start, end)
+              .map((r) => r.text)
+              .join("");
+            // Some readers ignore autoSpaceDE/DN=false and add about 0.2 em at
+            // script boundaries (verified by DOCX -> ODT/PDF inspection). Keep
+            // the source fitText width for Word, with a bounded scaling fallback
+            // for full mixed lines in readers that ignore fitText as well.
+            const boundaries = [
+              ...lineText.matchAll(
+                /(?<=\p{Script=Han})(?=[A-Za-z0-9])|(?<=[A-Za-z0-9])(?=\p{Script=Han})/gu
+              ),
+            ].length;
+            const clearance =
+              this.preserveSourceLines &&
+              paragraph.source === "pdf" &&
+              lineWidth >= available * 0.97 &&
+              boundaries > 0
+                ? Math.min(
+                    lineWidth * 0.08,
+                    boundaries *
+                      Math.max(...runs.slice(start, end).map((r) => r.size)) *
+                      0.2
+                  )
+                : 0;
             width = run.width * Math.min(1, available / Math.max(1, lineWidth));
+            fallbackWidth =
+              run.width *
+              Math.min(1, (available - clearance) / Math.max(1, lineWidth));
           }
           const scale =
             width === undefined
               ? undefined
-              : measuredScale(run, width, this.fonts.measure(run, fonts));
+              : measuredScale(
+                  run,
+                  fallbackWidth ?? width,
+                  this.fonts.measure(run, fonts)
+                );
           return textRun(
             run,
             fonts,
@@ -632,7 +665,7 @@ class Writer {
       });
     this.listReference = "";
     const indent = Math.max(0, Math.min(block.x - left, availableWidth - 1));
-    if (block.role === "scan-region") {
+    if (block.role === "scan-region" || block.role === "graphic-region") {
       // An inline drawing inherits a font baseline/descent, which accumulates
       // across mixed text/image rows. Exact inline line height clips the image.
       // Anchor the crop to its own flowing paragraph and reserve its full height

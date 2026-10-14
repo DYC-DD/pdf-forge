@@ -50,7 +50,7 @@ export type Figure = Box & {
   behindText?: boolean;
   format?: "png" | "jpg";
   inFooter?: boolean;
-  role?: "scan-background" | "scan-region";
+  role?: "scan-background" | "scan-region" | "graphic-region";
 };
 export type RawPage = {
   number: number;

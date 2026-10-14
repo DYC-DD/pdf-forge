@@ -3,6 +3,7 @@ import { bottom, bounds, median, right } from "./geometry";
 import { checkAbort } from "./limits";
 import { buildLines } from "./paragraphs";
 import { createScanFontMatcher } from "./scanFont";
+import { scanParagraphs } from "./scanParagraphs";
 
 /** Keep uncertain recognition and artwork as pixels; clear only reliable rows.
  * The retained layer is page anchored, so it cannot add height to Word's flow.
@@ -13,7 +14,10 @@ export function editableScanLines(
   image: { data: Uint8ClampedArray; width: number; height: number },
   scale: number
 ): TextSpan[][] {
-  const lines = buildLines(page.spans, true);
+  const lines = buildLines(
+    page.spans.filter((span) => !span.rasterized),
+    true
+  );
   const size = median(lines.map((line) => line.size));
   return lines
     .filter((line) => {
@@ -110,14 +114,26 @@ export async function retainUncertainScan(
   const context = canvas.getContext("2d");
   if (!context) return;
   const matchFont = createScanFontMatcher(original, scale);
-  const editable = editableScanLines(page, original, scale).filter((spans) => {
-    const font = matchFont(spans);
-    if (!font) return false;
-    spans.forEach((span) => {
-      span.font = font;
-    });
-    return true;
-  });
+  const candidates = editableScanLines(page, original, scale).filter(
+    (spans) => {
+      const font = matchFont(spans);
+      if (!font) return false;
+      spans.forEach((span) => {
+        span.font = font;
+      });
+      return true;
+    }
+  );
+  const candidateIds = new Set(candidates.flat().map((span) => span.id));
+  // The background route must honor the same complete-paragraph decision as
+  // local crops. A reliable line cannot revive part of a rejected paragraph.
+  const editable = scanParagraphs(buildLines(page.spans, true), page.rules)
+    .filter((paragraph) =>
+      paragraph.lines.every((line) =>
+        line.spans.every((span) => candidateIds.has(span.id))
+      )
+    )
+    .flatMap((paragraph) => paragraph.lines.map((line) => line.spans));
   const ids = new Set(editable.flat().map((span) => span.id));
   context.putImageData(original, 0, 0);
   context.fillStyle = "#ffffff";
@@ -146,6 +162,17 @@ export async function retainUncertainScan(
   // Rules and uncertain cells already remain in the original image. Do not
   // draw a second grid or infer columns from fragmented recognition in it.
   page.rules = [];
+  // The full original layer also contains previously retained local crops.
+  page.figures = [];
+  page.issues = page.issues.filter(
+    (issue) =>
+      ![
+        "scan-regions",
+        "scan-graphics",
+        "scan-editable",
+        "scan-fallback",
+      ].includes(issue.code)
+  );
   page.figures.push({
     id: `${page.number}:scan-background`,
     x: 0,

@@ -5,13 +5,18 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+const expanded = process.argv.includes("--expanded");
 const directory = resolve(
   root,
-  process.env.PDF2DOCX_PUBLIC_DIR || ".cache/pdf2docx-public"
+  process.env.PDF2DOCX_PUBLIC_DIR ||
+    (expanded ? ".cache/pdf2docx-expanded" : ".cache/pdf2docx-public")
 );
 const samples = JSON.parse(
   await readFile(
-    new URL("../src/tests/__fixtures__/pdf2docx-public.json", import.meta.url),
+    new URL(
+      `../src/tests/__fixtures__/pdf2docx-${expanded ? "expanded" : "public"}.json`,
+      import.meta.url
+    ),
     "utf8"
   )
 );
@@ -68,13 +73,30 @@ if (mode === "download") {
   // Keep transform caches reachable when the Windows runner isolates TEMP.
   const temp = resolve(root, ".cache/test-temp");
   await mkdir(temp, { recursive: true });
+  const manifest = resolve(directory, "test-manifest.json");
+  if (expanded) {
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      manifest,
+      JSON.stringify(
+        samples.map((sample) => ({
+          ...sample,
+          path: resolve(directory, `${sample.id}.pdf`),
+        })),
+        null,
+        2
+      )
+    );
+  }
   const result = spawnSync(
     process.execPath,
     [
       resolve(root, "node_modules/vitest/vitest.mjs"),
       "run",
-      "src/tests/pdf2docx-public.test.ts",
-      ...process.argv.slice(3),
+      expanded
+        ? "src/tests/pdf2docx-private.test.ts"
+        : "src/tests/pdf2docx-public.test.ts",
+      ...process.argv.slice(3).filter((arg) => arg !== "--expanded"),
     ],
     {
       cwd: root,
@@ -84,6 +106,7 @@ if (mode === "download") {
         TEMP: temp,
         TMP: temp,
         PDF2DOCX_PUBLIC_DIR: directory,
+        ...(expanded ? { PDF2DOCX_CORPUS_MANIFEST: manifest } : {}),
       },
     }
   );
@@ -91,6 +114,6 @@ if (mode === "download") {
   process.exitCode = result.status ?? 1;
 } else {
   throw new Error(
-    "Usage: node scripts/pdf2docx-public.mjs download|test [vitest options]"
+    "Usage: node scripts/pdf2docx-public.mjs download|test [--expanded] [vitest options]"
   );
 }

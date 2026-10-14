@@ -52,6 +52,55 @@ const span = (text: string, x: number, y: number): TextSpan => ({
 });
 
 describe("PDF2docx font metrics and source line widths", () => {
+  it("retains source fit widths and font sizes while allowing bounded reader spacing on full mixed lines", async () => {
+    vi.stubGlobal(
+      "OffscreenCanvas",
+      class {
+        getContext() {
+          return measureContext();
+        }
+      }
+    );
+    try {
+      const mixed = "甲1乙2丙3丁4".repeat(8);
+      const raw: RawPage = {
+        number: 1,
+        width: 676,
+        height: 842,
+        source: "pdf",
+        figures: [],
+        rules: [],
+        issues: [],
+        spans: [
+          { ...span(mixed, 50, 50), width: 576 },
+          { ...span("短1", 50, 90), width: 18 },
+        ],
+      };
+      const zip = await JSZip.loadAsync(
+        await (
+          await exportDocx(analyzeLayout([raw]), { preservePageBreaks: true })
+        ).arrayBuffer()
+      );
+      const xml = await zip.file("word/document.xml")!.async("string");
+      const full = [...xml.matchAll(/<w:r>.*?<\/w:r>/gu)]
+        .map((m) => m[0])
+        .find((r) => r.includes(mixed))!;
+      expect(full).toContain('<w:sz w:val="24"/>');
+      expect(
+        Number(full.match(/<w:fitText w:val="(\d+)"/u)?.[1])
+      ).toBeGreaterThan(11300);
+      const scale = Number(full.match(/<w:w w:val="(\d+)"/u)?.[1]);
+      expect(scale).toBeGreaterThanOrEqual(90);
+      expect(scale).toBeLessThanOrEqual(94);
+      const short = [...xml.matchAll(/<w:r>.*?<\/w:r>/gu)]
+        .map((m) => m[0])
+        .find((r) => r.includes("短1"))!;
+      expect(short).not.toContain("<w:w ");
+      expect(short).toContain('<w:fitText w:val="360"');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("selects an available same-family CJK font and measures Latin separately", () => {
     const resolver = createFontResolver(measureContext());
     const fonts = resolver.resolve("PMingLiU");

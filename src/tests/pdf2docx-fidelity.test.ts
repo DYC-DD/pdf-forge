@@ -49,6 +49,64 @@ const blocks = (raw: RawPage) =>
   analyzeLayout([raw]).pages[0].groups.flatMap((group) => group.columns.flat());
 
 describe("mixed artwork and dense source page fidelity", () => {
+  it("keeps a logo beside an editable table without stacking their heights", () => {
+    const raw = page([
+      span("A", 330, 55, { width: 10 }),
+      span("B", 440, 55, { width: 10 }),
+      span("C", 330, 75, { width: 10 }),
+      span("D", 440, 75, { width: 10 }),
+      span("Body below", 50, 120),
+    ]);
+    raw.figures = [
+      {
+        id: "logo",
+        x: 40,
+        y: 50,
+        width: 190,
+        height: 40,
+        data: new Uint8Array(),
+      },
+    ];
+    raw.rules = [
+      ...[50, 70, 90].map((y) => ({ x1: 325, x2: 555, y1: y, y2: y })),
+      ...[325, 435, 555].map((x) => ({ x1: x, x2: x, y1: 50, y2: 90 })),
+    ];
+    const model = analyzeLayout([raw]);
+    expect(model.stats.tables).toBe(1);
+    expect(model.stats.images).toBe(1);
+    expect(model.pages[0].overlays?.map((f) => f.id)).toEqual(["logo"]);
+    expect(blocks(raw).some((b) => b.kind === "image")).toBe(false);
+    raw.spans.push(span("Intervening text", 240, 60, { width: 70 }));
+    expect(analyzeLayout([raw]).pages[0].overlays).toHaveLength(0);
+  });
+  it("keeps aligned OCR crops and logos on one row despite form rules, without swallowing intervening text", () => {
+    const raw = page([span("Body below", 50, 120)]);
+    raw.figures = [
+      {
+        id: "logo",
+        x: 40,
+        y: 50,
+        width: 190,
+        height: 40,
+        data: new Uint8Array(),
+      },
+      {
+        id: "crop",
+        x: 325,
+        y: 49,
+        width: 230,
+        height: 39,
+        data: new Uint8Array(),
+        role: "scan-region",
+      },
+    ];
+    raw.rules = [{ x1: 325, x2: 555, y1: 77, y2: 77, thickness: 0.5 }];
+    const result = blocks(raw);
+    expect(result.filter((b) => b.kind === "image-row")).toHaveLength(1);
+    expect(result.some((b) => b.kind === "rule")).toBe(true);
+    raw.spans.push(span("Field", 245, 60, { width: 60 }));
+    expect(blocks(raw).some((b) => b.kind === "image-row")).toBe(false);
+  });
   it("does not merge an edge stamp and a touching thin address strip into an opaque page-wide rectangle", () => {
     const boxes = [
       { x: 0, y: 390, width: 40, height: 120 },
@@ -289,6 +347,46 @@ describe("scan region fidelity", () => {
     expect(
       editableScanLines(raw, context.getImageData(0, 0, 600, 800), 1)
     ).toEqual([]);
+  });
+  it("keeps paragraphs atomic when using the original page as a background", async () => {
+    const { raw, canvas, context } = fixture();
+    vi.stubGlobal("document", { createElement: () => createCanvas(1, 1) });
+    context.fillStyle = "white";
+    context.fillRect(0, 0, 600, 800);
+    context.font = "12px Arial";
+    context.fillStyle = "black";
+    raw.spans = [60, 78, 96, 170].map((baseline, index) => {
+      const text =
+        index < 3
+          ? "A reliable paragraph continues"
+          : "Separate reliable paragraph.";
+      context.fillText(text, 50, baseline);
+      const metrics = context.measureText(text);
+      return span(text, 50, baseline - metrics.actualBoundingBoxAscent, {
+        id: `paragraph-${index}`,
+        source: "ocr",
+        confidence: index === 1 ? 48 : 98,
+        baseline,
+        width: metrics.width,
+        height:
+          metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
+      });
+    });
+    const original = context.getImageData(0, 0, 600, 800);
+    expect(createScanFontMatcher(original, 1)([raw.spans[0]])).toBeTruthy();
+    await retainUncertainScan(
+      canvas as unknown as HTMLCanvasElement,
+      original as unknown as ImageData,
+      1,
+      raw
+    );
+    expect(raw.spans.map((s) => s.rasterized)).toEqual([
+      true,
+      true,
+      true,
+      false,
+    ]);
+    expect(raw.figures).toHaveLength(1);
   });
   it("keeps visibly different glyphs and missing fonts as original pixels", () => {
     const { raw, context } = fixture();

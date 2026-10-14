@@ -9,20 +9,24 @@ import {
   clip,
   degrees,
   endPath,
+  fill,
   PDFDocument,
   popGraphicsState,
   pushGraphicsState,
   rectangle,
   rgb,
   StandardFonts,
+  translate,
 } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { analyzePdf } from "../features/pdf2docx/lib/analyzePdf";
 import { exportDocx } from "../features/pdf2docx/lib/exportDocx";
 import {
+  captureFigures,
   extractPage,
   figureRegions,
+  renderPage,
 } from "../features/pdf2docx/lib/extractPage";
 import { DOCX_LIMITS } from "../features/pdf2docx/lib/limits";
 import { paragraphText } from "../features/pdf2docx/lib/paragraphs";
@@ -63,6 +67,51 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+
+it("isolates image paint after PDF.js optimizes preceding path operations", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([240, 240]);
+  // Each save/translate/path/restore quartet is folded by the render optimizer,
+  // but remains four operations in getOperatorList().
+  for (let i = 0; i < 12; i++)
+    page.pushOperators(
+      pushGraphicsState(),
+      translate(10 + i * 14, 200),
+      rectangle(0, 0, 8, 8),
+      fill(),
+      popGraphicsState()
+    );
+  const bitmap = createCanvas(10, 10),
+    ctx = bitmap.getContext("2d");
+  ctx.fillStyle = "#0066ff";
+  ctx.fillRect(0, 0, 10, 10);
+  const picture = await pdf.embedPng(bitmap.toBuffer("image/png"));
+  page.drawImage(picture, { x: 50, y: 100, width: 30, height: 30 });
+  page.drawText("Editable body after the picture", { x: 20, y: 50, size: 12 });
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "optimized.pdf")
+  );
+  let isolated: HTMLCanvasElement | undefined;
+  try {
+    const source = await (await task.promise).getPage(1);
+    isolated = (await renderPage(source, 1, undefined, { imagesOnly: true }))
+      .canvas;
+    const pixels = isolated.getContext("2d")!.getImageData(0, 0, 240, 240);
+    const at = (x: number, y: number) =>
+      Array.from(pixels.data.slice((y * 240 + x) * 4, (y * 240 + x) * 4 + 4));
+    expect(at(65, 120)).toEqual([0, 102, 255, 255]);
+    expect(at(12, 35)[3]).toBe(0);
+    for (let y = 175; y < 200; y++)
+      for (let x = 15; x < 235; x++) expect(at(x, y)[3]).toBe(0);
+    const { raw } = await extractPage(source);
+    expect(raw.spans.map((s) => s.text).join("")).toContain(
+      "Editable body after the picture"
+    );
+  } finally {
+    if (isolated) isolated.width = isolated.height = 0;
+    await task.destroy();
+  }
 });
 
 async function makeDocument() {
@@ -728,4 +777,218 @@ it("keeps large photographs and vector bars together without rasterizing native 
   } finally {
     await task.destroy();
   }
+});
+
+it("flags unassigned Unicode from a broken text mapping for automatic OCR", async () => {
+  const pdf = await PDFDocument.create();
+  pdf.addPage([300, 400]).drawText("Mapped text");
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "mapping.pdf")
+  );
+  try {
+    const page = await (await task.promise).getPage(1);
+    const content = await page.getTextContent();
+    const item = content.items.find((item) => "str" in item);
+    if (!item || !("str" in item)) throw new Error("Missing fixture text");
+    item.str = "文字\u0d49內容";
+    vi.spyOn(page, "getTextContent").mockResolvedValue(content);
+    const { raw } = await extractPage(page);
+    expect(raw.issues.some((issue) => issue.code === "encoding")).toBe(true);
+  } finally {
+    await task.destroy();
+  }
+});
+
+it("does not duplicate a photograph already covered by an OCR region", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([300, 400]);
+  const canvas = createCanvas(40, 40);
+  canvas.getContext("2d").fillRect(0, 0, 40, 40);
+  page.drawImage(await pdf.embedPng(canvas.toBuffer("image/png")), {
+    x: 100,
+    y: 100,
+    width: 40,
+    height: 40,
+  });
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "retained.pdf")
+  );
+  try {
+    const source = await (await task.promise).getPage(1);
+    const { raw, imageBoxes } = await extractPage(source);
+    raw.source = "ocr";
+    raw.figures.push({
+      id: "retained",
+      x: 90,
+      y: 250,
+      width: 60,
+      height: 60,
+      role: "scan-region",
+      data: new Uint8Array(canvas.toBuffer("image/png")),
+    });
+    await captureFigures(source, raw, imageBoxes);
+    expect(raw.figures.map((f) => f.id)).toEqual(["retained"]);
+  } finally {
+    await task.destroy();
+  }
+});
+
+it("does not discard a retained OCR region when merging its edge image exceeds the background cutoff", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([300, 400]);
+  const bitmap = createCanvas(40, 40);
+  bitmap.getContext("2d").fillRect(0, 0, 40, 40);
+  page.drawImage(await pdf.embedPng(bitmap.toBuffer("image/png")), {
+    x: 20,
+    y: 100,
+    width: 40,
+    height: 40,
+  });
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "edge-image.pdf")
+  );
+  try {
+    const source = await (await task.promise).getPage(1);
+    const { raw, imageBoxes } = await extractPage(source);
+    raw.source = "ocr";
+    raw.figures.push({
+      id: "large-crop",
+      x: 40,
+      y: 0,
+      width: 260,
+      height: 400,
+      role: "scan-region",
+      data: new Uint8Array(bitmap.toBuffer("image/png")),
+    });
+    await captureFigures(source, raw, imageBoxes);
+    expect(raw.figures).toHaveLength(1);
+    expect(raw.figures[0]).toMatchObject({
+      x: 20,
+      y: 0,
+      width: 280,
+      height: 400,
+      role: "scan-region",
+    });
+  } finally {
+    await task.destroy();
+  }
+});
+
+it("retains local bitmap lettering once and merges a partially overlapping OCR crop", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([300, 400]);
+  const canvas = createCanvas(100, 40);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#0066ff";
+  context.fillRect(0, 0, 100, 40);
+  const bitmap = await pdf.embedPng(canvas.toBuffer("image/png"));
+  page.drawImage(bitmap, { x: 30, y: 300, width: 100, height: 40 });
+  page.drawText("Logo lettering", { x: 35, y: 315, size: 10 });
+  page.drawImage(bitmap, { x: 30, y: 180, width: 100, height: 40 });
+  page.drawText("Callout lettering", { x: 35, y: 195, size: 10 });
+  page.drawText("Editable body", { x: 30, y: 120, size: 12 });
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "local-lettering.pdf")
+  );
+  try {
+    const source = await (await task.promise).getPage(1);
+    const { raw, imageBoxes } = await extractPage(source);
+    raw.source = "ocr";
+    raw.figures.push({
+      id: "partial-callout",
+      x: 90,
+      y: 175,
+      width: 80,
+      height: 30,
+      role: "scan-region",
+      data: new Uint8Array(canvas.toBuffer("image/png")),
+    });
+    await captureFigures(source, raw, imageBoxes);
+    expect(raw.spans.filter((s) => !s.rasterized).map((s) => s.text)).toEqual([
+      "Editable body",
+    ]);
+    expect(raw.figures).toHaveLength(2);
+    expect(
+      raw.figures.every((f) => f.role === "scan-region" && !f.overlay)
+    ).toBe(true);
+    const callout = raw.figures.find((f) => f.y > 150)!;
+    expect(callout.x).toBeLessThanOrEqual(30);
+    expect(callout.x + callout.width).toBeGreaterThanOrEqual(170);
+    expect(callout.y + callout.height).toBeGreaterThanOrEqual(220);
+    const crop = await loadImage(callout.data!);
+    const rendered = createCanvas(crop.width, crop.height);
+    rendered.getContext("2d").drawImage(crop, 0, 0);
+    // The portion outside the original OCR crop must survive the union.
+    const pixel = rendered
+      .getContext("2d")
+      .getImageData(15, crop.height - 9, 1, 1).data;
+    expect(Array.from(pixel)).toEqual([0, 102, 255, 255]);
+  } finally {
+    await task.destroy();
+  }
+});
+
+it("keeps chart axes and numeric labels together while body text and cell grids remain editable", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([600, 800]);
+  page.drawText("Editable chart introduction", { x: 50, y: 730, size: 14 });
+  const mask = createCanvas(20, 20);
+  mask.getContext("2d").fillRect(0, 0, 20, 20);
+  // A shadow bitmap protrudes 8 pt below the frame, while 92% remains inside.
+  page.drawImage(await pdf.embedPng(mask.toBuffer("image/png")), {
+    x: 110,
+    y: 392,
+    width: 100,
+    height: 100,
+  });
+  page.drawRectangle({
+    x: 50,
+    y: 400,
+    width: 400,
+    height: 210,
+    borderColor: rgb(0.5, 0.5, 0.5),
+    borderWidth: 0.8,
+  });
+  for (const [i, text] of ["120", "240", "360"].entries()) {
+    page.drawText(text, { x: 60, y: 440 + i * 50, size: 12 });
+    page.drawRectangle({
+      x: 110,
+      y: 435 + i * 50,
+      width: 100 + i * 70,
+      height: 25,
+      color: rgb(0.1, 0.4, 0.8),
+    });
+  }
+  page.drawText("Editable chart conclusion", { x: 50, y: 360, size: 14 });
+  for (const x of [50, 200, 350])
+    page.drawLine({ start: { x, y: 100 }, end: { x, y: 250 }, thickness: 0.8 });
+  for (const y of [100, 175, 250])
+    page.drawLine({ start: { x: 50, y }, end: { x: 350, y }, thickness: 0.8 });
+  for (const [text, x, y] of [
+    ["123", 60, 215],
+    ["456", 210, 215],
+    ["789", 60, 140],
+    ["012", 210, 140],
+  ] as const)
+    page.drawText(text, { x, y, size: 12 });
+  const model = await analyzePdf(
+    new File([new Uint8Array(await pdf.save())], "chart.pdf")
+  );
+  expect(model.stats.tables).toBe(1);
+  const charts = model.pages[0].groups
+    .flatMap((g) => g.columns.flat())
+    .filter((b) => b.kind === "image" && b.role === "graphic-region");
+  expect(charts).toHaveLength(1);
+  expect(charts[0].height).toBeGreaterThanOrEqual(218);
+  expect(model.pages[0].overlays ?? []).toHaveLength(0);
+  const zip = await JSZip.loadAsync(
+    await (await exportDocx(model, { preservePageBreaks: true })).arrayBuffer()
+  );
+  const xml = await zip.file("word/document.xml")!.async("string");
+  expect(xml).toContain("Editable chart introduction");
+  expect(xml).toContain("Editable chart conclusion");
+  expect(xml).toContain(">123</w:t>");
+  expect(xml).not.toContain(">120</w:t>");
+  expect(xml).not.toContain(">240</w:t>");
+  expect(xml).not.toContain(">360</w:t>");
 });

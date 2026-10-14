@@ -77,7 +77,8 @@ vi.mock("tesseract.js", async (importOriginal) => {
   };
 });
 
-const manifest = process.env.PDF2DOCX_PRIVATE_MANIFEST;
+const manifest =
+  process.env.PDF2DOCX_CORPUS_MANIFEST ?? process.env.PDF2DOCX_PRIVATE_MANIFEST;
 const output = process.env.PDF2DOCX_QA_DIR;
 // Optional local fonts align the Node canvas with the render host; font files
 // and private fixture paths never become checked-in test assets.
@@ -89,6 +90,7 @@ for (const font of (process.env.PDF2DOCX_QA_FONTS ?? "")
 const samples: {
   id: string;
   path: string;
+  sha256?: string;
   pages?: number[];
   minimumEditableCharacters?: number;
   minimumTables?: number;
@@ -129,12 +131,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe.skipIf(!manifest)("private PDF corpus (opt in, local only)", () => {
+describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
   it.each(samples)(
     "converts $id",
     async ({
       id,
       path,
+      sha256,
       pages,
       minimumEditableCharacters = 0,
       minimumTables = 0,
@@ -143,6 +146,11 @@ describe.skipIf(!manifest)("private PDF corpus (opt in, local only)", () => {
     }) => {
       expect(id).toMatch(/^[a-z0-9-]+$/);
       const bytes = await readFile(path);
+      if (sha256)
+        expect(
+          createHash("sha256").update(bytes).digest("hex"),
+          "upstream fixture changed"
+        ).toBe(sha256);
       const file = new File([bytes], `${id}.pdf`, { type: "application/pdf" });
       const task = await openPdf(file);
       let selection: number[];

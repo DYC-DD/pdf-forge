@@ -5,10 +5,13 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 // Run after rendering each exported DOCX to <output>/<id>/<id>.pdf. This
 // deliberately checks the rendered result, not DOCX section counts.
-const manifest = process.env.PDF2DOCX_PRIVATE_MANIFEST;
+const manifest =
+  process.env.PDF2DOCX_CORPUS_MANIFEST ?? process.env.PDF2DOCX_PRIVATE_MANIFEST;
 const output = process.env.PDF2DOCX_QA_DIR;
 if (!manifest || !output)
-  throw new Error("Set PDF2DOCX_PRIVATE_MANIFEST and PDF2DOCX_QA_DIR first.");
+  throw new Error(
+    "Set PDF2DOCX_CORPUS_MANIFEST (or PDF2DOCX_PRIVATE_MANIFEST) and PDF2DOCX_QA_DIR first."
+  );
 const samples = JSON.parse(await readFile(resolve(manifest), "utf8"));
 if (!Array.isArray(samples) || !samples.length)
   throw new Error("The manifest must contain at least one PDF sample.");

@@ -46,6 +46,7 @@ function groupImages(nodes: Node[]): Node[] {
         nodes.some(
           (entry) =>
             entry.kind !== "image" &&
+            entry.kind !== "rule" &&
             entry.x < right(box) &&
             right(entry) > box.x &&
             entry.y < bottom(box) &&
@@ -383,15 +384,41 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
       figures,
       overlays,
     } = classifyPage(page, recurring);
+    // A logo beside a native table shares the table's vertical band. Keeping
+    // both in normal flow stacks them and pushes the bottom of the page out.
+    // Anchor only isolated siblings whose full height fits that table band.
+    const tableSiblings = new Set(
+      figures.filter((figure) =>
+        tables.some((table) => {
+          if (
+            Math.abs(figure.y - table.y) > 6 ||
+            bottom(figure) > bottom(table) + 6 ||
+            !(right(figure) + 6 <= table.x || right(table) + 6 <= figure.x)
+          )
+            return false;
+          const box = bounds([figure, table]);
+          return !text.some(
+            (span) =>
+              span.x < right(box) &&
+              right(span) > box.x &&
+              span.y < bottom(box) &&
+              bottom(span) > box.y
+          );
+        })
+      )
+    );
+    overlays.push(...tableSiblings);
     const nodes: Node[] = [
       ...buildLines(text),
       ...tables,
       ...rules,
-      ...figures.map((figure) => ({
-        ...figure,
-        kind: "image" as const,
-        before: 0,
-      })),
+      ...figures
+        .filter((figure) => !tableSiblings.has(figure))
+        .map((figure) => ({
+          ...figure,
+          kind: "image" as const,
+          before: 0,
+        })),
     ];
     const content = bounds(nodes);
     const margins = nodes.length

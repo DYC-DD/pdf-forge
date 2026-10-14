@@ -2,6 +2,7 @@ import type { Box, RawPage, TextSpan } from "../types";
 import { bottom, bounds, containsCenter, median, right } from "./geometry";
 import { checkAbort } from "./limits";
 import { buildLines } from "./paragraphs";
+import { scanParagraphs } from "./scanParagraphs";
 import { detectTables } from "./tables";
 
 function uncertain(spans: readonly TextSpan[]): boolean {
@@ -76,6 +77,7 @@ export async function retainScanRegions(
     true
   );
   const body = lines.filter((line) => !line.spans.some((s) => used.has(s.id)));
+  const paragraphs = scanParagraphs(body, page.rules, tables);
   const regions: Box[] = [];
   // A watermark crossing a row invalidates that row even when the OCR model
   // gives a high score to a wrong amount. Include the complete writing row.
@@ -131,7 +133,11 @@ export async function retainScanRegions(
       extent = { ...art, height: last - art.y };
     }
     const crossing = body.filter((line) => overlaps(line, extent));
-    if (crossing.length) regions.push(bounds([extent, ...crossing]));
+    // OCR sometimes omits every word on a thin colored title strip. Keeping
+    // only its color layer would erase the unrecognized black lettering.
+    const banner =
+      extent.width >= page.width * 0.35 && extent.width >= extent.height * 8;
+    if (crossing.length || banner) regions.push(bounds([extent, ...crossing]));
   }
   for (const table of tables) {
     const content = page.spans.filter((s) => containsCenter(table, s));
@@ -147,27 +153,44 @@ export async function retainScanRegions(
   }
   if (!regions.length) return [];
 
+  // Expand any affected line to its complete paragraph. Do not average away
+  // an uncertain line using the other confident lines in that paragraph.
   // Image rows and editable rows must not coexist in the same vertical band:
   // otherwise a side-by-side form field would create a second flowing row.
   // Include adjacent ink boxes only when their centers belong to the band.
-  for (let pass = 0; pass < 4; pass++) {
+  // Every expansion absorbs at least one finite paragraph/table or merges a
+  // region. Iterate to closure so large watermarks cannot leave a mixed tail.
+  let changed = true;
+  while (changed) {
+    changed = false;
     for (let i = 0; i < regions.length; i++) {
       const box = regions[i];
       const neighbors: Box[] = [
-        ...body.filter(
-          (line) =>
-            line.y + line.height / 2 > box.y &&
-            line.y + line.height / 2 < bottom(box)
+        ...paragraphs.filter((paragraph) =>
+          paragraph.lines.some(
+            (line) =>
+              line.y + line.height / 2 > box.y &&
+              line.y + line.height / 2 < bottom(box)
+          )
         ),
         ...tables.filter((table) => overlaps(table, box)),
       ];
-      regions[i] = bounds([box, ...neighbors]);
+      const expanded = bounds([box, ...neighbors]);
+      if (
+        expanded.x !== box.x ||
+        expanded.y !== box.y ||
+        expanded.width !== box.width ||
+        expanded.height !== box.height
+      )
+        changed = true;
+      regions[i] = expanded;
     }
     regions.sort((a, b) => a.y - b.y);
     for (let i = regions.length - 1; i > 0; i--) {
       if (regions[i].y <= bottom(regions[i - 1]) + 3) {
         regions[i - 1] = bounds([regions[i - 1], regions[i]]);
         regions.splice(i, 1);
+        changed = true;
       }
     }
   }
@@ -225,7 +248,7 @@ export async function retainScanRegions(
     page: page.number,
     code: "scan-regions",
     severity: "review",
-    message: `有 ${retained.length} 個浮水印重疊或辨識不確定的區塊保留原圖；這些區塊無法直接編輯，其餘文字與表格可編輯。`,
+    message: `有 ${retained.length} 個浮水印重疊或辨識不確定的段落／表格保留原圖，避免同段文字與圖片交錯；這些區塊無法直接編輯，其餘可靠內容可編輯。`,
   });
   return retained;
 }

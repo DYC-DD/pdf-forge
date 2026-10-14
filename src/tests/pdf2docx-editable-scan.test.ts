@@ -155,6 +155,123 @@ it("reconstructs a scanned grid as editable Word cells rather than a background 
   expect(xml).not.toContain("<w:drawing>");
 });
 
+it("keeps one uncertain paragraph together despite alternating confidence and fragmented OCR IDs", async () => {
+  const f = fixture();
+  f.text("Clear heading:", 50, 45);
+  for (let i = 0; i < 5; i++)
+    f.text(
+      `Paragraph content row ${i} continues without a break`,
+      50,
+      80 + i * 18,
+      {
+        confidence: i === 1 || i === 3 ? 50 : 96,
+        paragraphId: `wrong-ocr-paragraph-${i}`,
+      }
+    );
+  f.text("Independent editable paragraph.", 50, 220);
+  await f.convert();
+  expect(f.page.spans.map((s) => !!s.rasterized)).toEqual([
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+  ]);
+  expect(f.page.figures.filter((f) => f.role === "scan-region")).toHaveLength(
+    1
+  );
+  const model = analyzeLayout([f.page]);
+  const zip = await JSZip.loadAsync(
+    await (await exportDocx(model, { preservePageBreaks: true })).arrayBuffer()
+  );
+  const xml = await zip.file("word/document.xml")!.async("string");
+  expect(xml).toContain("Independent editable paragraph.");
+  expect(xml).not.toContain("Paragraph content row");
+  expect(xml.match(/<w:drawing>/gu)).toHaveLength(1);
+});
+
+it("preserves the whole paragraph when a watermark crosses only its middle row", async () => {
+  const f = fixture();
+  f.context.fillStyle = "#99aacc";
+  f.context.fillRect(130, 120, 90, 34);
+  for (let i = 0; i < 3; i++)
+    f.text(
+      "Reliable OCR over an unreliable watermark region",
+      50,
+      100 + i * 24
+    );
+  f.text("Next paragraph is still editable.", 50, 220);
+  await f.convert();
+  expect(f.page.spans.map((s) => !!s.rasterized)).toEqual([
+    true,
+    true,
+    true,
+    false,
+  ]);
+  expect(f.page.figures.filter((f) => f.role === "scan-region")).toHaveLength(
+    1
+  );
+});
+
+it("respects list boundaries in double-spaced scans without making the entire page an image", async () => {
+  const f = fixture();
+  const rows = [
+    "1. First independent clause continues here",
+    "Continuation contains an uncertain value",
+    "Final line of the first clause.",
+    "2. Reliable second clause continues here",
+    "Reliable continuation remains editable",
+    "Final line of the second clause.",
+  ];
+  rows.forEach((text, i) =>
+    f.text(text, 50, 80 + i * 32, {
+      confidence: i === 1 ? 40 : 96,
+      paragraphId: "one-wrong-ocr-block",
+    })
+  );
+  await f.convert();
+  expect(f.page.spans.map((s) => !!s.rasterized)).toEqual([
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+  ]);
+  expect(f.page.figures.filter((f) => f.role === "scan-region")).toHaveLength(
+    1
+  );
+});
+
+it("keeps a fully reliable multiline paragraph editable", async () => {
+  const f = fixture();
+  for (let i = 0; i < 5; i++)
+    f.text("Readable paragraph continuation", 50, 80 + i * 20);
+  await f.convert();
+  expect(f.page.spans.every((s) => !s.rasterized)).toBe(true);
+  expect(f.page.figures).toEqual([]);
+});
+
+it("does not absorb independent form labels or text beyond a separator", async () => {
+  const f = fixture();
+  f.text("Name:", 50, 50, { confidence: 45 });
+  f.text("Address:", 50, 68);
+  f.text("Phone:", 50, 86);
+  f.text("An uncertain complete paragraph", 50, 140, { confidence: 45 });
+  f.page.rules.push({ x1: 50, x2: 450, y1: 157, y2: 157 });
+  f.text("A reliable independent paragraph", 50, 163);
+  await f.convert();
+  expect(f.page.spans.map((s) => !!s.rasterized)).toEqual([
+    true,
+    false,
+    false,
+    true,
+    false,
+  ]);
+});
+
 it("preserves an empty scanned grid instead of erasing all but its bottom rule", async () => {
   const f = fixture();
   f.text("Reliable body above the form", 50, 50);
@@ -218,6 +335,42 @@ it("keeps a colored heading as native colored text, not artwork", async () => {
   expect(f.page.spans[0].rasterized).not.toBe(true);
   expect(f.page.spans[0].color).toMatch(/^[0-9a-f]{6}$/u);
   expect(f.page.figures).toEqual([]);
+});
+
+it("retains thin colored banners including black lettering completely missed by OCR", async () => {
+  const f = fixture();
+  f.text("Editable body", 50, 50);
+  f.context.fillStyle = "#ffff00";
+  f.context.fillRect(40, 150, 520, 14);
+  f.context.fillStyle = "#000000";
+  f.context.fillText("Unrecognized heading", 170, 161);
+  await f.convert();
+  const region = f.page.figures.find(
+    (figure) => figure.role === "scan-region"
+  )!;
+  expect(region).toBeDefined();
+  expect(region.y).toBeLessThanOrEqual(150);
+  expect(region.y + region.height).toBeGreaterThanOrEqual(164);
+  expect(f.page.spans[0].rasterized).not.toBe(true);
+  const img = await loadImage(region.data);
+  const canvas = createCanvas(img.width, img.height),
+    ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  const pixels = ctx.getImageData(0, 0, img.width, img.height).data;
+  let black = 0,
+    yellow = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (
+      pixels[i + 3] > 200 &&
+      pixels[i] < 90 &&
+      pixels[i + 1] < 90 &&
+      pixels[i + 2] < 90
+    )
+      black++;
+    if (pixels[i] > 220 && pixels[i + 1] > 220 && pixels[i + 2] < 40) yellow++;
+  }
+  expect(black).toBeGreaterThan(50);
+  expect(yellow).toBeGreaterThan(1000);
 });
 
 it("retains a colored stamp independently while body text remains native", async () => {
@@ -346,4 +499,46 @@ it("labels the exceptional image-only fallback instead of calling it editable", 
     f.page.issues.some((issue) => issue.message.includes("無法直接編輯"))
   ).toBe(true);
   expect(analyzeLayout([f.page]).stats.characters).toBe(0);
+});
+
+it("does not erase dark photographic texture as a table grid", () => {
+  const f = fixture();
+  f.context.fillStyle = "#606060";
+  f.context.fillRect(40, 40, 520, 500);
+  f.context.strokeStyle = "#151515";
+  f.context.lineWidth = 1;
+  for (let n = 60; n < 500; n += 20) {
+    f.context.beginPath();
+    f.context.moveTo(50, n);
+    f.context.lineTo(550, n);
+    f.context.moveTo(n, 50);
+    f.context.lineTo(n, 530);
+    f.context.stroke();
+  }
+  const rules = scanRules(f.context.getImageData(0, 0, 600, 800), 1);
+  // The picture's outer frame may remain; its internal texture must not.
+  expect(
+    rules.every((r) => r.y1 < 45 || r.y1 > 535 || r.x1 < 45 || r.x1 > 555)
+  ).toBe(true);
+});
+
+it("retains one complete original when no paragraph has reliable editable text", async () => {
+  const f = fixture();
+  f.text("Uncertain first line", 50, 50, { confidence: 20 });
+  f.text("Uncertain second line", 50, 70, { confidence: 30 });
+  f.context.fillStyle = "#3268b0";
+  f.context.fillRect(300, 300, 150, 200);
+  await f.convert();
+  expect(f.page.figures).toHaveLength(1);
+  expect(f.page.figures[0]).toMatchObject({
+    role: "scan-background",
+    overlay: true,
+    width: 600,
+    height: 800,
+  });
+  expect(f.page.spans.every((s) => s.rasterized)).toBe(true);
+  expect(f.page.rules).toEqual([]);
+  const model = analyzeLayout([f.page]);
+  expect(model.stats.characters).toBe(0);
+  expect(model.stats.images).toBe(1);
 });

@@ -1,9 +1,19 @@
 import { OPS, type PDFPageProxy } from "pdfjs-dist";
 
 import type { Box, Issue, RawPage, Rule, TextSpan } from "../types";
-import { bottom, bounds, containsCenter, median, right } from "./geometry";
+import { framedGraphics } from "./framedGraphics";
+import {
+  bottom,
+  bounds,
+  containsBox,
+  containsCenter,
+  median,
+  right,
+} from "./geometry";
 import { transparentStamp } from "./imageAppearance";
 import { checkAbort, DOCX_LIMITS } from "./limits";
+import { deskewScan } from "./scanDeskew";
+import { retainUncertainScan } from "./scanFallback";
 import { detectTables } from "./tables";
 import { applyTextAppearance, pdfFontName } from "./textAppearance";
 
@@ -15,6 +25,8 @@ type ImagePlacement = Box & {
   behindText?: boolean;
   composite?: boolean;
   inFooter?: boolean;
+  fullContent?: boolean;
+  scanRegion?: boolean;
 };
 const identity: Matrix = [1, 0, 0, 1, 0, 0];
 export function multiply(a: readonly number[], b: readonly number[]): Matrix {
@@ -178,7 +190,7 @@ export async function extractPage(
   });
   if (
     raw.spans.some((span) =>
-      /[\uFFFD\u0000-\u0008\uE000-\uF8FF]/u.test(span.text)
+      /[\uFFFD\u0000-\u0008\uE000-\uF8FF\p{Cn}]/u.test(span.text)
     )
   )
     issue(
@@ -501,10 +513,51 @@ export async function extractPage(
       candidate.artwork ||
       !tables.some((table) => containsCenter(table, candidate.box))
   );
-  if (vectors.length)
+  const charts = framedGraphics(
+    raw,
+    [...imageBoxes, ...vectors.map((v) => v.box)],
+    tables
+  );
+  if (charts.length) {
+    raw.spans.forEach((span) => {
+      if (charts.some((box) => containsCenter(box, span)))
+        span.rasterized = true;
+    });
+    raw.rules = raw.rules.filter(
+      (r) =>
+        !charts.some((box) =>
+          containsBox(
+            box,
+            {
+              x: Math.min(r.x1, r.x2),
+              y: Math.min(r.y1, r.y2),
+              width: Math.abs(r.x2 - r.x1),
+              height: Math.abs(r.y2 - r.y1),
+            },
+            1
+          )
+        )
+    );
+    raw.fills = raw.fills?.filter(
+      (fill) => !charts.some((box) => containsBox(box, fill, 1))
+    );
+    for (let i = imageBoxes.length - 1; i >= 0; i--)
+      if (charts.some((box) => containsBox(box, imageBoxes[i], 2)))
+        imageBoxes.splice(i, 1);
+    imageBoxes.push(...charts.map((box) => ({ ...box, fullContent: true })));
+    issue(
+      "chart-image",
+      "圖表與座標標籤保留為完整圖片，周圍正文仍可編輯。",
+      "info"
+    );
+  }
+  const remainingVectors = vectors.filter(
+    (v) => !charts.some((box) => containsBox(box, v.box, 2))
+  );
+  if (remainingVectors.length)
     imageBoxes.push({
-      ...bounds(vectors.map((entry) => entry.box)),
-      vectorOperations: vectors.map((entry) => entry.index),
+      ...bounds(remainingVectors.map((entry) => entry.box)),
+      vectorOperations: remainingVectors.map((entry) => entry.index),
       behindText: true,
     });
   return {
@@ -552,6 +605,21 @@ export async function renderPage(
   const selectedText = new Set(
     options?.textOperations ?? options?.vectorOperations
   );
+  // getOperatorList() is unoptimized, whereas render() folds repeated images,
+  // paths and text state operations. Its callback indexes a DIFFERENT list.
+  // The optimizer preserves the order/count of text and path paint calls, so
+  // select those by their ordinal, never by their raw operation index.
+  const selectedPaint = new Map<number, Set<number>>();
+  const sourceCounts = new Map<number, number>();
+  operators?.fnArray.forEach((op, index) => {
+    if (!excluded.has(op)) return;
+    const ordinal = sourceCounts.get(op) ?? 0;
+    sourceCounts.set(op, ordinal + 1);
+    if (selectedText.has(index)) {
+      if (!selectedPaint.has(op)) selectedPaint.set(op, new Set());
+      selectedPaint.get(op)!.add(ordinal);
+    }
+  });
   const imagePaints = new Set([
     OPS.paintImageXObject,
     OPS.paintInlineImageXObject,
@@ -561,21 +629,43 @@ export async function renderPage(
     OPS.paintInlineImageXObjectGroup,
     OPS.paintImageMaskXObjectGroup,
   ]);
+  const decisions: boolean[] = [];
+  const renderCounts = new Map<number, number>();
+  const filter = (index: number) => {
+    // PDF.js currently exposes the executing list on RenderTask. Keep this
+    // compatibility boundary local and fail explicitly if a future release
+    // removes it, instead of silently dropping dependencies or drawing text.
+    const list = (
+      task as unknown as {
+        _internalRenderTask?: {
+          operatorList?: { fnArray: number[]; argsArray: unknown[][] };
+        };
+      }
+    )._internalRenderTask?.operatorList;
+    if (!list) throw new Error("無法安全擷取 PDF 圖層，請更新轉換工具後重試。");
+    for (let i = decisions.length; i <= index; i++) {
+      const op = list.fnArray[i];
+      if (excluded.has(op)) {
+        const ordinal = renderCounts.get(op) ?? 0;
+        renderCounts.set(op, ordinal + 1);
+        decisions[i] =
+          !!selectedPaint.get(op)?.has(ordinal) ||
+          (op === OPS.constructPath && list.argsArray[i]?.[0] === OPS.endPath);
+      } else {
+        decisions[i] =
+          !!options?.includeImages ||
+          (!options?.textOperations && !options?.vectorOperations) ||
+          !imagePaints.has(op);
+      }
+    }
+    return decisions[index];
+  };
   const task = page.render({
     canvas,
     canvasContext: canvas.getContext("2d", { alpha: true })!,
     viewport,
     background: isolated ? "rgba(0,0,0,0)" : "#ffffff",
-    operationsFilter: operators
-      ? (index) =>
-          selectedText.has(index) ||
-          (operators.fnArray[index] === OPS.constructPath &&
-            operators.argsArray[index][0] === OPS.endPath) ||
-          (!excluded.has(operators.fnArray[index]) &&
-            (options?.includeImages ||
-              (!options?.textOperations && !options?.vectorOperations) ||
-              !imagePaints.has(operators.fnArray[index])))
-      : undefined,
+    operationsFilter: operators ? filter : undefined,
   });
   const abort = () => task.cancel();
   signal?.addEventListener("abort", abort, { once: true });
@@ -657,18 +747,103 @@ export async function captureFigures(
   signal?: AbortSignal
 ): Promise<void> {
   const includeLarge = raw.source === "pdf";
+  // A photograph crossing several OCR crops cannot be reconstructed as
+  // independent flowing pictures without repeating/covering content. Keep the
+  // original composition, clearing only complete reliable text paragraphs.
+  if (
+    !includeLarge &&
+    boxes.some(
+      (box) =>
+        !box.textOperations &&
+        !box.vectorOperations &&
+        box.width * box.height > raw.width * raw.height * 0.15 &&
+        box.width * box.height < raw.width * raw.height * 0.7 &&
+        raw.figures.some(
+          (figure) =>
+            figure.role === "scan-region" &&
+            Math.min(right(box), right(figure)) > Math.max(box.x, figure.x) &&
+            Math.min(bottom(box), bottom(figure)) > Math.max(box.y, figure.y) &&
+            !(
+              figure.x <= box.x + 1 &&
+              figure.y <= box.y + 1 &&
+              right(figure) >= right(box) - 1 &&
+              bottom(figure) >= bottom(box) - 1
+            )
+        )
+    )
+  ) {
+    const { canvas, scale } = await renderPage(page, 3, signal);
+    try {
+      // OCR coordinates belong to its deskewed canvas, not the original tilt.
+      if (raw.issues.some((issue) => issue.code === "scan-deskew"))
+        deskewScan(canvas);
+      await retainUncertainScan(
+        canvas,
+        canvas
+          .getContext("2d")!
+          .getImageData(0, 0, canvas.width, canvas.height),
+        scale,
+        raw,
+        signal
+      );
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
+    return;
+  }
   const regions: ImagePlacement[] = [
     ...figureRegions(
-      boxes.filter((box) => !box.textOperations && !box.vectorOperations),
+      boxes.filter(
+        (box) =>
+          !box.textOperations && !box.vectorOperations && !box.fullContent
+      ),
       raw.width,
       raw.height,
       includeLarge
     ),
     ...boxes.filter(
       (box) =>
-        (box.textOperations || box.vectorOperations) && raw.source === "pdf"
+        (box.textOperations || box.vectorOperations || box.fullContent) &&
+        raw.source === "pdf"
     ),
   ];
+  if (!includeLarge) {
+    for (const box of regions) {
+      if (box.width * box.height > raw.width * raw.height * 0.15) continue;
+      // The image already contains its lettering. OCR text over a local logo
+      // or callout is a second copy, even if the OCR score happens to be high.
+      if (raw.figures.some((f) => !f.overlay && containsBox(f, box, 1)))
+        continue;
+      const intersecting = raw.figures.filter(
+        (f) =>
+          f.role === "scan-region" &&
+          Math.min(right(f), right(box)) > Math.max(f.x, box.x) + 1 &&
+          Math.min(bottom(f), bottom(box)) > Math.max(f.y, box.y) + 1
+      );
+      if (
+        !intersecting.length &&
+        !raw.spans.some((s) => containsCenter(box, s))
+      )
+        continue;
+      Object.assign(box, bounds([box, ...intersecting]), {
+        fullContent: true,
+        scanRegion: true,
+      });
+      raw.figures = raw.figures.filter((f) => !intersecting.includes(f));
+      raw.spans.forEach((s) => {
+        if (containsCenter(box, s)) s.rasterized = true;
+      });
+      raw.rules = raw.rules.filter(
+        (rule) =>
+          !containsBox(box, {
+            x: Math.min(rule.x1, rule.x2),
+            y: Math.min(rule.y1, rule.y2),
+            width: Math.abs(rule.x2 - rule.x1),
+            height: Math.abs(rule.y2 - rule.y1),
+          })
+      );
+    }
+  }
   // Complex illustrated pages paint bitmaps and vector patches in alternating
   // order. Preserve that artwork as one local graphics layer, without body
   // text; independently stacking white bitmap backdrops would hide the paths.
@@ -676,6 +851,7 @@ export async function captureFigures(
   const composite =
     vector &&
     raw.source === "pdf" &&
+    !regions.some((box) => box.fullContent) &&
     !regions.some((box) => box.textOperations) &&
     regions.some(
       (box) =>
@@ -703,8 +879,28 @@ export async function captureFigures(
     } else regions.splice(0, regions.length, box);
   }
   const candidates = regions.filter(
-    (box) =>
-      includeLarge || box.width * box.height < raw.width * raw.height * 0.7
+    (box, index) =>
+      (includeLarge ||
+        box.fullContent ||
+        box.width * box.height < raw.width * raw.height * 0.7) &&
+      !regions.some(
+        (other, otherIndex) =>
+          other !== box &&
+          other.fullContent &&
+          containsBox(other, box) &&
+          (other.width * other.height > box.width * box.height ||
+            otherIndex < index)
+      ) &&
+      // OCR crops already include original bitmap pixels. Do not insert the
+      // same photograph again when its complete bounds are already retained.
+      !raw.figures.some(
+        (figure) =>
+          !figure.overlay &&
+          figure.x <= box.x + 1 &&
+          figure.y <= box.y + 1 &&
+          right(figure) >= right(box) - 1 &&
+          bottom(figure) >= bottom(box) - 1
+      )
   );
   if (
     (!includeLarge &&
@@ -757,14 +953,21 @@ export async function captureFigures(
       try {
         const context = crop.getContext("2d");
         if (!context) throw new Error("瀏覽器無法擷取圖片。");
-        const isolated =
-          !sharedComposite && (box.textOperations || box.vectorOperations)
+        const isolated = box.fullContent
+          ? await renderPage(page, scale, signal)
+          : !sharedComposite && (box.textOperations || box.vectorOperations)
             ? await renderPage(page, scale, signal, {
                 textOperations: box.textOperations,
                 vectorOperations: box.vectorOperations,
                 includeImages: box.composite,
               })
             : undefined;
+        if (
+          isolated &&
+          box.scanRegion &&
+          raw.issues.some((issue) => issue.code === "scan-deskew")
+        )
+          deskewScan(isolated.canvas);
         context.drawImage(
           isolated?.canvas ?? canvas,
           x * scale,
@@ -793,6 +996,7 @@ export async function captureFigures(
           pixels.data,
           !box.textOperations &&
             !box.vectorOperations &&
+            !box.fullContent &&
             raw.source === "pdf" &&
             raw.spans.filter((span) => containsCenter(box, span)).length >= 3,
           boxes.some(
@@ -822,11 +1026,17 @@ export async function captureFigures(
           id: `${raw.number}:image:${raw.figures.length}`,
           data: new Uint8Array(await blob.arrayBuffer()),
           format: box.composite ? "jpg" : "png",
+          role: box.scanRegion
+            ? "scan-region"
+            : box.fullContent
+              ? "graphic-region"
+              : undefined,
           inFooter: box.inFooter,
           overlay:
-            !!box.textOperations ||
-            !!box.vectorOperations ||
-            raw.spans.some((span) => containsCenter(box, span)),
+            !box.fullContent &&
+            (!!box.textOperations ||
+              !!box.vectorOperations ||
+              raw.spans.some((span) => containsCenter(box, span))),
           behindText:
             stamp ||
             !!box.textOperations ||
