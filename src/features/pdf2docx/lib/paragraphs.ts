@@ -414,6 +414,11 @@ export function groupParagraphs(
         (listPattern.test(firstText) || chineseList.test(firstText)) &&
         line.x >= current[0].x &&
         line.x - current[0].x <= reference * 5;
+      // Returning to the body margin ends a list even when its final item has
+      // no punctuation and the following paragraph uses the same leading.
+      const leavesList =
+        (listPattern.test(firstText) || chineseList.test(firstText)) &&
+        line.x < current[0].x - reference * 0.5;
       if (
         (previousParagraph &&
           currentParagraph &&
@@ -426,6 +431,7 @@ export function groupParagraphs(
         article.test(text) ||
         article.test(previousText) ||
         previousHeading ||
+        leavesList ||
         (paragraphIndent && !hangingContinuation) ||
         endOfParagraph ||
         (Math.abs(line.x - previous.x) > reference * 3 && !hangingContinuation)

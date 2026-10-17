@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { analyzePdf } from "../features/pdf2docx/lib/analyzePdf";
 import { exportDocx } from "../features/pdf2docx/lib/exportDocx";
+import { paragraphText } from "../features/pdf2docx/lib/paragraphs";
 import type { RawPage } from "../features/pdf2docx/types";
 import { openPdf } from "../shared/pdf/preview";
 
@@ -91,11 +92,20 @@ const samples: {
   id: string;
   path: string;
   sha256?: string;
+  sourcePageCount?: number;
   pages?: number[];
   minimumEditableCharacters?: number;
   minimumTables?: number;
+  maximumOcrPages?: number;
+  minimumRotatedCells?: number;
+  minimumLargestTableColumns?: number;
   expectedText?: string[];
+  unexpectedText?: string[];
   minimumPreservedRegions?: number;
+  requiredReviewCodes?: string[];
+  expectedColumns?: { page: number; text: string[][] }[];
+  minimumRaisedRuns?: number;
+  minimumGraphicRegions?: number;
 }[] = manifest ? JSON.parse(await readFile(resolve(manifest), "utf8")) : [];
 
 beforeEach(async () => {
@@ -138,11 +148,20 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       id,
       path,
       sha256,
+      sourcePageCount,
       pages,
       minimumEditableCharacters = 0,
       minimumTables = 0,
+      maximumOcrPages = Infinity,
+      minimumRotatedCells = 0,
+      minimumLargestTableColumns = 0,
       expectedText = [],
+      unexpectedText = [],
       minimumPreservedRegions = 0,
+      requiredReviewCodes = [],
+      expectedColumns = [],
+      minimumRaisedRuns = 0,
+      minimumGraphicRegions = 0,
     }) => {
       expect(id).toMatch(/^[a-z0-9-]+$/);
       const bytes = await readFile(path);
@@ -156,6 +175,10 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       let selection: number[];
       try {
         const pdf = await task.promise;
+        if (sourcePageCount !== undefined)
+          expect(pdf.numPages, "source page count changed").toBe(
+            sourcePageCount
+          );
         selection =
           pages ?? Array.from({ length: pdf.numPages }, (_, i) => i + 1);
       } finally {
@@ -175,16 +198,66 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
         minimumEditableCharacters
       );
       expect(model.stats.tables).toBeGreaterThanOrEqual(minimumTables);
+      expect(model.stats.ocrPages).toBeLessThanOrEqual(maximumOcrPages);
+      for (const code of requiredReviewCodes)
+        expect(
+          model.issues.some(
+            (issue) => issue.code === code && issue.severity === "review"
+          ),
+          `Missing review notice: ${code}`
+        ).toBe(true);
+      for (const check of expectedColumns) {
+        const page = model.pages.find((page) => page.number === check.page);
+        const groups =
+          page?.groups.filter(
+            (group) => group.columns.length === check.text.length
+          ) ?? [];
+        const normalize = (text: string) =>
+          text.normalize("NFKC").replace(/\s/gu, "");
+        expect(
+          groups.some((group) =>
+            check.text.every((snippets, index) => {
+              const text = normalize(
+                group.columns[index]
+                  .filter((block) => block.kind === "paragraph")
+                  .map(paragraphText)
+                  .join("")
+              );
+              return snippets.every((snippet) =>
+                text.includes(normalize(snippet))
+              );
+            })
+          ),
+          `Missing independent columns on source page ${check.page}`
+        ).toBe(true);
+      }
+      const tables = model.pages
+        .flatMap((p) => p.groups.flatMap((g) => g.columns.flat()))
+        .filter((b) => b.kind === "table");
+      expect(
+        tables.flatMap((t) => t.cells).filter((c) => c.rotation).length
+      ).toBeGreaterThanOrEqual(minimumRotatedCells);
+      expect(
+        Math.max(0, ...tables.map((t) => t.columns.length))
+      ).toBeGreaterThanOrEqual(minimumLargestTableColumns);
       const preservedRegions = observed.pages
         .flatMap((page) => page.figures)
         .filter((figure) => figure.role === "scan-region").length;
       expect(preservedRegions).toBeGreaterThanOrEqual(minimumPreservedRegions);
+      expect(
+        observed.pages
+          .flatMap((page) => page.figures)
+          .filter((figure) => figure.role === "graphic-region").length
+      ).toBeGreaterThanOrEqual(minimumGraphicRegions);
       const blob = await exportDocx(model, { preservePageBreaks: true });
       const zip = await JSZip.loadAsync(await blob.arrayBuffer());
       const xml = await zip.file("word/document.xml")!.async("string");
       expect(xml).not.toContain("w:txbxContent");
       expect(xml).not.toContain("\uFFFD");
       expect(xml).not.toContain("w:vanish");
+      expect(
+        (xml.match(/<w:position w:val="[1-9][\d.]*(?:pt)?"/gu) ?? []).length
+      ).toBeGreaterThanOrEqual(minimumRaisedRuns);
       const parts = await Promise.all(
         Object.values(zip.files)
           .filter((entry) =>
@@ -256,6 +329,10 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       // editable character count cannot prove that those characters are right.
       for (const snippet of expectedText)
         expect(text, `Source text mismatch in ${id}: ${snippet}`).toContain(
+          snippet.normalize("NFKC").replace(/\s/gu, "")
+        );
+      for (const snippet of unexpectedText)
+        expect(text, `Incorrect OCR text in ${id}: ${snippet}`).not.toContain(
           snippet.normalize("NFKC").replace(/\s/gu, "")
         );
     },

@@ -167,6 +167,122 @@ describe("PDF2docx paragraph reconstruction", () => {
 });
 
 describe("PDF2docx geometry and reading order", () => {
+  it("keeps three prose columns in reading order with unequal gutters and spanning text", async () => {
+    const spans = [
+      span("Full width newsletter title", 50, 50, 450, { size: 22 }),
+    ];
+    for (let row = 0; row < 5; row++) {
+      spans.push(span(`First column row ${row}`, 50, 110 + row * 15, 120));
+      spans.push(span(`Second column row ${row}`, 195, 110 + row * 15, 130));
+      spans.push(span(`Third column row ${row}`, 360, 110 + row * 15, 140));
+    }
+    spans.push(span("Full width closing paragraph", 50, 230, 450));
+    const model = analyzeLayout([page(spans)]);
+    expect(model.pages[0].groups.map((g) => g.columns.length)).toEqual([
+      1, 3, 1,
+    ]);
+    const columns = model.pages[0].groups[1];
+    expect(columns.gaps).toEqual([25, 35]);
+    expect(columns.widths).toEqual([120, 130, 140]);
+    for (const [i, label] of ["First", "Second", "Third"].entries()) {
+      const text = columns.columns[i]
+        .filter((b) => b.kind === "paragraph")
+        .map(paragraphText)
+        .join(" ");
+      expect(text).toBe(
+        Array.from(
+          { length: 5 },
+          (_, row) => `${label} column row ${row}`
+        ).join(" ")
+      );
+    }
+    expect(model.issues.filter((i) => i.code === "coverage")).toEqual([]);
+    const doc = await xml(model, true);
+    expect(doc.document).toContain('w:num="3"');
+    expect(doc.document).toContain('w:space="500"');
+    expect(doc.document).toContain('w:space="700"');
+    expect(doc.document.indexOf("First column row 4")).toBeLessThan(
+      doc.document.indexOf("Second column row 0")
+    );
+    expect(doc.document.indexOf("Second column row 4")).toBeLessThan(
+      doc.document.indexOf("Third column row 0")
+    );
+  });
+  it("keeps three short form fields on each row instead of inferring reading columns", () => {
+    const spans = [0, 1, 2, 3].flatMap((row) =>
+      [50, 200, 350].map((x, col) =>
+        span(`Field ${row}-${col}`, x, 70 + row * 40, 80)
+      )
+    );
+    const model = analyzeLayout([page(spans)]);
+    expect(model.pages[0].groups.every((g) => g.columns.length === 1)).toBe(
+      true
+    );
+  });
+  it("separates narrow gutters before joining rows across two prose columns", () => {
+    const spans = [
+      span("Left heading", 50, 50, 244, { size: 24, bold: true }),
+      span("Right opening", 299, 52, 210),
+    ];
+    for (let index = 0; index < 5; index++) {
+      spans.push(span(`Left prose ${index}`, 50, 90 + index * 14, 246));
+      spans.push(span(`Right prose ${index}`, 299, 90 + index * 14, 240));
+    }
+    const model = analyzeLayout([page(spans)]);
+    expect(model.pages[0].groups).toHaveLength(1);
+    const columns = model.pages[0].groups[0].columns;
+    expect(columns).toHaveLength(2);
+    const text = columns.map((column) =>
+      column
+        .filter((block) => block.kind === "paragraph")
+        .map(paragraphText)
+        .join(" ")
+    );
+    expect(text[0]).toContain("Left prose 4");
+    expect(text[0]).not.toContain("Right");
+    expect(text[1]).toContain("Right opening");
+    expect(text[1]).not.toContain("Left");
+    expect(model.issues.filter((issue) => issue.code === "coverage")).toEqual(
+      []
+    );
+  });
+  it("does not turn short paired form fields into narrow reading columns", () => {
+    const spans: TextSpan[] = [];
+    for (let index = 0; index < 5; index++) {
+      spans.push(span(`Label ${index}`, 50, 70 + index * 20, 50));
+      spans.push(span(`Value ${index}`, 104, 70 + index * 20, 55));
+    }
+    const model = analyzeLayout([page(spans)]);
+    expect(
+      model.pages[0].groups.every((group) => group.columns.length === 1)
+    ).toBe(true);
+  });
+  it("ends a list at the body margin while keeping hanging continuation lines", () => {
+    const model = analyzeLayout([
+      page([
+        span("• Wrapped item", 74, 80, 200),
+        span("continued here", 92, 94, 160),
+        span("Following body paragraph", 56, 114, 240),
+        span("1. Numbered item", 74, 144, 200),
+        span("Following explanation", 56, 164, 240),
+      ]),
+    ]);
+    const paragraphs = blocks(model).filter(
+      (block) => block.kind === "paragraph"
+    );
+    expect(paragraphs.map(paragraphText)).toEqual([
+      "• Wrapped item continued here",
+      "Following body paragraph",
+      "1. Numbered item",
+      "Following explanation",
+    ]);
+    expect(paragraphs.map((p) => p.role)).toEqual([
+      "list",
+      "body",
+      "list",
+      "body",
+    ]);
+  });
   it("reads down the left column before the right, including a spanning title", async () => {
     const spans = [
       span("Full width title", 50, 50, 500, { size: 20, bold: true }),
@@ -191,10 +307,77 @@ describe("PDF2docx geometry and reading order", () => {
       doc.document.indexOf("Right 0")
     );
     expect(doc.document).toContain('w:num="2"');
-    expect(doc.document).toContain('w:w="3800"');
-    expect(doc.document).toContain('w:w="4800"');
+    // 14 pt of preset outer whitespace belongs to the outer columns; the
+    // physical text widths remain 190/240 pt and the gutter remains 70 pt.
+    expect(doc.document).toContain('w:w="4080"');
+    expect(doc.document).toContain('w:w="5080"');
     expect(doc.document).toContain('w:type="column"');
   });
+  it("keeps fill-in blanks inside single-column prose", () => {
+    const model = analyzeLayout([
+      page(
+        [
+          ...[50, 66, 82, 98].flatMap((y) => [
+            span("A repeated form label", 50, y, 210),
+            span("continued instruction", 290, y, 210),
+          ]),
+        ],
+        [{ x1: 260, x2: 290, y1: 62, y2: 62 }]
+      ),
+    ]);
+    expect(model.pages[0].groups).toHaveLength(1);
+    expect(model.pages[0].groups[0].columns).toHaveLength(1);
+  });
+
+  it.each([-90, 90] as const)(
+    "exports %s-degree table labels as editable rotated cells",
+    async (rotation) => {
+      const rules = [50, 150, 250]
+        .map((x) => ({ x1: x, x2: x, y1: 50, y2: 250 }))
+        .concat([50, 150, 250].map((y) => ({ x1: 50, x2: 250, y1: y, y2: y })));
+      const model = analyzeLayout([
+        page(
+          [
+            span("Rotated label", 80, 60, 12, { height: 80, rotation }),
+            span("Normal", 160, 60, 60),
+            span("Bottom", 60, 170, 60),
+          ],
+          rules
+        ),
+      ]);
+      const table = blocks(model).find((b) => b.kind === "table")!;
+      expect(table.cells[0].rotation).toBe(rotation);
+      expect(table.cells[0].paragraphs[0].runs[0].width).toBeCloseTo(80);
+      const result = await xml(model, true);
+      expect(result.document).toContain(
+        `w:textDirection w:val="${rotation === -90 ? "btLr" : "tbRl"}"`
+      );
+      expect(result.document).toContain("Rotated label");
+    }
+  );
+
+  it("includes unruled outer columns when repeated row ends and text establish their edges", () => {
+    const rules = [100, 200, 300]
+      .map((x) => ({ x1: x, x2: x, y1: 50, y2: 110 }))
+      .concat(
+        [50, 70, 90, 110].map((y) => ({ x1: 50, x2: 350, y1: y, y2: y }))
+      );
+    const model = analyzeLayout([
+      page(
+        [55, 75, 95].flatMap((y) =>
+          [55, 110, 210, 310].map((x, i) => span(String(i + 1), x, y, 15))
+        ),
+        rules
+      ),
+    ]);
+    const table = blocks(model).find((b) => b.kind === "table")!;
+    expect(table.columns).toHaveLength(4);
+    expect(table.x).toBe(50);
+    expect(table.width).toBe(300);
+    expect(model.stats.paragraphs).toBe(0);
+    expect(table.cells).toHaveLength(12);
+  });
+
   it("reconstructs horizontal and vertical merged table cells without losing text", async () => {
     const rules: Rule[] = [
       { x1: 50, y1: 100, x2: 530, y2: 100 },

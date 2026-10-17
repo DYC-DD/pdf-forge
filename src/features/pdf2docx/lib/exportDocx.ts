@@ -25,6 +25,7 @@ import {
   TableLayoutType,
   TableRow,
   TabStopType,
+  TextDirection,
   TextWrappingType,
   VerticalAlignTable,
   VerticalPositionRelativeFrom,
@@ -188,7 +189,8 @@ class Writer {
     let runs = paragraph.runs.map((run) =>
       this.preserveSourceLines &&
       paragraph.source === "pdf" &&
-      !marker &&
+      (!marker ||
+        paragraph.runs.some((item) => item.tabBefore !== undefined)) &&
       run.sourceLineStart &&
       !run.breakBefore
         ? {
@@ -303,7 +305,7 @@ class Writer {
             },
           })
         ),
-        ...runs.map((run, index) => {
+        ...runs.flatMap((run, index) => {
           const fonts = this.fonts.resolve(run.font);
           let width: number | undefined;
           let fallbackWidth: number | undefined;
@@ -373,8 +375,10 @@ class Writer {
                   fallbackWidth ?? width,
                   this.fonts.measure(run, fonts)
                 );
-          return textRun(
-            run,
+          const value = textRun(
+            run.tabBefore === undefined
+              ? run
+              : { ...run, tabBefore: undefined, breakBefore: false },
             fonts,
             scale,
             paragraph.source === "pdf" &&
@@ -383,6 +387,17 @@ class Writer {
               : undefined,
             ++this.fitId
           );
+          // fitText must only measure glyphs. Including a tab in that same run
+          // makes Word fit the tab advance as text and wrap the next glyphs.
+          return run.tabBefore === undefined
+            ? [value]
+            : [
+                new WordRun({
+                  children: [new Tab()],
+                  break: run.breakBefore ? 1 : undefined,
+                }),
+                value,
+              ];
         }),
       ],
       heading:
@@ -398,11 +413,12 @@ class Writer {
       // Word rejects paragraphs with more than 64 tab definitions. Repeated
       // source rows reuse stops; keep a sorted, unique, bounded definition.
       tabStops: [
-        ...new Set(
-          paragraph.runs
+        ...new Set([
+          ...(listIndent ? [listIndent.left] : []),
+          ...paragraph.runs
             .filter((run) => run.tabBefore !== undefined)
-            .map((run) => twips(run.tabBefore! - left))
-        ),
+            .map((run) => twips(run.tabBefore! - left)),
+        ]),
       ]
         .sort((a, b) => a - b)
         .slice(0, 64)
@@ -560,6 +576,12 @@ class Writer {
                     },
                     columnSpan: cell.columnSpan,
                     rowSpan: cell.rowSpan,
+                    textDirection:
+                      cell.rotation === -90
+                        ? TextDirection.BOTTOM_TO_TOP_LEFT_TO_RIGHT
+                        : cell.rotation === 90
+                          ? TextDirection.TOP_TO_BOTTOM_RIGHT_TO_LEFT
+                          : undefined,
                     borders: table.borderless
                       ? Object.fromEntries(
                           ["top", "bottom"].map((edge) => {
@@ -606,9 +628,16 @@ class Writer {
                                 .slice(0, cell.column)
                                 .reduce((sum, width) => sum + width, 0) +
                               (cell.padding?.left ?? 3),
-                            table.columns
-                              .slice(cell.column, cell.column + cell.columnSpan)
-                              .reduce((sum, width) => sum + width, 0) -
+                            (cell.rotation
+                              ? table.rows.slice(
+                                  cell.row,
+                                  cell.row + cell.rowSpan
+                                )
+                              : table.columns.slice(
+                                  cell.column,
+                                  cell.column + cell.columnSpan
+                                )
+                            ).reduce((sum, width) => sum + width, 0) -
                               (cell.padding?.left ?? 3) -
                               (cell.padding?.right ?? 3)
                           )
@@ -854,12 +883,17 @@ export async function exportDocx(
         const columnWidth =
           group.widths?.[index] ??
           (width - group.gap * (columns - 1)) / columns;
-        if (
+        // Word applies paragraph space-before ahead of an inline column
+        // break, then drops it in the new column. A separate break paragraph
+        // keeps source top spacing on the content paragraph that follows.
+        const separateColumnBreak = Boolean(
           index &&
           (!blocks.length ||
+            blocks[0].before > 1 ||
             blocks[0].kind === "table" ||
             blocks[0].kind === "image-row")
-        )
+        );
+        if (separateColumnBreak)
           children.push(
             new WordParagraph({
               children: [new ColumnBreak()],
@@ -893,11 +927,11 @@ export async function exportDocx(
               block,
               columnWidth,
               columnLeft,
-              index > 0 && blockIndex === 0
+              index > 0 && blockIndex === 0 && !separateColumnBreak
             )
           );
         }
-        columnLeft += columnWidth + group.gap;
+        columnLeft += columnWidth + (group.gaps?.[index] ?? group.gap);
       });
       const last = sections[sections.length - 1];
       const singleContinuation =
@@ -958,7 +992,10 @@ export async function exportDocx(
                             group.widths?.[index] ??
                               (width - group.gap * (columns - 1)) / columns
                           ),
-                          space: index < columns - 1 ? positive(group.gap) : 0,
+                          space:
+                            index < columns - 1
+                              ? positive(group.gaps?.[index] ?? group.gap)
+                              : 0,
                         })
                     )
                   : undefined,

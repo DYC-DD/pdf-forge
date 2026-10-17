@@ -84,7 +84,47 @@ describe.skipIf(!directory)(
           page.groups.flatMap((group) => group.columns.flat())
         );
         const tables = blocks.filter((block) => block.kind === "table");
-        if (id === "w3c-table") {
+        if (id === "w3c-lists") {
+          const paragraphs = blocks.filter(
+            (block) => block.kind === "paragraph"
+          );
+          expect(
+            paragraphs.filter((p) => p.role === "list").map(paragraphText)
+          ).toEqual([
+            "• Rocky High School",
+            "• Moose Middle School",
+            "• Peabody Elementary",
+            "1. Snow-shoeing",
+            "2. Ice-skating",
+            "3. Skiing",
+          ]);
+          expect(
+            paragraphs.filter((p) => p.role === "body").map(paragraphText)
+          ).toContain("The most popular school sports are:");
+        } else if (id === "w3c-columns-oo") {
+          expect(model.pages[0].groups).toHaveLength(1);
+          const columns = model.pages[0].groups[0].columns;
+          expect(columns).toHaveLength(2);
+          const text = columns.map((column) =>
+            column
+              .filter((block) => block.kind === "paragraph")
+              .map(paragraphText)
+              .join("\n")
+          );
+          expect(text[0]).toMatch(/^Application for this and\s+that/);
+          expect(text[0]).toContain("Header One");
+          expect(text[0]).not.toContain("Another");
+          expect(text[1]).toMatch(/^tincidunt consectetur ut vitae ligula\./);
+          expect(text[1]).toContain("Another Header One");
+          expect(text[1]).not.toContain("Nullam a est");
+        } else if (id === "w3c-page-numbers") {
+          expect(
+            model.pages[4].footer?.runs.find((run) => run.pageNumber)?.text
+          ).toBe("1");
+          expect(xml).toContain('<w:pgNumType w:start="1"');
+          for (const label of ["i", "ii", "iii", "iv"])
+            expect(xml).toContain(`>${label}</w:t>`);
+        } else if (id === "w3c-table") {
           expect(tables).toHaveLength(1);
           expect(tables[0].columns).toHaveLength(5);
           expect(tables[0].rows).toHaveLength(5);
@@ -130,6 +170,23 @@ describe.skipIf(!directory)(
           expect(text[1]).toMatch(/^2\. Nulla/);
           expect(text[1]).toContain("Another Header One");
         } else if (id === "tracemonkey") {
+          const diagram = model.pages[1].groups
+            .flatMap((group) => group.columns.flat())
+            .find(
+              (block) =>
+                block.kind === "image" && block.role === "graphic-region"
+            );
+          expect(diagram).toBeDefined();
+          expect(diagram!.width).toBeGreaterThan(150);
+          expect(diagram!.height).toBeGreaterThan(150);
+          const pageText = model.pages[1].groups
+            .flatMap((group) => group.columns.flat())
+            .filter((block) => block.kind === "paragraph")
+            .map(paragraphText)
+            .join(" ");
+          expect(pageText).toContain("Figure 2.");
+          expect(pageText).toContain("Here is the sequence of events");
+          expect(pageText).not.toContain("Symbol Key");
           expect(
             model.pages.every((page) =>
               page.groups.some((group) => group.columns.length === 2)

@@ -3,7 +3,13 @@ import { OPS } from "pdfjs-dist";
 import type { TextSpan } from "../types";
 
 type Operators = { fnArray: ArrayLike<number>; argsArray: any[] };
-type Appearance = { text: string; color: string; bold: boolean; order: number };
+type Appearance = {
+  text: string;
+  color: string;
+  bold: boolean;
+  invisible: boolean;
+  order: number;
+};
 
 export function pdfFontName(name: string): string {
   let value = name.replace(/^[A-Z]{6}\+/, "");
@@ -65,7 +71,13 @@ export function applyTextAppearance(
         .join("")
         .replace(/\s/gu, "");
       if (text)
-        painted.push({ text, color, bold: mode === 1 || mode === 2, order: i });
+        painted.push({
+          text,
+          color,
+          bold: mode === 1 || mode === 2,
+          invisible: mode === 3 || mode === 7,
+          order: i,
+        });
     }
   }
   const stream = painted.map((run) => run.text).join("");
@@ -107,6 +119,8 @@ export function applyTextAppearance(
       span.color = appearances[0].color;
     if (appearances.length && appearances.every((run) => run.bold))
       span.bold = true;
+    if (appearances.length && appearances.every((run) => run.invisible))
+      span.invisible = true;
     if (appearances.length)
       span.paintOrder = Math.max(...appearances.map((run) => run.order));
     let position = start;

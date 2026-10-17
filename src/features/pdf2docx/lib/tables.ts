@@ -83,6 +83,40 @@ export function detectTables(
       hs.map((rule) => (rule.y1 + rule.y2) / 2),
       tolerance
     );
+    // Open outer edges still delimit columns when several row strokes end at
+    // the same x and real text occupies that strip (e.g. a numeric register).
+    // Otherwise only the central grid is claimed and side columns fall below it.
+    if (xs.length >= 3 && ys.length >= 3) {
+      for (const side of ["left", "right"] as const) {
+        const endpoints = hs.map((rule) =>
+          side === "left"
+            ? Math.min(rule.x1, rule.x2)
+            : Math.max(rule.x1, rule.x2)
+        );
+        const edge =
+          side === "left" ? Math.min(...endpoints) : Math.max(...endpoints);
+        const inner = side === "left" ? xs[0] : xs[xs.length - 1];
+        const repeated = new Set(
+          hs
+            .filter((_, i) => Math.abs(endpoints[i] - edge) <= tolerance)
+            .map((rule) => Math.round(rule.y1 / tolerance))
+        ).size;
+        if (
+          (side === "left" ? inner - edge : edge - inner) > bodySize &&
+          repeated >= 3 &&
+          spans.some(
+            (span) =>
+              span.y >= ys[0] &&
+              span.y < ys[ys.length - 1] &&
+              span.x >= Math.min(edge, inner) - 1 &&
+              right(span) <= Math.max(edge, inner) + 1
+          )
+        ) {
+          if (side === "left") xs.unshift(edge);
+          else xs.push(edge);
+        }
+      }
+    }
     // A rectangular border alone is not evidence of a table.
     if (xs.length < 3 || ys.length < 3 || xs.length > 41 || ys.length > 201)
       continue;
@@ -96,7 +130,8 @@ export function detectTables(
     const content = spans
       .filter((span) => containsCenter(box, span))
       .flatMap((span) => {
-        if (!span.advances || span.source !== "pdf") return [span];
+        if (!span.advances || span.source !== "pdf" || span.rotation)
+          return [span];
         const characters = Array.from(span.text);
         let x = span.x,
           start = 0,
@@ -252,38 +287,71 @@ export function detectTables(
             : span
         );
       cellSpans.forEach((span) => localUsed.add(span.id));
+      const rotation =
+        cellSpans[0]?.rotation &&
+        cellSpans.every((span) => span.rotation === cellSpans[0].rotation)
+          ? cellSpans[0].rotation
+          : undefined;
+      // Analyze an upright virtual cell, then let Word rotate the editable
+      // cell. Using physical glyph widths here crushes vertical labels.
+      const textCell = rotation
+        ? { ...cellBox, width: cellBox.height, height: cellBox.width }
+        : cellBox;
+      if (rotation)
+        cellSpans = cellSpans.map((span) => {
+          const x =
+            cellBox.x +
+            (rotation === -90
+              ? cellBox.y + cellBox.height - span.y - span.height
+              : span.y - cellBox.y);
+          const y =
+            cellBox.y +
+            (rotation === -90
+              ? span.x - cellBox.x
+              : cellBox.x + cellBox.width - span.x - span.width);
+          return {
+            ...span,
+            x,
+            y,
+            width: span.height,
+            height: span.width,
+            baseline: y + span.size * 0.8,
+            rotation: undefined,
+          };
+        });
       const padding = {
         left: cellSpans.length
           ? Math.max(
               0,
               Math.min(
                 3,
-                Math.min(...cellSpans.map((span) => span.x)) - cellBox.x
+                Math.min(...cellSpans.map((span) => span.x)) - textCell.x
               )
             )
           : 3,
         right: cellSpans.length
           ? Math.max(
               0,
-              Math.min(3, right(cellBox) - Math.max(...cellSpans.map(right)))
+              Math.min(3, right(textCell) - Math.max(...cellSpans.map(right)))
             )
           : 3,
       };
       const inner = {
-        ...cellBox,
-        x: cellBox.x + padding.left,
-        y: cellBox.y + 3,
-        width: Math.max(1, cellBox.width - padding.left - padding.right),
+        ...textCell,
+        x: textCell.x + padding.left,
+        y: textCell.y + 3,
+        width: Math.max(1, textCell.width - padding.left - padding.right),
       };
       const textBox = bounds(cellSpans);
       const centerDelta = Math.abs(
-        textBox.y + textBox.height / 2 - cellBox.y - cellBox.height / 2
+        textBox.y + textBox.height / 2 - textCell.y - textCell.height / 2
       );
       table.cells.push({
         row,
         column,
         rowSpan,
         columnSpan,
+        rotation,
         padding,
         paragraphs: groupParagraphs(
           buildLines(cellSpans, true),
@@ -295,7 +363,7 @@ export function detectTables(
           ids: [...new Set(paragraph.ids.map((id) => origins.get(id) ?? id))],
           lineHeight: Math.min(
             paragraph.lineHeight,
-            cellBox.height / Math.max(1, paragraph.lineCount ?? 1) -
+            textCell.height / Math.max(1, paragraph.lineCount ?? 1) -
               // Word keeps clearance on both sides of the cell text. Leave
               // room for the frame instead of making every tight row grow.
               2 * (table.border?.thickness ?? 0.5)

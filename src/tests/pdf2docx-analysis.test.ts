@@ -3,7 +3,11 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 import { analyzePdf } from "../features/pdf2docx/lib/analyzePdf";
 import { DOCX_LIMITS } from "../features/pdf2docx/lib/limits";
-import type { AnalyzeOptions, RawPage } from "../features/pdf2docx/types";
+import type {
+  AnalyzeOptions,
+  RawPage,
+  TextSpan,
+} from "../features/pdf2docx/types";
 
 const fixture = vi.hoisted(() => ({
   count: 25,
@@ -11,6 +15,7 @@ const fixture = vi.hoisted(() => ({
   outline: false,
   imageBytes: 1,
   itemCount: 0,
+  spans: [] as TextSpan[],
   destroy: vi.fn(),
   cleanup: vi.fn(),
   workers: [] as {
@@ -39,7 +44,7 @@ vi.mock("../features/pdf2docx/lib/extractPage", () => ({
       width: 595,
       height: 842,
       source: "pdf",
-      spans: [],
+      spans: fixture.spans,
       rules: [],
       figures: [],
       issues: fixture.outline
@@ -102,10 +107,42 @@ beforeEach(() => {
   fixture.outline = false;
   fixture.imageBytes = 1;
   fixture.itemCount = 0;
+  fixture.spans = [];
   fixture.workers = [];
   vi.clearAllMocks();
 });
 const file = new File(["private fixture stub"], "document.pdf");
+
+it("rebuilds a searchable scan instead of printing its invisible text over the bitmap", async () => {
+  fixture.count = 1;
+  fixture.spans = [
+    {
+      id: "search",
+      text: "Existing searchable text",
+      x: 50,
+      y: 50,
+      width: 200,
+      height: 12,
+      baseline: 62,
+      size: 12,
+      font: "Helvetica",
+      bold: false,
+      italic: false,
+      source: "pdf",
+      invisible: true,
+      hidden: true,
+    },
+  ];
+  await analyzePdf(file);
+  expect(fixture.workers).toHaveLength(1);
+  expect(fixture.workers[0].pages).toEqual([1]);
+  fixture.workers = [];
+  const withoutOcr = await analyzePdf(file, undefined, { ocr: "off" });
+  expect(fixture.workers).toHaveLength(0);
+  expect(withoutOcr.issues).toContainEqual(
+    expect.objectContaining({ code: "scan", severity: "error" })
+  );
+});
 
 it("automatically processes all 25 scans with bounded OCR worker lifetimes", async () => {
   const progress = vi.fn();

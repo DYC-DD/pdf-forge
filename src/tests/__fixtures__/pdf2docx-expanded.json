@@ -4,6 +4,7 @@
     "url": "https://www.pcc.gov.tw/upload/Upload/old/oldupload/upload/article/2_c_10_2.pdf",
     "sha256": "ba4e331f5260501a7f3895b5632bbc500d365b47daf5aefb32a377cdf6b209ea",
     "sourcePageCount": 21,
+    "minimumEditableCharacters": 15000,
     "title": "公共工程委員會勞務採購契約範本（歷史版本，僅作格式測試）",
     "expectedText": ["勞務採購契約範本"]
   },
@@ -13,6 +14,8 @@
     "sha256": "2ebf2587c70937d4976eda6df957c2e005e41b85f4cc7ef7bd811caf3eab1ce7",
     "pages": [1, 20, 41, 81, 181, 255],
     "sourcePageCount": 255,
+    "minimumEditableCharacters": 2000,
+    "minimumTables": 5,
     "title": "新竹縣災害防救深耕第3期111年期中報告",
     "expectedText": ["新竹縣災害防救"]
   },
@@ -30,15 +33,165 @@
     "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-ocr/ocr-example.pdf",
     "sha256": "7a161be656c7e82986a1959890eadbdcd0876e15e01b28fd00900190de15eed5",
     "sourcePageCount": 1,
+    "minimumEditableCharacters": 2800,
+    "minimumPreservedRegions": 3,
     "title": "W3C PDF7 OCR recipe example",
-    "expectedText": ["Schnitzelbank Pot"]
+    "expectedText": [
+      "Minnesota Blue",
+      "Pineapple cheese is named after its shape rather than its flavor"
+    ],
+    "unexpectedText": ["Ye pound imported Roquefort"]
   },
   {
     "id": "ntpc-services",
     "url": "https://www-ws.land.ntpc.gov.tw/001/Upload/407/relfile/9040/4016/79a5687c-6891-47b3-bd23-6a57f2cfe28d.pdf",
     "sha256": "2acdc6760bbeb1d954babb9e95d9c2f779e3683890b63e3ecde0338b7e013ea7",
     "sourcePageCount": 25,
+    "minimumEditableCharacters": 8000,
+    "minimumTables": 14,
     "title": "新北市新莊地政事務所地政水電瓦斯好厝邊成果分析報告",
     "expectedText": ["新北市新莊地政事務所"]
+  },
+  {
+    "id": "irs-w4",
+    "title": "IRS W-4 2024（歷史表單，僅作格式測試）",
+    "url": "https://www.irs.gov/pub/irs-prior/fw4--2024.pdf",
+    "sha256": "e60e3af7512073bffbd7ef3c4f3a2fc9593d2aed2e420718d4ccf17659e2c3ed",
+    "sourcePageCount": 4,
+    "minimumEditableCharacters": 16000,
+    "maximumOcrPages": 0,
+    "minimumTables": 4,
+    "minimumLargestTableColumns": 13,
+    "expectedText": [
+      "Employee",
+      "Multiple Jobs Worksheet",
+      "Deductions Worksheet"
+    ]
+  },
+  {
+    "id": "pdflib-invoice",
+    "title": "PDFlib PDF/A-2a invoice with portrait and item table",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/invoice_pdfa2a.pdf",
+    "sha256": "483d83c26546876510481afb2d56b0907075d7eb41859a171888e9dfe33e9569",
+    "sourcePageCount": 1,
+    "minimumEditableCharacters": 650,
+    "expectedText": ["INVOICE", "John Q. Doe", "845.00", "Terms of payment"]
+  },
+  {
+    "id": "pdflib-rotated",
+    "title": "PDFlib table with rotated labels and merged cells",
+    "minimumRotatedCells": 9,
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/table_rotated_text.pdf",
+    "sha256": "07559c8226733b57a2d585d3114f736b0be49eaafd0b43a5188747d4ec7f7ba1",
+    "sourcePageCount": 1,
+    "minimumTables": 1,
+    "expectedText": ["Plane Table", "Description"]
+  },
+  {
+    "id": "pdflib-arabic",
+    "title": "PDFlib Arabic, Persian, digits and Latin in a landscape table",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/arabic_formatting.pdf",
+    "sha256": "1b7751c52931e07afc5a470c4abdffed69575ace14a61335a7e6fb5aea861f12",
+    "sourcePageCount": 1,
+    "minimumTables": 1,
+    "expectedText": ["Arabic formatting topic", "European digits", "0123456789"]
+  },
+  {
+    "id": "pdflib-multipage-table",
+    "title": "PDFlib 跨頁表格、重複表頭與合併儲存格",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/starter_table.pdf",
+    "sourcePageCount": 2,
+    "expectedText": [
+      "Table header (row 1)",
+      "Col 1/Row 4",
+      "Col 4/Row 41",
+      "Col 1/Row 50"
+    ],
+    "sha256": "fd4fd1a49c71e0c8c2663c89df0125c2411018ea7708ab7cb39eadf0a51238ad",
+    "minimumEditableCharacters": 2200,
+    "minimumTables": 2,
+    "qualityNotes": "兩頁原生可編輯表格；照片標籤、標誌、斜向文字與已填值欄位局部保留影像，需核對相對位置。",
+    "maximumOcrPages": 0,
+    "minimumGraphicRegions": 4,
+    "requiredReviewCodes": ["annotation-region"]
+  },
+  {
+    "id": "pdflib-footnotes",
+    "title": "PDFlib 上標註腳及跳轉連結",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/footnotes_in_text.pdf",
+    "sourcePageCount": 1,
+    "expectedText": [
+      "Our paper planes",
+      "For more information, see www.kraxi.com."
+    ],
+    "sha256": "b24187ae3326238da89ff5102a9e6822c02696f166887c731350fb17a3750cae",
+    "minimumEditableCharacters": 650,
+    "maximumOcrPages": 0,
+    "minimumRaisedRuns": 4
+  },
+  {
+    "id": "ams-formulas",
+    "title": "AMS LaTeX 公式、矩陣、分式及原始碼",
+    "url": "https://tug.ctan.org/macros/latex/required/amsmath/testmath.pdf",
+    "sourcePageCount": 41,
+    "pages": [3, 24, 26],
+    "expectedText": ["Theorem 3.3.", "Corollary 3.4."],
+    "sha256": "2cfed881f790c42e4d36e1f18fde4c949186c41af64f8630199cec97d39f7f34",
+    "minimumEditableCharacters": 2900,
+    "maximumOcrPages": 0,
+    "qualityNotes": "內容片段可讀不等於公式正確；矩陣與大型運算子位置未通過目視核對，3 頁轉成 4 頁。"
+  },
+  {
+    "id": "mydraw-newsletter",
+    "title": "MyDraw 三欄圖文電子報",
+    "url": "https://www.mydraw.com/_author/res/Downloads/Templates/FlyersAndCertificates/Newsletter/SimpleNewsletterDesign.pdf",
+    "sourcePageCount": 1,
+    "expectedText": ["Newsletter", "email@company.com"],
+    "sha256": "73d176851134db1d3dfd07557b29de9f114b23828bc8dc12d8f86bbcff0ca69e",
+    "minimumEditableCharacters": 2000,
+    "maximumOcrPages": 0,
+    "expectedColumns": [
+      {
+        "page": 1,
+        "text": [
+          [
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Ut at erat nec eros aliquam efficitur et eu turpis."
+          ],
+          [
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Ut at erat nec eros aliquam efficitur et eu turpis."
+          ],
+          [
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Ut at erat nec eros aliquam efficitur et eu turpis."
+          ]
+        ]
+      }
+    ],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Lorem ipsum dolor sit amet,",
+        "occurrences": 3,
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "email@company.com",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "cpc-vertical",
+    "title": "中油歷史刊物直排中文雙頁掃描",
+    "url": "https://ws.cpc.com.tw/CPCDA/Files/G254.pdf",
+    "sourcePageCount": 132,
+    "pages": [88],
+    "expectedText": [],
+    "sha256": "95c2a728100a9c241fdcd32ef6837bd49372d8799bab1724b8c5f8b5efbce489",
+    "requiredReviewCodes": ["scan-fallback"],
+    "qualityNotes": "第 88 頁是印刷頁碼 162–163 的直排雙頁掃描；目前只保留影像、0 可編輯字元，不算可編輯轉換成功。"
   }
 ]

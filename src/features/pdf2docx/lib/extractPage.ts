@@ -1,6 +1,7 @@
 import { OPS, type PDFPageProxy } from "pdfjs-dist";
 
 import type { Box, Issue, RawPage, Rule, TextSpan } from "../types";
+import { diagramGraphics } from "./diagramGraphics";
 import { framedGraphics } from "./framedGraphics";
 import {
   bottom,
@@ -19,6 +20,7 @@ import { applyTextAppearance, pdfFontName } from "./textAppearance";
 
 type Matrix = [number, number, number, number, number, number];
 type ImagePlacement = Box & {
+  overlay?: boolean;
   blendMode?: string;
   textOperations?: number[];
   vectorOperations?: number[];
@@ -132,6 +134,9 @@ export async function extractPage(
       ),
     };
     raw.spans.push(span);
+    const rotation = (Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI;
+    if (Math.abs(Math.abs(rotation) - 90) < 1)
+      span.rotation = rotation < 0 ? -90 : 90;
     angles.set(
       span.id,
       Math.abs((Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI)
@@ -200,11 +205,71 @@ export async function extractPage(
     );
   const annotations = await page.getAnnotations({ intent: "display" });
   checkAbort(signal);
+  const isolatedFields = new Map<(typeof annotations)[number], Box>();
+  const visibleText = raw.spans.filter(
+    (span) => !span.invisible && span.text.trim()
+  );
+  if (visibleText.reduce((sum, span) => sum + span.text.length, 0) >= 100) {
+    for (const annotation of annotations) {
+      if (
+        annotation.subtype !== "Widget" ||
+        annotation.fieldType !== "Tx" ||
+        !String(annotation.fieldValue ?? "").trim() ||
+        !Array.isArray(annotation.rect) ||
+        annotation.rect.length !== 4 ||
+        !annotation.rect.every(Number.isFinite)
+      )
+        continue;
+      const [x1, y1, x2, y2] = annotation.rect;
+      const box = transformedBox(viewport.transform, {
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1),
+      });
+      // Preserve the visible appearance of a small, isolated field. A value
+      // in one cell must not discard a whole page of native editable text.
+      if (
+        box.width > 3 &&
+        box.height > 3 &&
+        box.width * box.height <= raw.width * raw.height * 0.05 &&
+        box.height <= raw.height * 0.2 &&
+        box.x >= 0 &&
+        box.y >= 0 &&
+        right(box) <= raw.width &&
+        bottom(box) <= raw.height &&
+        !visibleText.some(
+          (span) =>
+            span.x < right(box) &&
+            right(span) > box.x &&
+            span.y < bottom(box) &&
+            bottom(span) > box.y
+        )
+      )
+        isolatedFields.set(annotation, box);
+    }
+  }
+  if (isolatedFields.size)
+    issue(
+      "annotation-region",
+      "已保留局部表單欄位的原稿外觀；欄位內容為圖片，周圍文字仍可編輯，請核對相對位置。"
+    );
   if (
     annotations.some(
       (annotation) =>
         annotation.subtype === "FreeText" ||
-        (annotation.subtype === "Widget" && annotation.fieldValue)
+        (annotation.subtype === "Widget" &&
+          !isolatedFields.has(annotation) &&
+          // An unchecked PDF checkbox stores the name Off. It has no visible
+          // value to recover and must not send an otherwise native form to OCR.
+          !(
+            annotation.fieldType === "Btn" && annotation.fieldValue === "Off"
+          ) &&
+          (Array.isArray(annotation.fieldValue)
+            ? annotation.fieldValue.some((value: unknown) =>
+                String(value).trim()
+              )
+            : String(annotation.fieldValue ?? "").trim()))
     )
   )
     issue(
@@ -490,16 +555,18 @@ export async function extractPage(
   // Some PDFs retain template text beneath a later opaque rectangle. Reading
   // that hidden text would invent content that is absent from the visible page.
   for (const span of raw.spans) {
-    span.hidden = raw.fills!.some(
-      (fill) =>
-        fill.opaque &&
-        span.paintOrder !== undefined &&
-        fill.paintOrder! > span.paintOrder &&
-        fill.x <= span.x + 0.5 &&
-        fill.y <= span.y + 0.5 &&
-        right(fill) >= right(span) - 0.5 &&
-        bottom(fill) >= bottom(span) - 0.5
-    );
+    span.hidden =
+      span.invisible ||
+      raw.fills!.some(
+        (fill) =>
+          fill.opaque &&
+          span.paintOrder !== undefined &&
+          fill.paintOrder! > span.paintOrder &&
+          fill.x <= span.x + 0.5 &&
+          fill.y <= span.y + 0.5 &&
+          right(fill) >= right(span) - 0.5 &&
+          bottom(fill) >= bottom(span) - 0.5
+      );
     if (/Wingdings/iu.test(span.font) && span.text === "l") span.text = "●";
   }
   const { tables } = detectTables(
@@ -517,6 +584,14 @@ export async function extractPage(
     raw,
     [...imageBoxes, ...vectors.map((v) => v.box)],
     tables
+  );
+  charts.push(
+    ...diagramGraphics(
+      raw,
+      [...imageBoxes, ...vectors.map((v) => v.box)],
+      tables,
+      charts
+    )
   );
   if (charts.length) {
     raw.spans.forEach((span) => {
@@ -551,8 +626,68 @@ export async function extractPage(
       "info"
     );
   }
+  // Word paints a cell's shading over behind-text artwork, while an opaque
+  // foreground photo hides editable lettering on that photo. Preserve only
+  // small illustrated cells as one crop, keeping the surrounding grid native.
+  const illustratedCells: Box[] = [];
+  for (const table of tables) {
+    for (const cell of table.cells) {
+      const box = {
+        x:
+          table.x +
+          table.columns.slice(0, cell.column).reduce((a, b) => a + b, 0),
+        y: table.y + table.rows.slice(0, cell.row).reduce((a, b) => a + b, 0),
+        width: table.columns
+          .slice(cell.column, cell.column + cell.columnSpan)
+          .reduce((a, b) => a + b, 0),
+        height: table.rows
+          .slice(cell.row, cell.row + cell.rowSpan)
+          .reduce((a, b) => a + b, 0),
+      };
+      if (box.width * box.height > raw.width * raw.height * 0.05) continue;
+      const labels = raw.spans.filter(
+        (span) => !span.hidden && containsCenter(box, span)
+      );
+      if (labels.reduce((sum, span) => sum + span.text.length, 0) > 80)
+        continue;
+      const artwork =
+        imageBoxes.some(
+          (image) => !image.textOperations && containsBox(box, image, 1)
+        ) ||
+        vectors.some((v) => containsBox(box, v.box, 1)) ||
+        labels.some((span) => {
+          const angle = angles.get(span.id) ?? 0;
+          return angle > 10 && angle < 80;
+        });
+      if (!artwork) continue;
+      illustratedCells.push(box);
+      labels.forEach((span) => {
+        span.rasterized = true;
+      });
+    }
+  }
+  if (illustratedCells.length) {
+    for (let i = imageBoxes.length - 1; i >= 0; i--)
+      if (illustratedCells.some((box) => containsBox(box, imageBoxes[i], 1)))
+        imageBoxes.splice(i, 1);
+    imageBoxes.push(
+      ...illustratedCells.map((box) => ({
+        ...box,
+        fullContent: true,
+        overlay: true,
+      }))
+    );
+    issue(
+      "table-artwork",
+      "表格中的局部圖像、標籤與斜向文字已保留原稿外觀；其他儲存格仍可編輯。",
+      "info"
+    );
+  }
   const remainingVectors = vectors.filter(
-    (v) => !charts.some((box) => containsBox(box, v.box, 2))
+    (v) =>
+      ![...charts, ...illustratedCells].some((box) =>
+        containsBox(box, v.box, 2)
+      )
   );
   if (remainingVectors.length)
     imageBoxes.push({
@@ -560,6 +695,29 @@ export async function extractPage(
       vectorOperations: remainingVectors.map((entry) => entry.index),
       behindText: true,
     });
+  for (const annotation of annotations) {
+    const field = isolatedFields.get(annotation);
+    if (field) {
+      imageBoxes.push({ ...field, fullContent: true, overlay: true });
+      continue;
+    }
+    if (
+      annotation.subtype !== "Widget" ||
+      annotation.fieldType !== "Btn" ||
+      annotation.fieldValue !== "Off" ||
+      !Array.isArray(annotation.rect)
+    )
+      continue;
+    const [x1, y1, x2, y2] = annotation.rect;
+    const box = transformedBox(viewport.transform, {
+      x: Math.min(x1, x2),
+      y: Math.min(y1, y2),
+      width: Math.abs(x2 - x1),
+      height: Math.abs(y2 - y1),
+    });
+    if (box.width > 0 && box.height > 0)
+      imageBoxes.push({ ...box, fullContent: true, overlay: true });
+  }
   return {
     raw,
     imageBoxes: imageBoxes.filter((box) => box.width > 3 && box.height > 3),
@@ -1033,10 +1191,11 @@ export async function captureFigures(
               : undefined,
           inFooter: box.inFooter,
           overlay:
-            !box.fullContent &&
-            (!!box.textOperations ||
-              !!box.vectorOperations ||
-              raw.spans.some((span) => containsCenter(box, span))),
+            box.overlay ||
+            (!box.fullContent &&
+              (!!box.textOperations ||
+                !!box.vectorOperations ||
+                raw.spans.some((span) => containsCenter(box, span)))),
           behindText:
             stamp ||
             !!box.textOperations ||

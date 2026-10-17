@@ -17,6 +17,11 @@ export type TextSpan = Box & {
   underline?: boolean;
   decorative?: boolean;
   hidden?: boolean;
+  /** PDF text rendering mode 3 or 7: searchable/clipping text, not painted. */
+  invisible?: boolean;
+  /** OCR and the existing searchable layer disagree; preserve the source pixels. */
+  sourceMismatch?: boolean;
+  rotation?: -90 | 90;
   paintOrder?: number;
   rasterized?: boolean;
   advances?: number[];
@@ -99,6 +104,7 @@ export type Paragraph = Box & {
   floatingImages?: ImageBlock[];
 };
 export type TableCellModel = {
+  rotation?: -90 | 90;
   row: number;
   column: number;
   rowSpan: number;
@@ -135,6 +141,8 @@ export type FlowBlock =
 export type FlowGroup = {
   columns: FlowBlock[][];
   gap: number;
+  /** Individual gutters for layouts with unequal column spacing. */
+  gaps?: number[];
   widths?: number[];
 };
 export type PageModel = {

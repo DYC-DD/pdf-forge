@@ -61,10 +61,10 @@ type MarginEvidence = Partial<PageModel["margins"]> & {
   reliableWidth: boolean;
 };
 
-// OCR boxes describe ink, while Word lays out complete lines and table rows.
+// Source boxes describe ink, while Word lays out complete lines and table rows.
 // Allow that measured flow to use the blank bottom margin without shrinking
 // type or clipping a table cell merely to hit the source page count.
-function scanFlowBottom(page: PageModel): number {
+function measuredFlowBottom(page: PageModel): number {
   let cursor = page.margins.top;
   const leading = page.groups
     .flatMap((g) => g.columns.flat())
@@ -152,7 +152,9 @@ function marginEvidence(page: PageModel): MarginEvidence {
   const rightEdges = [...wide, ...columnEdges].map(right);
   const first = Math.min(...blocks.map((block) => block.y));
   const last = Math.max(
-    ...(page.source === "ocr" ? [scanFlowBottom(page) + 4] : []),
+    ...(page.source === "ocr" || tables.length
+      ? [measuredFlowBottom(page) + 4]
+      : []),
     // A centered continuation marker still occupies the bottom of the page.
     // Alignment can weaken width evidence, never the required writing height.
     ...blocks.map((block) =>
@@ -386,9 +388,13 @@ export function applyPageSetup(
                       .reduce((sum, value) => sum + value, 0)) *
                     sx +
                     (cell.padding?.left ?? 3) * sx,
-                  block.columns
-                    .slice(cell.column, cell.column + cell.columnSpan)
-                    .reduce((sum, value) => sum + value, 0) *
+                  (cell.rotation
+                    ? block.rows.slice(cell.row, cell.row + cell.rowSpan)
+                    : block.columns.slice(
+                        cell.column,
+                        cell.column + cell.columnSpan
+                      )
+                  ).reduce((sum, value) => sum + value, 0) *
                     sx -
                     ((cell.padding?.left ?? 3) + (cell.padding?.right ?? 3)) *
                       sx
@@ -427,14 +433,24 @@ export function applyPageSetup(
       let sourceLeft = page.margins.left,
         targetLeft = output.margins.left;
       const width = output.width - output.margins.left - output.margins.right;
+      const columnWidths = group.widths?.map(
+        (value, index) =>
+          value * sx +
+          (index === 0 ? page.margins.left * sx - output.margins.left : 0) +
+          (index === group.columns.length - 1
+            ? page.margins.right * sx - output.margins.right
+            : 0)
+      );
+      // Keep physical gutter positions when a familiar margin preset adds
+      // outer whitespace. Otherwise each image loses the added indent from
+      // its width, and the following column starts too far to the left.
       return {
         ...group,
         gap: group.gap * sx,
-        widths: group.widths?.map((value) => value * sx),
+        gaps: group.gaps?.map((value) => value * sx),
+        widths: columnWidths,
         columns: group.columns.map((blocks, index) => {
-          const availableWidth = group.widths?.[index]
-            ? group.widths[index] * sx
-            : width;
+          const availableWidth = columnWidths?.[index] ?? width;
           const mapped = blocks.map((block) =>
             map(
               block,
@@ -445,8 +461,9 @@ export function applyPageSetup(
                 page.width - page.margins.left - page.margins.right
             )
           );
-          sourceLeft += (group.widths?.[index] ?? width) + group.gap;
-          targetLeft += availableWidth + group.gap * sx;
+          const gutter = group.gaps?.[index] ?? group.gap;
+          sourceLeft += (group.widths?.[index] ?? width) + gutter;
+          targetLeft += availableWidth + gutter * sx;
           return mapped;
         }),
       };

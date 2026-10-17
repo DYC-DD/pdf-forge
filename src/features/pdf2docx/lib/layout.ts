@@ -181,7 +181,7 @@ function findColumnGap(
       const start = right(left),
         end = rightLine.x;
       if (
-        end - start >= Math.max(18, size * 1.5) &&
+        end - start >= Math.max(3, size * 0.25) &&
         start > region.x + region.width * 0.2 &&
         end < right(region) - region.width * 0.2
       )
@@ -190,6 +190,18 @@ function findColumnGap(
   }
   let best: { gap: [number, number]; score: number } | undefined;
   for (const gap of candidates.values()) {
+    // A short rule joining both sides is a fill-in blank within a source row,
+    // not a column gutter. Full-width section separators do not count.
+    if (
+      nodes.some(
+        (node) =>
+          node.kind === "rule" &&
+          node.width < region.width * 0.65 &&
+          node.x <= gap[0] + 2 &&
+          right(node) >= gap[1] - 2
+      )
+    )
+      continue;
     const left = narrow.filter((line) => right(line) <= gap[0] + 1);
     const rightLines = narrow.filter((line) => line.x >= gap[1] - 1);
     if (left.length < 2 || rightLines.length < 2) continue;
@@ -250,21 +262,71 @@ function findColumnGap(
 }
 
 function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
-  let gap = findColumnGap(nodes, region, bodySize);
+  // A narrow gutter can be smaller than an ordinary word space. Probe actual
+  // span boundaries before inferring columns; otherwise joined left/right rows
+  // hide the gutter and masquerade as full-width headings. Keep the original
+  // nodes unless both sides establish independent prose in findColumnGap.
+  const candidates = nodes
+    .flatMap<Node>((node) => {
+      if (node.kind !== "line") return [node];
+      const groups: (typeof node.spans)[] = [];
+      let edge = -Infinity;
+      for (const span of node.spans) {
+        const group = groups[groups.length - 1];
+        if (!group || span.x - edge >= Math.max(3, bodySize * 0.25)) {
+          groups.push([span]);
+          edge = right(span);
+        } else {
+          group.push(span);
+          edge = Math.max(edge, right(span));
+        }
+      }
+      return groups.flatMap((spans) => buildLines(spans, true));
+    })
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  let gap = findColumnGap(candidates, region, bodySize);
   if (!gap) return [{ columns: [flow(nodes, region, bodySize)], gap: 0 }];
+  // A page can have more than two independent reading columns. Search inside
+  // each established side; spanning titles are excluded from that local probe.
+  const collectGaps = (
+    entries: Node[],
+    box: Box,
+    depth = 0
+  ): [number, number][] => {
+    const found = findColumnGap(entries, box, bodySize);
+    if (!found || depth >= 2) return [];
+    const left = { ...box, width: found[0] - box.x };
+    const rightBox = { ...box, x: found[1], width: right(box) - found[1] };
+    return [
+      ...collectGaps(
+        entries.filter((n) => right(n) <= found[0] + 1),
+        left,
+        depth + 1
+      ),
+      found,
+      ...collectGaps(
+        entries.filter((n) => n.x >= found[1] - 1),
+        rightBox,
+        depth + 1
+      ),
+    ];
+  };
+  const extraGaps = collectGaps(candidates, region);
+  if (extraGaps.length > 1)
+    return multiColumnGroups(nodes, region, bodySize, extraGaps);
   // Long source rows can narrow an established gutter below buildLines' wide
   // gap threshold. Split those rows at their actual span boundary before
-  // treating them as full-width headings. Never cut a span or a larger title.
+  // treating them as full-width headings. Never cut an individual text span.
   const rightEdge = gap[1];
   nodes = nodes
-    .flatMap((node) => {
-      if (node.kind !== "line" || node.size > bodySize * 1.25) return [node];
+    .flatMap<Node>((node) => {
+      if (node.kind !== "line") return [node];
       const left = node.spans.filter((span) => span.x < rightEdge - 2);
       const rightSpans = node.spans.filter((span) => span.x >= rightEdge - 2);
       if (
         !left.length ||
         !rightSpans.length ||
-        right(bounds(left)) + Math.max(12, bodySize * 0.6) >
+        right(bounds(left)) + Math.max(3, bodySize * 0.25) >
           bounds(rightSpans).x
       )
         return [node];
@@ -273,11 +335,26 @@ function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
     .sort((a, b) => a.y - b.y || a.x - b.x);
   gap = findColumnGap(nodes, region, bodySize) ?? gap;
   const [leftEnd, rightStart] = gap;
+  const crossingRows = nodes.filter(
+    (node) =>
+      node.kind === "line" &&
+      ((node.x < rightStart - Math.max(2, bodySize * 0.3) &&
+        right(node) > leftEnd + Math.max(2, bodySize * 0.3)) ||
+        // Dotted leaders connect a label and its field/value in the same row.
+        /(?:\.\s*){4}/u.test(node.spans.map((span) => span.text).join("")))
+  );
   const crossing = nodes
     .filter(
       (node) =>
-        node.x < rightStart - Math.max(2, bodySize * 0.3) &&
-        right(node) > leftEnd + Math.max(2, bodySize * 0.3)
+        (node.x < rightStart - Math.max(2, bodySize * 0.3) &&
+          right(node) > leftEnd + Math.max(2, bodySize * 0.3)) ||
+        (node.kind === "line" &&
+          crossingRows.some(
+            (row) =>
+              row.kind === "line" &&
+              Math.abs(row.baseline - node.baseline) <
+                Math.max(row.size, node.size) * 0.4
+          ))
     )
     .sort((a, b) => a.y - b.y);
   const remaining = new Set(nodes.filter((node) => !crossing.includes(node)));
@@ -354,7 +431,117 @@ function pageGroups(nodes: Node[], region: Box, bodySize: number): FlowGroup[] {
         : bottom(last);
   }
   band(bottom(region) + 1);
-  return groups;
+  // A ruled form can alternate spanning text and isolated field rules many
+  // times. Adjacent single-column bands need no new Word section; its terminal
+  // paragraph would otherwise add height on every field row.
+  const compact: FlowGroup[] = [];
+  for (const group of groups) {
+    const previous = compact[compact.length - 1];
+    if (previous?.columns.length === 1 && group.columns.length === 1)
+      previous.columns[0].push(...group.columns[0]);
+    else compact.push(group);
+  }
+  return compact;
+}
+
+function multiColumnGroups(
+  nodes: Node[],
+  region: Box,
+  bodySize: number,
+  gaps: [number, number][]
+): FlowGroup[] {
+  // Pictures can be slightly wider than the text below them. Let them use
+  // the gutter without misclassifying the picture as a spanning page heading.
+  gaps = gaps.map(([start, end]) => [
+    Math.max(
+      start,
+      ...nodes
+        .filter((n) => n.kind === "image" && n.x < start && right(n) < end - 3)
+        .map(right)
+    ),
+    end,
+  ]);
+  const edges = [region.x, ...gaps.map((g) => g[1])];
+  const ends = [...gaps.map((g) => g[0]), right(region)];
+  const split = nodes
+    .flatMap<Node>((node) => {
+      if (node.kind !== "line") return [node];
+      const parts = edges.map((_, i) =>
+        node.spans.filter(
+          (s) =>
+            s.x >= edges[i] - 2 &&
+            (i === edges.length - 1 || s.x < edges[i + 1] - 2)
+        )
+      );
+      // Do not split a title whose glyphs actually cross a gutter.
+      if (
+        parts.some(
+          (spans, i) =>
+            spans.length &&
+            i < gaps.length &&
+            right(bounds(spans)) > gaps[i][1] - 3
+        )
+      )
+        return [node];
+      return parts.flatMap((spans) => buildLines(spans, true));
+    })
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  const spanning = split.filter((n) =>
+    gaps.some(([a, b]) => n.x < b - 2 && right(n) > a + 2)
+  );
+  const remaining = new Set(split.filter((n) => !spanning.includes(n)));
+  const result: FlowGroup[] = [];
+  let cursor = region.y;
+  const band = (end: number) => {
+    const entries = [...remaining].filter((n) => n.y < end);
+    if (!entries.length) return;
+    entries.forEach((n) => remaining.delete(n));
+    result.push({
+      columns: edges.map((x, i) =>
+        flow(
+          entries.filter((n) => {
+            const center = n.x + n.width / 2;
+            return (
+              (i === 0 || center >= (gaps[i - 1][0] + gaps[i - 1][1]) / 2) &&
+              (i === gaps.length || center < (gaps[i][0] + gaps[i][1]) / 2)
+            );
+          }),
+          { x, y: cursor, width: ends[i] - x, height: end - cursor },
+          bodySize
+        )
+      ),
+      widths: edges.map((x, i) => ends[i] - x),
+      gap: gaps[0][1] - gaps[0][0],
+      gaps: gaps.map(([a, b]) => b - a),
+    });
+    cursor = Math.max(
+      cursor,
+      ...entries.map((n) =>
+        n.kind === "line" ? n.y + Math.max(n.height, n.size * 1.25) : bottom(n)
+      )
+    );
+  };
+  for (let i = 0; i < spanning.length; i++) {
+    const entry = spanning[i];
+    band(entry.y);
+    const fullWidth = [entry];
+    while (
+      i + 1 < spanning.length &&
+      ![...remaining].some((n) => n.y < spanning[i + 1].y)
+    )
+      fullWidth.push(spanning[++i]);
+    result.push({
+      columns: [flow(fullWidth, { ...region, y: cursor }, bodySize)],
+      gap: 0,
+    });
+    const last = fullWidth[fullWidth.length - 1];
+    cursor =
+      last.kind === "line"
+        ? last.y + Math.max(last.height, last.size * 1.25)
+        : bottom(last);
+  }
+  band(bottom(region) + 1);
+  return result;
 }
 
 export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
@@ -507,7 +694,7 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
         page: page.number,
         code: "columns",
         severity: "review",
-        message: "已辨識雙欄，請核對閱讀順序與欄位分界。",
+        message: `已辨識 ${Math.max(...groups.map((group) => group.columns.length))} 欄，請核對閱讀順序與欄位分界。`,
       });
     const characters = spans.reduce(
       (sum, span) => sum + span.text.replace(/\s/gu, "").length,

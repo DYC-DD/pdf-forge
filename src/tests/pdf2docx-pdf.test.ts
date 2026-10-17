@@ -15,7 +15,9 @@ import {
   pushGraphicsState,
   rectangle,
   rgb,
+  setTextRenderingMode,
   StandardFonts,
+  TextRenderingMode,
   translate,
 } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -110,6 +112,58 @@ it("isolates image paint after PDF.js optimizes preceding path operations", asyn
     );
   } finally {
     if (isolated) isolated.width = isolated.height = 0;
+    await task.destroy();
+  }
+});
+
+it("keeps lettering on a photo in a small table cell while retaining native neighboring cells", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([600, 800]);
+  for (const x of [40, 220, 400])
+    page.drawLine({ start: { x, y: 400 }, end: { x, y: 600 }, thickness: 1 });
+  for (const y of [400, 500, 600])
+    page.drawLine({ start: { x: 40, y }, end: { x: 400, y }, thickness: 1 });
+  const bitmap = createCanvas(100, 60);
+  const ctx = bitmap.getContext("2d");
+  ctx.fillStyle = "#0066aa";
+  ctx.fillRect(0, 0, 100, 60);
+  const picture = await pdf.embedPng(bitmap.toBuffer("image/png"));
+  page.drawImage(picture, { x: 240, y: 520, width: 100, height: 60 });
+  page.drawText("PHOTO", { x: 250, y: 540, size: 14, color: rgb(1, 1, 1) });
+  page.drawText("Editable neighboring cell", { x: 50, y: 550, size: 12 });
+  page.drawText("Editable lower row", { x: 50, y: 450, size: 12 });
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "table-photo.pdf")
+  );
+  try {
+    const source = await (await task.promise).getPage(1);
+    const { raw, imageBoxes } = await extractPage(source);
+    expect(raw.spans.find((s) => s.text === "PHOTO")?.rasterized).toBe(true);
+    expect(
+      raw.spans.find((s) => s.text === "Editable neighboring cell")?.rasterized
+    ).not.toBe(true);
+    const crop = imageBoxes.find((box) => box.fullContent && box.x === 220);
+    expect(crop).toMatchObject({ width: 180, height: 100, overlay: true });
+    await captureFigures(source, raw, imageBoxes);
+    const figure = raw.figures.find((f) => f.x === 220)!;
+    const decoded = await loadImage(figure.data);
+    const canvas = createCanvas(decoded.width, decoded.height);
+    const context = canvas.getContext("2d");
+    context.drawImage(decoded, 0, 0);
+    const scale = canvas.width / figure.width;
+    // Inspect only the blue photo, excluding its white cell background.
+    const pixels = context.getImageData(
+      21 * scale,
+      21 * scale,
+      98 * scale,
+      58 * scale
+    ).data;
+    let white = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i] > 230 && pixels[i + 1] > 230 && pixels[i + 2] > 230)
+        white++;
+    expect(white).toBeGreaterThan(30);
+  } finally {
     await task.destroy();
   }
 });
@@ -503,6 +557,36 @@ describe("PDF2docx with real PDF.js input", () => {
       expect.objectContaining({ code: "text-direction", severity: "review" })
     );
   });
+  it.each([false, true])(
+    "only requires OCR for a checkbox when checked=%s",
+    async (checked) => {
+      const pdf = await PDFDocument.create();
+      const page = pdf.addPage([300, 300]);
+      page.drawText("Editable form label", { x: 40, y: 250, size: 12 });
+      const box = pdf.getForm().createCheckBox("choice");
+      box.addToPage(page, { x: 40, y: 200, width: 12, height: 12 });
+      if (checked) box.check();
+      const model = await analyzePdf(
+        new File([new Uint8Array(await pdf.save())], "checkbox.pdf"),
+        undefined,
+        { ocr: "off" }
+      );
+      expect(model.issues.some((issue) => issue.code === "annotations")).toBe(
+        checked
+      );
+      expect(model.stats.ocrPages).toBe(0);
+      expect(model.stats.characters).toBeGreaterThan(10);
+      if (!checked) {
+        expect(model.stats.images).toBeGreaterThanOrEqual(1);
+        expect(model.pages[0].overlays).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ overlay: true, width: 12, height: 12 }),
+          ])
+        );
+      }
+    }
+  );
+
   it("detects visible form values missing from the PDF text layer", async () => {
     const pdf = await PDFDocument.create(),
       page = pdf.addPage();
@@ -522,6 +606,56 @@ describe("PDF2docx with real PDF.js input", () => {
       exportDocx(model, { preservePageBreaks: false })
     ).rejects.toThrow("完整讀取");
   });
+  it.each([false, true])(
+    "preserves only isolated text-field appearances beside native prose (overlap=%s)",
+    async (overlap) => {
+      const pdf = await PDFDocument.create();
+      const page = pdf.addPage([600, 800]);
+      for (let row = 0; row < 4; row++)
+        page.drawText(
+          `Native editable paragraph ${row} with enough visible text to retain.`,
+          { x: 50, y: 700 - row * 20, size: 12 }
+        );
+      const field = pdf.getForm().createTextField("small-note");
+      field.setText("Field value");
+      field.addToPage(page, {
+        x: 50,
+        y: overlap ? 690 : 550,
+        width: 120,
+        height: 24,
+      });
+      const model = await analyzePdf(
+        new File([new Uint8Array(await pdf.save())], "native-field.pdf"),
+        [1],
+        { ocr: "off" }
+      );
+      expect(model.issues.some((issue) => issue.code === "annotations")).toBe(
+        overlap
+      );
+      expect(model.stats.characters).toBeGreaterThan(200);
+      if (!overlap) {
+        expect(model.issues).toContainEqual(
+          expect.objectContaining({
+            code: "annotation-region",
+            severity: "review",
+          })
+        );
+        expect(model.pages[0].overlays).toContainEqual(
+          expect.objectContaining({ overlay: true, width: 121, height: 25 })
+        );
+        const blob = await exportDocx(model, { preservePageBreaks: true });
+        const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+        expect(await zip.file("word/document.xml")!.async("string")).toContain(
+          "Native editable paragraph 3"
+        );
+        expect(
+          Object.keys(zip.files).some(
+            (name) => name.startsWith("word/media/") && !zip.files[name].dir
+          )
+        ).toBe(true);
+      }
+    }
+  );
   it("rejects oversize input, invalid ranges and already cancelled work", async () => {
     const file = new File(["input"], "large.pdf");
     Object.defineProperty(file, "size", { value: DOCX_LIMITS.fileBytes + 1 });
@@ -585,6 +719,32 @@ describe("PDF2docx with real PDF.js input", () => {
 });
 
 describe("native artwork and paint order regressions", () => {
+  it("distinguishes invisible search text from visible text after graphics-state restore", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([595, 842]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    page.pushOperators(
+      pushGraphicsState(),
+      setTextRenderingMode(TextRenderingMode.Invisible)
+    );
+    page.drawText("Searchable scan text", { x: 50, y: 700, size: 12, font });
+    page.pushOperators(popGraphicsState());
+    page.drawText("Visible body text", { x: 50, y: 650, size: 12, font });
+    const task = await openPdf(
+      new File([new Uint8Array(await pdf.save())], "searchable.pdf")
+    );
+    try {
+      const { raw } = await extractPage(await (await task.promise).getPage(1));
+      expect(
+        raw.spans.find((s) => s.text === "Searchable scan text")
+      ).toMatchObject({ invisible: true, hidden: true });
+      expect(
+        raw.spans.find((s) => s.text === "Visible body text")?.hidden
+      ).toBeFalsy();
+    } finally {
+      await task.destroy();
+    }
+  });
   it("recognizes thick filled grid strokes as center lines and keeps cells editable", async () => {
     const pdf = await PDFDocument.create(),
       page = pdf.addPage([595, 842]);

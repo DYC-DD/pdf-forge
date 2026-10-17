@@ -56,8 +56,16 @@ export async function analyzePdf(
       const page = await pdf.getPage(number);
       try {
         const { raw, imageBoxes } = await extractPage(page, options.signal);
+        const visibleSpans = raw.spans.filter((span) => !span.hidden);
+        // Searchable scans already contain invisible OCR text over a bitmap.
+        // Flowing it as native text would print a second copy over the image.
+        const searchableScan =
+          raw.spans.some((span) => span.invisible) &&
+          imageBoxes.some(
+            (box) => box.width * box.height > raw.width * raw.height * 0.7
+          );
         const embeddedPicture =
-          raw.spans.reduce((sum, span) => sum + span.text.trim().length, 0) <
+          visibleSpans.reduce((sum, span) => sum + span.text.trim().length, 0) <
             24 &&
           imageBoxes.some(
             (box) =>
@@ -68,8 +76,11 @@ export async function analyzePdf(
         const needsOcr =
           options.ocr === "always" ||
           (options.ocr === "auto" &&
-            ((!raw.spans.length && imageBoxes.length > 0 && !embeddedPicture) ||
-              (!raw.spans.length &&
+            (searchableScan ||
+              (!visibleSpans.length &&
+                imageBoxes.length > 0 &&
+                !embeddedPicture) ||
+              (!visibleSpans.length &&
                 (raw.rules.length > 0 ||
                   raw.issues.some((issue) => issue.severity === "review"))) ||
               raw.issues.some(
@@ -112,7 +123,11 @@ export async function analyzePdf(
               message: "此頁未讀取到文字，已保留為可移動及縮放的圖片。",
             });
           }
-        } else if (!raw.spans.length && imageBoxes.length && !embeddedPicture)
+        } else if (
+          (searchableScan || !visibleSpans.length) &&
+          imageBoxes.length &&
+          !embeddedPicture
+        )
           raw.issues.push({
             page: number,
             code: "scan",
@@ -120,7 +135,7 @@ export async function analyzePdf(
             message: "此頁只有圖片，尚未完成辨識。請重新掃描文件。",
           });
         else if (
-          !raw.spans.length &&
+          !visibleSpans.length &&
           (raw.rules.length ||
             raw.issues.some((issue) => issue.severity === "review"))
         )

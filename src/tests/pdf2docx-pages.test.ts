@@ -21,9 +21,45 @@ import {
 import type {
   ExportOptions,
   Figure,
+  PageModel,
   RawPage,
   TextSpan,
 } from "../features/pdf2docx/types";
+
+it("preserves picture widths and physical gutters when outer margins change", () => {
+  const raw = page([span("Newsletter heading", 50, 40, 500, { size: 22 })]);
+  raw.figures = [
+    figure(50, 100, 150),
+    figure(225, 100, 140),
+    figure(400, 100, 150),
+  ];
+  for (let row = 0; row < 6; row++) {
+    raw.spans.push(span(`Left prose ${row}`, 50, 210 + row * 16, 145));
+    raw.spans.push(span(`Middle prose ${row}`, 225, 210 + row * 16, 135));
+    raw.spans.push(span(`Right prose ${row}`, 400, 210 + row * 16, 145));
+  }
+  const model = analyzeLayout([raw]);
+  const mapped: PageModel = applyPageSetup(model.pages[0], {
+    paperSize: "source",
+    width: 600,
+    height: 800,
+    marginPreset: "narrow",
+    margins: { top: 36, bottom: 36, left: 36, right: 36 },
+  });
+  const group = mapped.groups.find((g) => g.columns.length === 3)!;
+  expect(group).toBeDefined();
+  expect(group.gaps).toEqual([25, 35]);
+  expect(group.widths).toEqual([164, 140, 164]);
+  expect(
+    group.columns.map((col) => col.find((b) => b.kind === "image")?.width)
+  ).toEqual([150, 140, 150]);
+  let left = mapped.margins.left;
+  for (const [index, column] of group.columns.entries()) {
+    const para = column.find((b) => b.kind === "paragraph")!;
+    expect(left + para.indent).toBeCloseTo([50, 225, 400][index]);
+    left += group.widths![index] + (group.gaps?.[index] ?? 0);
+  }
+});
 
 let id = 0;
 function span(
