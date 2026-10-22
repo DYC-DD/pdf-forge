@@ -13,6 +13,7 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ### Changed
 
+- 本機與 GitHub Actions 統一使用 Node.js `24.22.1` LTS 與 npm `11.21.1`；新增 `.node-version`、`engines`、`packageManager` 及安裝版本檢查，確保符合安全修補門檻並減少環境差異。
 - PDF2docx 改善窄欄距辨識，支援三欄等多欄閱讀順序、不同欄距及跨欄標題；填空底線與點狀導引線保留在同一列，避免誤判為分欄。
 - 透過 `.gitattributes` 統一文字檔的 Git 儲存與 checkout 換行為 LF，並設定 VS Code 新檔案使用 LF，與既有 EditorConfig、Prettier 規則一致，避免 Windows／macOS 切換產生整份檔案的換行 diff。
 
