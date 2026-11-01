@@ -42,7 +42,7 @@
     "fast-png": "^8.0.0",
     "fflate": "^0.8.3",
     "jszip": "^3.10.2",
-    "lucide-react": "^1.48.0",
+    "lucide-react": "^1.64.0",
     "motion": "^13.4.4",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.3.289",
