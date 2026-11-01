@@ -38,7 +38,7 @@
     "@tesseract.js-data/chi_tra": "^1.0.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "canvas-confetti": "^1.9.4",
-    "docx": "^9.9.0",
+    "docx": "^9.15.0",
     "fast-png": "^8.0.0",
     "fflate": "^0.8.3",
     "jszip": "^3.10.2",
