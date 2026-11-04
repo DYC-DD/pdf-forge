@@ -1,4 +1,13 @@
 import { fileStem } from "../../../shared/files/file";
+import { inspectWebp, isWebp } from "./webpContainer";
+
+export const IMAGE_MIME_TYPES = {
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+} as const;
+export const IMAGE_INPUT_ACCEPT =
+  ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
 
 export function conversionStem(name: string) {
   return fileStem(
@@ -16,7 +25,7 @@ export const IMAGE_INPUT_LIMITS = {
 } as const;
 
 export type ImageInfo = {
-  format: "jpg" | "png";
+  format: keyof typeof IMAGE_MIME_TYPES;
   width: number;
   height: number;
   orientation: number;
@@ -30,17 +39,24 @@ export type ImageItem = ImageInput & {
   error?: string;
 };
 
-export function sourceType(bytes: Uint8Array): "pdf" | "jpg" | "png" | null {
+export function sourceType(
+  bytes: Uint8Array
+): "pdf" | ImageInfo["format"] | null {
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
   if ([137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v))
     return "png";
+  if (isWebp(bytes)) return "webp";
   if (new TextDecoder().decode(bytes.subarray(0, 1024)).includes("%PDF-"))
     return "pdf";
   return null;
 }
 
-export async function detectSources(files: readonly File[]) {
-  if (!files.length) throw new Error("請加入 PDF 或 JPG／PNG 圖片。");
+export async function detectSources(
+  files: readonly File[],
+  { allowWebp = true }: { allowWebp?: boolean } = {}
+) {
+  const supported = allowWebp ? "PDF、JPG、PNG 或 WEBP" : "PDF、JPG 或 PNG";
+  if (!files.length) throw new Error(`請加入 ${supported}。`);
   if (files.length > IMAGE_INPUT_LIMITS.files)
     throw new Error("一次最多可加入 100 張圖片。");
   const types = [];
@@ -51,8 +67,8 @@ export async function detectSources(files: readonly File[]) {
     const type = sourceType(
       new Uint8Array(await file.slice(0, 1024).arrayBuffer())
     );
-    if (!type)
-      throw new Error(`${file.name} 格式不支援，請加入 PDF、JPG 或 PNG。`);
+    if (!type || (type === "webp" && !allowWebp))
+      throw new Error(`${file.name} 格式不支援，請加入 ${supported}。`);
     types.push(type);
   }
   if (types.includes("pdf")) {
@@ -114,7 +130,19 @@ export function inspectImageBytes(bytes: Uint8Array): ImageInfo {
   let width = 0;
   let height = 0;
   let orientation = 1;
-  if (
+  if (format === "webp") {
+    const image = inspectWebp(bytes);
+    width = image.width;
+    height = image.height;
+    if (image.exif) {
+      const prefix = new TextDecoder().decode(image.exif.subarray(0, 6));
+      orientation = exifOrientation(
+        image.exif,
+        prefix === "Exif\0\0" ? 6 : 0,
+        image.exif.length
+      );
+    }
+  } else if (
     format === "png" &&
     bytes.length >= 33 &&
     view.getUint32(8) === 13 &&
@@ -159,8 +187,12 @@ export function inspectImageBytes(bytes: Uint8Array): ImageInfo {
       at += length;
     }
   }
-  if ((format !== "jpg" && format !== "png") || !width || !height)
-    throw new Error("圖片內容無法讀取，請重新選擇 JPG 或 PNG。");
+  if (
+    (format !== "jpg" && format !== "png" && format !== "webp") ||
+    !width ||
+    !height
+  )
+    throw new Error("圖片內容無法讀取，請重新選擇 JPG、PNG 或 WEBP。");
   if (
     width > IMAGE_INPUT_LIMITS.edge ||
     height > IMAGE_INPUT_LIMITS.edge ||

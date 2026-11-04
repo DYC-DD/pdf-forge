@@ -31,6 +31,7 @@ export function editableScanLines(
         if ((span.confidence ?? 0) < 60) uncertain += count;
       }
       if (
+        line.spans.some((span) => span.sourceMismatch) ||
         !weight ||
         confidence / weight < 88 ||
         uncertain / weight > 0.05 ||

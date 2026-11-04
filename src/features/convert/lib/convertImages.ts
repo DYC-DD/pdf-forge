@@ -14,6 +14,7 @@ import { exportRaster } from "./imagePixels";
 import {
   conversionStem,
   IMAGE_INPUT_LIMITS,
+  IMAGE_MIME_TYPES,
   imageInputsError,
   imageTransform,
   inspectImageBytes,
@@ -44,7 +45,7 @@ function svgImage(bytes: Uint8Array, info: ImageInfo, rotation: number) {
     binary += String.fromCharCode(...embedded.subarray(at, at + 32768));
   return new Blob(
     [
-      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}"><image width="${info.width}" height="${info.height}" transform="matrix(${matrix.join(" ")})" xlink:href="data:image/${info.format === "jpg" ? "jpeg" : "png"};base64,${btoa(binary)}"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}"><image width="${info.width}" height="${info.height}" transform="matrix(${matrix.join(" ")})" xlink:href="data:${IMAGE_MIME_TYPES[info.format]};base64,${btoa(binary)}"/></svg>`,
     ],
     { type: "image/svg+xml" }
   );
@@ -76,7 +77,7 @@ export async function convertImages(
     checkImageCancelled(options.signal);
     if (options.format === "pdf") {
       if (!pdf) throw new Error("無法建立 PDF。");
-      const imageRef = await embedBestImage(pdf, bytes, info);
+      const imageRef = await embedBestImage(pdf, bytes, info, options.signal);
       const { size, matrix } = imageTransform(info, rotation);
       // Physical page size uses 300 DPI; original pixels and JPEG data stay intact.
       const scale = 72 / 300;
@@ -111,7 +112,7 @@ export async function convertImages(
         throw new Error("輸出 PDF 超過 128 MB，請分批轉換較少圖片。");
     } else {
       const original = new Blob([bytes], {
-        type: info.format === "jpg" ? "image/jpeg" : "image/png",
+        type: IMAGE_MIME_TYPES[info.format],
       });
       const untouched = rotation === 0 && info.orientation === 1;
       let blob: Blob;
