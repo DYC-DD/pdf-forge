@@ -1,0 +1,3 @@
+# Keep text files normalized to LF in Git and in every platform's checkout.
+# Auto-detection leaves binary files unchanged.
+* text=auto eol=lf

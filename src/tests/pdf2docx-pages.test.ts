@@ -21,9 +21,45 @@ import {
 import type {
   ExportOptions,
   Figure,
+  PageModel,
   RawPage,
   TextSpan,
 } from "../features/pdf2docx/types";
+
+it("preserves picture widths and physical gutters when outer margins change", () => {
+  const raw = page([span("Newsletter heading", 50, 40, 500, { size: 22 })]);
+  raw.figures = [
+    figure(50, 100, 150),
+    figure(225, 100, 140),
+    figure(400, 100, 150),
+  ];
+  for (let row = 0; row < 6; row++) {
+    raw.spans.push(span(`Left prose ${row}`, 50, 210 + row * 16, 145));
+    raw.spans.push(span(`Middle prose ${row}`, 225, 210 + row * 16, 135));
+    raw.spans.push(span(`Right prose ${row}`, 400, 210 + row * 16, 145));
+  }
+  const model = analyzeLayout([raw]);
+  const mapped: PageModel = applyPageSetup(model.pages[0], {
+    paperSize: "source",
+    width: 600,
+    height: 800,
+    marginPreset: "narrow",
+    margins: { top: 36, bottom: 36, left: 36, right: 36 },
+  });
+  const group = mapped.groups.find((g) => g.columns.length === 3)!;
+  expect(group).toBeDefined();
+  expect(group.gaps).toEqual([25, 35]);
+  expect(group.widths).toEqual([164, 140, 164]);
+  expect(
+    group.columns.map((col) => col.find((b) => b.kind === "image")?.width)
+  ).toEqual([150, 140, 150]);
+  let left = mapped.margins.left;
+  for (const [index, column] of group.columns.entries()) {
+    const para = column.find((b) => b.kind === "paragraph")!;
+    expect(left + para.indent).toBeCloseTo([50, 225, 400][index]);
+    left += group.widths![index] + (group.gaps?.[index] ?? 0);
+  }
+});
 
 let id = 0;
 function span(
@@ -432,4 +468,105 @@ describe("PDF2docx image arrangement and OCR reading order", () => {
       "Second OCR paragraph",
     ]);
   });
+});
+
+it("keeps native tables inside narrow source edges so page-anchored cell crops align", () => {
+  const raw = page([
+    span("Left cell", 29, 54, 65),
+    span("Right cell", 119, 54, 150),
+    span("Second left", 29, 84, 65),
+    span("Second right", 119, 84, 150),
+  ]);
+  raw.rules = [
+    ...[50, 80, 110].map((y) => ({ x1: 25, x2: 575, y1: y, y2: y })),
+    ...[25, 115, 575].map((x) => ({ x1: x, x2: x, y1: 50, y2: 110 })),
+  ];
+  const model = analyzeLayout([raw]);
+  expect(model.stats.tables).toBe(1);
+  const setup = detectPageSetups(model.pages)[0];
+  expect(setup.margins.left).toBe(25);
+  expect(setup.margins.right).toBe(25);
+  const mapped = applyPageSetup(model.pages[0], setup);
+  const table = mapped.groups
+    .flatMap((g) => g.columns.flat())
+    .find((b) => b.kind === "table")!;
+  expect(table.x).toBeCloseTo(25);
+  expect(table.x + table.width).toBeCloseTo(575);
+});
+
+it.each(["pdf", "ocr"] as const)(
+  "keeps a two-line publication date literal instead of a PAGE field (%s)",
+  async (source) => {
+    const raw = page([
+      span("Editable body", 50, 50),
+      span("October", 275, 744, 50, { source }),
+      span("2026", 286, 760, 28, { source }),
+    ]);
+    raw.source = source;
+    const model = analyzeLayout([raw]);
+    expect(model.pages[0].footer).toBeUndefined();
+    const zip = await JSZip.loadAsync(
+      await (
+        await exportDocx(model, { preservePageBreaks: true })
+      ).arrayBuffer()
+    );
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toContain(">October</w:t>");
+    expect(xml).toContain(">2026</w:t>");
+    expect(xml).not.toContain("PAGE");
+  }
+);
+
+it("does not confuse a distant month with an independent numeric page footer", () => {
+  const model = analyzeLayout([
+    page([
+      span("Editable body", 50, 50),
+      span("October", 50, 744, 50),
+      span("2026", 286, 760, 28),
+    ]),
+  ]);
+  expect(model.pages[0].footer?.runs.some((run) => run.pageNumber)).toBe(true);
+});
+
+it.each(["left", "center"] as const)(
+  "retains vertical margin evidence on an all-heading poster (%s)",
+  (align) => {
+    const model = analyzeLayout([
+      page([
+        span("Poster heading", 50, 4, 500, {
+          size: 30,
+          height: 30,
+          baseline: 34,
+        }),
+        span("Caption", 50, 100, 500),
+        span("Source caption", 50, 770, 500),
+      ]),
+    ]);
+    for (const group of model.pages[0].groups)
+      for (const col of group.columns)
+        for (const block of col)
+          if (block.kind === "paragraph") {
+            block.role = "heading";
+            block.align = align;
+          }
+    const setup = detectPageSetups(model.pages)[0];
+    expect(setup.margins.top).toBeLessThanOrEqual(4);
+    expect(setup.margins.bottom).toBeLessThan(20);
+    expect(Object.values(setup.margins).every(Number.isFinite)).toBe(true);
+    const mapped = applyPageSetup(model.pages[0], setup);
+    expect(mapped.groups[0].columns[0][0].y).toBeLessThanOrEqual(4);
+  }
+);
+
+it("keeps a normal preset for an isolated centered title away from page edges", () => {
+  const model = analyzeLayout([
+    page([span("Centered title", 180, 350, 240, { size: 30, height: 30 })]),
+  ]);
+  const block = model.pages[0].groups[0].columns[0][0];
+  if (block.kind !== "paragraph") throw new Error("Expected title");
+  block.role = "heading";
+  block.align = "center";
+  expect(detectPageSetups(model.pages)[0].margins).toEqual(
+    MARGIN_PRESETS.standard
+  );
 });
