@@ -13,6 +13,7 @@ import { deskewScan } from "./scanDeskew";
 import { retainUncertainScan } from "./scanFallback";
 import { normalizeOversizedScan } from "./scanPageSize";
 import { scanRules } from "./scanRules";
+import { markSearchableScanDisagreements } from "./searchableScan";
 
 export class LocalOcr {
   private worker: Worker | null = null;
@@ -91,6 +92,7 @@ export class LocalOcr {
     // Scanner pixel dimensions are sometimes stored as PDF points. Normalize
     // before grid detection; otherwise individual glyph strokes become rules.
     normalizeOversizedScan(raw);
+    const searchableText = raw.spans.filter((span) => span.invisible);
     const scale = (renderScale * originalWidth) / raw.width;
     if (deskewScan(canvas))
       raw.issues.push({
@@ -262,6 +264,7 @@ export class LocalOcr {
         }),
       ]);
       checkAbort(this.options.signal);
+      markSearchableScanDisagreements(raw.spans, searchableText);
       if (original)
         await (
           this.options.preserveUncertainScan === true

@@ -1,5 +1,41 @@
 [
   {
+    "id": "w3c-lists",
+    "title": "W3C PDF21 bulleted and numbered lists",
+    "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-lists/lists.pdf",
+    "sha256": "4fc127b16ce756cea30e9db30897a4387349ba7499281c7bf64c9671e3d3f9ae",
+    "pages": [1],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "The most popular school sports are:",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "w3c-page-numbers",
+    "title": "W3C PDF17 Roman and restarted Arabic page numbers",
+    "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-page-numbers/page-numbers.pdf",
+    "sha256": "a680a8e52b4a9a3df0ed9b45eefb0d116d8b9384d468b662e71a902e7a29f51a",
+    "pages": [1, 2, 3, 4, 5]
+  },
+  {
+    "id": "w3c-columns-oo",
+    "title": "W3C PDF3 OpenOffice two-column reading order",
+    "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-reading-order/reading-order-2cols-oo.pdf",
+    "sha256": "0c8cd5c891e4b39f85f3f3ebea00c8aa56db35ce1f6d04f1ff263dac43e1ff3a",
+    "pages": [1],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "tincidunt consectetur ut vitae ligula.",
+        "maxPositionError": 6
+      },
+      { "page": 1, "text": "Another Header One", "maxPositionError": 6 }
+    ]
+  },
+  {
     "id": "w3c-table",
     "title": "W3C PDF6 table header example",
     "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-table-headers/table-example-repaired.pdf",

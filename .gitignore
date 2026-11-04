@@ -144,3 +144,10 @@ public/ocr/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# MacOS
+.DS_Store
+
+# Local PDF-to-DOCX QA notes
+docs/PDF2DOCX-QA.md
+

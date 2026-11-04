@@ -444,3 +444,159 @@ describe("scan illustration isolation", () => {
     expect(scanGraphics({ width, height, data }, 1, [], [])).toEqual([]);
   });
 });
+
+describe("painted line-end soft hyphens", () => {
+  const paint = (mode = 0, width = 300, isInFont = true, spacing = 0) => ({
+    fnArray: [
+      OPS.setTextRenderingMode,
+      OPS.setCharSpacing,
+      OPS.setFillRGBColor,
+      OPS.showText,
+      OPS.showText,
+    ],
+    argsArray: [
+      [mode],
+      [spacing],
+      ["#008000"],
+      [
+        [
+          ...Array.from("some text", (unicode) => ({
+            unicode,
+            width: 500,
+            isInFont: true,
+          })),
+          -100,
+          { unicode: "\u00ad", width, isInFont },
+        ],
+      ],
+      glyphs("Next"),
+    ],
+  });
+  it("restores a painted hyphen and its advance, keeping subsequent paint aligned", () => {
+    const first = { ...span("some text", 10, 20), width: 46 };
+    const next = span("Next", 10, 40);
+    applyTextAppearance([first, next], paint(), new Set([first.id]));
+    expect(first.text).toBe("some text-");
+    expect(first.width).toBeCloseTo(49);
+    expect(first.advances?.reduce((a, b) => a + b, 0)).toBeCloseTo(49);
+    expect([first.color, next.color]).toEqual(["008000", "008000"]);
+    expect(first.paintOrder).toBe(3);
+    expect(next.paintOrder).toBe(4);
+  });
+  it.each([
+    ["not a line end", 0, 300, true, 0, false],
+    ["invisible text", 3, 300, true, 0, true],
+    ["clip-only text", 7, 300, true, 0, true],
+    ["zero advance", 0, 0, true, 0, true],
+    ["missing glyph", 0, 300, false, 0, true],
+    ["character spacing", 0, 300, true, 2, true],
+  ] as const)(
+    "does not invent a hyphen for %s",
+    (_, mode, width, present, spacing, lineEnd) => {
+      const first = { ...span("some text", 10, 20), width: 46 };
+      applyTextAppearance(
+        [first],
+        paint(mode, width, present, spacing),
+        new Set(lineEnd ? [first.id] : [])
+      );
+      expect(first.text).toBe("some text");
+      expect(first.width).toBe(46);
+    }
+  );
+  it("does not add a terminal hyphen to a partial paint run", () => {
+    const first = span("text", 10, 20);
+    applyTextAppearance([first], paint(), new Set([first.id]));
+    expect(first.text).toBe("text");
+  });
+});
+
+it("does not estimate a hyphen advance from a paint run with omitted leading spaces", () => {
+  const first = span("some text", 10, 20);
+  applyTextAppearance(
+    [first],
+    {
+      fnArray: [OPS.showText],
+      argsArray: [
+        [
+          Array.from(" some text\u00ad", (unicode) => ({
+            unicode,
+            width: 500,
+            isInFont: true,
+          })),
+        ],
+      ],
+    },
+    new Set([first.id])
+  );
+  expect(first.text).toBe("some text");
+});
+
+describe("painted soft hyphens after split text items", () => {
+  const ops = {
+    fnArray: [OPS.showText],
+    argsArray: [
+      [
+        [
+          ...Array.from("some text", (unicode) => ({
+            unicode,
+            width: 500,
+            isInFont: true,
+          })),
+          -100,
+          { unicode: "\u00ad", width: 300, isInFont: true },
+        ],
+      ],
+    ],
+  };
+  it("uses the terminal item's own advance after a verified prefix on the same line", () => {
+    const prefix = span("some", 10, 20, 20);
+    const tail = span("text", 40, 20, 21);
+    applyTextAppearance([prefix, tail], ops, new Set([tail.id]));
+    expect(tail.text).toBe("text-");
+    expect(tail.width).toBeCloseTo(24);
+    expect(prefix.text).toBe("some");
+    expect(prefix.width).toBe(20);
+  });
+  it.each([
+    ["different baseline", { baseline: 60 }],
+    ["different font", { font: "Arial" }],
+    ["different font size", { size: 20 }],
+    ["reversed position", { x: 0 }],
+  ] as const)("does not infer a continuation with %s", (_, extra) => {
+    const prefix = span("some", 10, 20, 20);
+    const tail = span("text", 40, 20, 21, extra);
+    applyTextAppearance([prefix, tail], ops, new Set([tail.id]));
+    expect(tail.text).toBe("text");
+    expect(tail.width).toBe(21);
+  });
+  it("does not recover across unmatched text", () => {
+    const prefix = span("some", 10, 20, 20);
+    const other = span("unmatched", 32, 20, 2);
+    const tail = span("text", 40, 20, 21);
+    applyTextAppearance([prefix, other, tail], ops, new Set([tail.id]));
+    expect(tail.text).toBe("text");
+  });
+});
+
+it("only restores the terminal occurrence when a paint run repeats the suffix", () => {
+  const first = span("some", 10, 20, 20);
+  const middle = span("text", 40, 20, 20);
+  const last = span("text", 70, 20, 20);
+  const glyphs = Array.from("some text text\u00ad", (unicode) => ({
+    unicode,
+    width: unicode === "\u00ad" ? 300 : 500,
+    isInFont: true,
+  }));
+  applyTextAppearance(
+    [first, middle, last],
+    { fnArray: [OPS.showText], argsArray: [[glyphs]] },
+    new Set([middle.id, last.id])
+  );
+  expect([first.text, middle.text, last.text]).toEqual([
+    "some",
+    "text",
+    "text-",
+  ]);
+  expect(middle.width).toBe(20);
+  expect(last.width).toBeCloseTo(23);
+});

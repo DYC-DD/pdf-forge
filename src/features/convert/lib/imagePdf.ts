@@ -1,7 +1,8 @@
 import { PDFDocument, PDFName, PDFRawStream, type PDFRef } from "pdf-lib";
 
+import { checkImageCancelled } from "./imageCanvas";
 import { jpegProfile, profileSpace } from "./imageMetadata";
-import { decodePngPixels, type ImagePixels } from "./imagePixels";
+import { decodePixels, type ImagePixels } from "./imagePixels";
 import type { ImageInfo } from "./imageSource";
 
 function iccSpace(
@@ -26,7 +27,7 @@ function iccSpace(
   return ["ICCBased", ref];
 }
 
-function pngSpace(pdf: PDFDocument, image: ImagePixels, components: number) {
+function pixelSpace(pdf: PDFDocument, image: ImagePixels, components: number) {
   if (image.profile || image.colorChunks.some(({ type }) => type === "sRGB"))
     return iccSpace(pdf, image.profile, components);
   const gammaChunk = image.colorChunks.find(({ type }) => type === "gAMA");
@@ -89,7 +90,8 @@ function pngSpace(pdf: PDFDocument, image: ImagePixels, components: number) {
 export async function embedBestImage(
   pdf: PDFDocument,
   bytes: Uint8Array,
-  info: ImageInfo
+  info: ImageInfo,
+  signal?: AbortSignal
 ): Promise<PDFRef> {
   if (info.format === "jpg") {
     const image = await pdf.embedJpg(bytes);
@@ -110,7 +112,7 @@ export async function embedBestImage(
     );
     return image.ref;
   }
-  const image = decodePngPixels(bytes);
+  const image = await decodePixels(bytes, info, signal);
   const components = image.channels < 3 ? 1 : 3;
   const hasAlpha = image.channels === 2 || image.channels === 4;
   const bytesPerSample = image.depth / 8;
@@ -126,6 +128,7 @@ export async function embedBestImage(
   };
   let transparent = false;
   for (let pixel = 0; pixel < image.width * image.height; pixel++) {
+    if (pixel % image.width === 0) checkImageCancelled(signal);
     for (let channel = 0; channel < components; channel++)
       write(
         color,
@@ -158,7 +161,7 @@ export async function embedBestImage(
   return pdf.context.register(
     pdf.context.flateStream(color, {
       ...base,
-      ColorSpace: pngSpace(pdf, image, components),
+      ColorSpace: pixelSpace(pdf, image, components),
       SMask: mask,
     })
   );

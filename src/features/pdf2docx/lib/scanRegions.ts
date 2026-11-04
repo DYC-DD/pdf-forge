@@ -18,6 +18,7 @@ function uncertain(spans: readonly TextSpan[]): boolean {
     0
   );
   return (
+    spans.some((s) => s.sourceMismatch) ||
     !count ||
     score / count < 84 ||
     low / count > 0.1 ||

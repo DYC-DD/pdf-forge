@@ -74,20 +74,18 @@ if (mode === "download") {
   const temp = resolve(root, ".cache/test-temp");
   await mkdir(temp, { recursive: true });
   const manifest = resolve(directory, "test-manifest.json");
-  if (expanded) {
-    await mkdir(directory, { recursive: true });
-    await writeFile(
-      manifest,
-      JSON.stringify(
-        samples.map((sample) => ({
-          ...sample,
-          path: resolve(directory, `${sample.id}.pdf`),
-        })),
-        null,
-        2
-      )
-    );
-  }
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    manifest,
+    JSON.stringify(
+      samples.map((sample) => ({
+        ...sample,
+        path: resolve(directory, `${sample.id}.pdf`),
+      })),
+      null,
+      2
+    )
+  );
   const result = spawnSync(
     process.execPath,
     [
