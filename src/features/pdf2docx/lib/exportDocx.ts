@@ -6,6 +6,8 @@ import {
   ColumnBreak,
   Document,
   Footer,
+  FrameAnchorType,
+  FrameWrap,
   HeadingLevel,
   HeightRule,
   HorizontalPositionRelativeFrom,
@@ -25,6 +27,7 @@ import {
   TableLayoutType,
   TableRow,
   TabStopType,
+  TextDirection,
   TextWrappingType,
   VerticalAlignTable,
   VerticalPositionRelativeFrom,
@@ -32,6 +35,7 @@ import {
   Math as WordMath,
   Paragraph as WordParagraph,
   TextRun as WordRun,
+  type IFrameOptions,
   type ILevelsOptions,
   type IParagraphOptions,
   type IRunOptions,
@@ -55,9 +59,11 @@ import {
   measuredScale,
   type WordFonts,
 } from "./fontMetrics";
+import { anchorFormControls } from "./formControls";
 import { bottom, right } from "./geometry";
 import { applyPageSetup, detectPageSetups } from "./pageSetup";
 import { joinSeparator, paragraphText } from "./paragraphs";
+import { anchorTextBackgrounds } from "./textBackgrounds";
 
 const twips = (points: number) => Math.round(points * 20);
 const positive = (points: number) => Math.max(0, twips(points));
@@ -155,7 +161,11 @@ function textRun(
       underline: run.underline ? {} : undefined,
       position: run.baselineShift ? `${run.baselineShift}pt` : undefined,
     },
-    width,
+    // Word's fitText can split/reverse shaped glyph clusters. Keep native
+    // shaping for these scripts; source size and bounded font scaling remain.
+    /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Devanagari}]/u.test(run.text)
+      ? undefined
+      : width,
     id
   );
 }
@@ -167,6 +177,7 @@ class Writer {
   private listReference = "";
   private listNumber = -1;
   private listFormat = "";
+  private listFontKey = "";
   private fitId = 0;
   private fonts = createFontResolver();
 
@@ -176,8 +187,43 @@ class Writer {
     columnBreak = false,
     left = 0,
     availableWidth = 0,
-    pageImages: ImageBlock[] = []
+    pageImages: ImageBlock[] = [],
+    frame?: IFrameOptions
   ): WordParagraph {
+    const sourceStarts = paragraph.runs.filter(
+      (run, index) => index === 0 || run.sourceLineStart
+    );
+    if (
+      this.preserveSourceLines &&
+      paragraph.source === "pdf" &&
+      paragraph.role !== "list" &&
+      sourceStarts.length > 2 &&
+      sourceStarts.every((run) => run.sourceLineX !== undefined) &&
+      paragraph.runs.every(
+        (run) =>
+          run.width !== undefined &&
+          !run.fraction &&
+          !run.baselineShift &&
+          !/[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Devanagari}]/u.test(
+            run.text
+          )
+      )
+    ) {
+      const base = Math.min(
+        ...sourceStarts.slice(1).map((run) => run.sourceLineX!)
+      );
+      paragraph = {
+        ...paragraph,
+        align: "left",
+        indent: base - left,
+        firstIndent: sourceStarts[0].sourceLineX! - base,
+        runs: paragraph.runs.map((run) =>
+          run.sourceLineStart && run.sourceLineX! > base + 0.5
+            ? { ...run, tabBefore: run.sourceLineX }
+            : run
+        ),
+      };
+    }
     const text = paragraphText(paragraph);
     const marker =
       paragraph.role === "list" && !inCell
@@ -188,7 +234,8 @@ class Writer {
     let runs = paragraph.runs.map((run) =>
       this.preserveSourceLines &&
       paragraph.source === "pdf" &&
-      !marker &&
+      (!marker ||
+        paragraph.runs.some((item) => item.tabBefore !== undefined)) &&
       run.sourceLineStart &&
       !run.breakBefore
         ? {
@@ -205,8 +252,36 @@ class Writer {
       const bullet = !!marker[1];
       const start = bullet ? 1 : Number(marker[3]);
       const format = bullet ? marker[1] : `${marker[2]}%1${marker[4]}`;
+      const measuredMarker =
+        this.preserveSourceLines &&
+        paragraph.source === "pdf" &&
+        paragraph.lineCount === 1
+          ? paragraph.listMarkerWidth
+          : undefined;
+      const labelRun = runs[0];
+      // A native marker can have a different color from its body text even
+      // when no measured label gap is available. Keep that color in the
+      // numbering definition and in its reuse key.
+      const markerColor =
+        paragraph.source === "pdf" ? labelRun.color : undefined;
+      const fontKey =
+        measuredMarker === undefined
+          ? markerColor === undefined
+            ? ""
+            : JSON.stringify([markerColor])
+          : JSON.stringify([
+              labelRun.font,
+              labelRun.size,
+              labelRun.bold,
+              labelRun.italic,
+              labelRun.color,
+            ]);
       const listLeft =
-        paragraph.firstIndent < 0 ? paragraph.indent : paragraph.indent + 15;
+        measuredMarker === undefined
+          ? paragraph.firstIndent < 0
+            ? paragraph.indent
+            : paragraph.indent + 15
+          : paragraph.indent + paragraph.firstIndent + measuredMarker;
       const hanging = listLeft - paragraph.indent - paragraph.firstIndent;
       listIndent = {
         left: twips(listLeft),
@@ -216,6 +291,7 @@ class Writer {
       if (
         !this.listReference ||
         this.listFormat !== format ||
+        this.listFontKey !== fontKey ||
         (!bullet && start !== this.listNumber + 1)
       ) {
         this.listReference = `list-${this.numbering.length}`;
@@ -229,6 +305,18 @@ class Writer {
               start,
               alignment: AlignmentType.LEFT,
               style: {
+                run:
+                  measuredMarker === undefined
+                    ? markerColor === undefined
+                      ? undefined
+                      : { color: markerColor }
+                    : {
+                        font: this.fonts.resolve(labelRun.font),
+                        size: Math.round(labelRun.size * 2),
+                        bold: labelRun.bold,
+                        italics: labelRun.italic,
+                        color: labelRun.color,
+                      },
                 paragraph: {
                   indent: {
                     left: positive(listLeft),
@@ -242,9 +330,10 @@ class Writer {
       }
       this.listNumber = start;
       this.listFormat = format;
+      this.listFontKey = fontKey;
       numbering = { reference: this.listReference, level: 0 };
       let remaining = marker[0].length;
-      runs = runs.map((run) => {
+      runs = runs.map((run, index) => {
         const count = Math.min(remaining, run.text.length);
         remaining -= count;
         return {
@@ -253,15 +342,98 @@ class Writer {
           width:
             run.width === undefined
               ? undefined
-              : (run.width * (run.text.length - count)) /
-                Math.max(1, run.text.length),
+              : index === 0 && measuredMarker !== undefined
+                ? Math.max(0, run.width - measuredMarker)
+                : (run.width * (run.text.length - count)) /
+                  Math.max(1, run.text.length),
         };
       });
     } else {
       this.listReference = "";
       this.listNumber = -1;
     }
+    const terminalRun = runs.at(-1);
+    // Two independently positioned, same-font heading labels may deliberately
+    // use different sizes. Preserve those sizes while anchoring the final label.
+    const mixedSizeFieldHeading =
+      paragraph.role === "heading" &&
+      runs.length === 2 &&
+      runs[0].tabBefore === undefined &&
+      terminalRun?.tabBefore !== undefined &&
+      runs.every((run) =>
+        /^\p{Script=Latin}[\p{Script=Latin}\p{M}\p{N}]*$/u.test(run.text)
+      ) &&
+      Math.min(...runs.map((run) => run.size)) >=
+        Math.max(...runs.map((run) => run.size)) * 0.8;
+
+    // A left tab whose fitted text ends exactly at the writing boundary can
+    // wrap in Word even when the source widths fit. Anchor that final field
+    // by its measured right edge, preserving the glyph width and font size.
+    // Restrict this to a single native source line with a known LTR field.
+    const terminalTab =
+      this.preserveSourceLines &&
+      paragraph.source === "pdf" &&
+      paragraph.lineCount === 1 &&
+      paragraph.align === "left" &&
+      !marker &&
+      terminalRun?.tabBefore !== undefined &&
+      terminalRun.width !== undefined &&
+      terminalRun.width > 0 &&
+      (terminalRun.width <= availableWidth * 0.2 ||
+        // A single unbroken field can be wider on a small source page.
+        // Keep long prose continuations on the existing left-tab path.
+        (terminalRun.width <= availableWidth * 0.5 &&
+          /^\p{L}[\p{L}\p{M}\p{N}]*$/u.test(terminalRun.text))) &&
+      !terminalRun.fraction &&
+      runs.every(
+        (run) =>
+          run.font === terminalRun.font &&
+          (run.size === terminalRun.size || mixedSizeFieldHeading) &&
+          !run.baselineShift &&
+          !run.fraction &&
+          !/\p{Sm}/u.test(run.text)
+      ) &&
+      !/[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Devanagari}]/u.test(
+        terminalRun.text
+      ) &&
+      Math.abs(
+        terminalRun.tabBefore +
+          terminalRun.width -
+          left -
+          (availableWidth - (paragraph.rightIndent ?? 0))
+      ) <= 1.5
+        ? terminalRun
+        : undefined;
+    // Tab stops belong to the paragraph, not to individual source lines.
+    // A later row can introduce intermediate stops; one Tab would land on
+    // those instead of the intended field. Traverse every intervening stop.
+    const tabPositions = [
+      ...new Set([
+        ...(listIndent ? [listIndent.left] : []),
+        ...paragraph.runs
+          .filter((run) => run.tabBefore !== undefined)
+          .map((run) => twips(run.tabBefore! - left)),
+      ]),
+    ]
+      .sort((a, b) => a - b)
+      .slice(0, 64);
+    const measuredRows =
+      this.preserveSourceLines &&
+      paragraph.source === "pdf" &&
+      (paragraph.lineCount ?? 1) > 1 &&
+      !marker &&
+      runs.every(
+        (run) =>
+          run.width !== undefined &&
+          !run.fraction &&
+          !run.baselineShift &&
+          !/[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Devanagari}]/u.test(
+            run.text
+          )
+      );
+    let sourceCursor = left + paragraph.indent + paragraph.firstIndent;
     return new SourceParagraph({
+      frame,
       children: [
         ...pageImages.map((image, index) =>
           this.image(image, image.width, {
@@ -280,6 +452,33 @@ class Writer {
           })
         ),
         ...(columnBreak ? [new ColumnBreak()] : []),
+        ...[
+          ...(paragraph.backgroundImages ?? []),
+          ...(paragraph.controlImages ?? []),
+        ].map((image) =>
+          this.image(image, image.width, {
+            // Word resolves the column origin inside a cell after its padding;
+            // cell paragraphs also omit the source paragraph space-before.
+            horizontalPosition: {
+              relative: inCell
+                ? HorizontalPositionRelativeFrom.COLUMN
+                : HorizontalPositionRelativeFrom.PAGE,
+              offset: emu(image.x - (inCell ? left : 0)),
+            },
+            verticalPosition: {
+              relative: VerticalPositionRelativeFrom.PARAGRAPH,
+              offset: emu(
+                (inCell ? 0 : Math.min(paragraph.before, 144)) +
+                  image.y -
+                  paragraph.y
+              ),
+            },
+            allowOverlap: true,
+            layoutInCell: inCell,
+            behindDocument: image.behindText ?? false,
+            wrap: { type: TextWrappingType.NONE },
+          })
+        ),
         ...(paragraph.floatingImages ?? []).map((image) =>
           this.image(image, availableWidth, {
             horizontalPosition: {
@@ -303,7 +502,7 @@ class Writer {
             },
           })
         ),
-        ...runs.map((run, index) => {
+        ...runs.flatMap((run, index) => {
           const fonts = this.fonts.resolve(run.font);
           let width: number | undefined;
           let fallbackWidth: number | undefined;
@@ -373,8 +572,25 @@ class Writer {
                   fallbackWidth ?? width,
                   this.fonts.measure(run, fonts)
                 );
-          return textRun(
-            run,
+          if (index > 0 && run.breakBefore)
+            sourceCursor = left + paragraph.indent;
+          const tabCount =
+            measuredRows && run.tabBefore !== undefined
+              ? Math.max(
+                  1,
+                  tabPositions.filter(
+                    (position) =>
+                      position > twips(sourceCursor - left) &&
+                      position <= twips(run.tabBefore! - left)
+                  ).length
+                )
+              : 1;
+          sourceCursor =
+            (run.tabBefore ?? sourceCursor) + (width ?? run.width ?? 0);
+          const value = textRun(
+            run.tabBefore === undefined
+              ? run
+              : { ...run, tabBefore: undefined, breakBefore: false },
             fonts,
             scale,
             paragraph.source === "pdf" &&
@@ -383,6 +599,17 @@ class Writer {
               : undefined,
             ++this.fitId
           );
+          // fitText must only measure glyphs. Including a tab in that same run
+          // makes Word fit the tab advance as text and wrap the next glyphs.
+          return run.tabBefore === undefined
+            ? [value]
+            : [
+                new WordRun({
+                  children: Array.from({ length: tabCount }, () => new Tab()),
+                  break: run.breakBefore ? 1 : undefined,
+                }),
+                value,
+              ];
         }),
       ],
       heading:
@@ -397,19 +624,16 @@ class Writer {
       numbering,
       // Word rejects paragraphs with more than 64 tab definitions. Repeated
       // source rows reuse stops; keep a sorted, unique, bounded definition.
-      tabStops: [
-        ...new Set(
-          paragraph.runs
-            .filter((run) => run.tabBefore !== undefined)
-            .map((run) => twips(run.tabBefore! - left))
-        ),
-      ]
-        .sort((a, b) => a - b)
-        .slice(0, 64)
-        .map((position) => ({
-          type: TabStopType.LEFT,
-          position,
-        })),
+      tabStops: tabPositions.map((position) => ({
+        type:
+          terminalTab && position === twips(terminalTab.tabBefore! - left)
+            ? TabStopType.RIGHT
+            : TabStopType.LEFT,
+        position:
+          terminalTab && position === twips(terminalTab.tabBefore! - left)
+            ? twips(terminalTab.tabBefore! + terminalTab.width! - left)
+            : position,
+      })),
       indent: marker
         ? listIndent
         : {
@@ -560,6 +784,12 @@ class Writer {
                     },
                     columnSpan: cell.columnSpan,
                     rowSpan: cell.rowSpan,
+                    textDirection:
+                      cell.rotation === -90
+                        ? TextDirection.BOTTOM_TO_TOP_LEFT_TO_RIGHT
+                        : cell.rotation === 90
+                          ? TextDirection.TOP_TO_BOTTOM_RIGHT_TO_LEFT
+                          : undefined,
                     borders: table.borderless
                       ? Object.fromEntries(
                           ["top", "bottom"].map((edge) => {
@@ -606,9 +836,16 @@ class Writer {
                                 .slice(0, cell.column)
                                 .reduce((sum, width) => sum + width, 0) +
                               (cell.padding?.left ?? 3),
-                            table.columns
-                              .slice(cell.column, cell.column + cell.columnSpan)
-                              .reduce((sum, width) => sum + width, 0) -
+                            (cell.rotation
+                              ? table.rows.slice(
+                                  cell.row,
+                                  cell.row + cell.rowSpan
+                                )
+                              : table.columns.slice(
+                                  cell.column,
+                                  cell.column + cell.columnSpan
+                                )
+                            ).reduce((sum, width) => sum + width, 0) -
                               (cell.padding?.left ?? 3) -
                               (cell.padding?.right ?? 3)
                           )
@@ -730,6 +967,32 @@ export function prepareExportPages(
   options: ExportOptions
 ): PageModel[] {
   const pages = structuredClone(model.pages);
+  // Keep source flow for page-setup inference. Promoting a header must not
+  // change the shared writing area on unrelated pages of the document.
+  for (const page of pages) {
+    const column =
+      page.groups[0]?.columns.length === 1
+        ? page.groups[0].columns[0]
+        : undefined;
+    const heading = column?.[0];
+    if (!column || heading?.kind !== "paragraph" || !heading.sideHeading)
+      continue;
+    page.sideHeadings = [heading];
+    column.shift();
+    let cursor = page.margins.top;
+    for (const block of column) {
+      block.before = Math.max(0, block.y - cursor);
+      cursor = Math.max(
+        Math.max(cursor, block.y) +
+          (block.kind === "paragraph"
+            ? Math.max(block.height, (block.lineCount ?? 1) * block.lineHeight)
+            : block.height),
+        ...(block.kind === "paragraph"
+          ? (block.floatingImages?.map(bottom) ?? [])
+          : [])
+      );
+    }
+  }
   if (options.preservePageBreaks) return pages;
   // Join only unambiguous single-column continuations. Keep original source
   // geometry in the analysis model; this adjustment applies to export only.
@@ -737,6 +1000,10 @@ export function prepareExportPages(
     const previous = pages[index - 1],
       current = pages[index];
     if (
+      previous.dropCaps?.length ||
+      previous.sideHeadings?.length ||
+      current.dropCaps?.length ||
+      current.sideHeadings?.length ||
       previous.overlays?.some((image) => image.role === "scan-background") ||
       current.overlays?.some((image) => image.role === "scan-background") ||
       !samePage(previous, current) ||
@@ -792,10 +1059,16 @@ export async function exportDocx(
   const pages = prepareExportPages(model, options).map((page, index) =>
     applyPageSetup(page, setups[index])
   );
+  pages.forEach(anchorFormControls);
+  pages.forEach(anchorTextBackgrounds);
   let previousPage: PageModel | undefined;
   for (const page of pages) {
     const preservePage =
       options.preservePageBreaks ||
+      !!page.dropCaps?.length ||
+      !!page.sideHeadings?.length ||
+      !!previousPage?.dropCaps?.length ||
+      !!previousPage?.sideHeadings?.length ||
       page.overlays?.some((image) => image.role === "scan-background") ||
       previousPage?.overlays?.some((image) => image.role === "scan-background");
     const footer = page.footer;
@@ -849,17 +1122,60 @@ export async function exportDocx(
             },
           })
         );
+      if (groupIndex === 0)
+        for (const cap of [
+          ...(page.dropCaps ?? []),
+          ...(page.sideHeadings ?? []),
+        ])
+          children.push(
+            writer.paragraph(cap, false, false, cap.x, cap.width, [], {
+              type: "absolute",
+              position: { x: twips(cap.x), y: twips(cap.y) },
+              anchor: {
+                horizontal: FrameAnchorType.PAGE,
+                vertical: FrameAnchorType.PAGE,
+              },
+              width: twips(cap.width),
+              wrap: FrameWrap.NONE,
+              anchorLock: true,
+            })
+          );
+      // Word suppresses spacing-before on the first in-flow paragraph after
+      // a floating frame. A minimal anchor retains the measured source gap.
+      if (
+        groupIndex === 0 &&
+        (page.dropCaps?.length || page.sideHeadings?.length) &&
+        !page.overlays?.length
+      )
+        children.push(
+          new WordParagraph({
+            children: [],
+            spacing: {
+              before: 0,
+              after: 0,
+              line: 1,
+              lineRule: LineRuleType.EXACT,
+            },
+          })
+        );
       let columnLeft = page.margins.left;
       group.columns.forEach((blocks, index) => {
         const columnWidth =
           group.widths?.[index] ??
           (width - group.gap * (columns - 1)) / columns;
-        if (
+        // Word applies paragraph space-before ahead of an inline column
+        // break, then drops it in the new column. A separate break paragraph
+        // keeps source top spacing on the content paragraph that follows.
+        const separateColumnBreak = Boolean(
           index &&
           (!blocks.length ||
+            blocks[0].before > 1 ||
             blocks[0].kind === "table" ||
+            // A rule has no inline runs to carry the column break.
+            blocks[0].kind === "rule" ||
             blocks[0].kind === "image-row")
-        )
+        );
+        if (separateColumnBreak)
           children.push(
             new WordParagraph({
               children: [new ColumnBreak()],
@@ -874,7 +1190,9 @@ export async function exportDocx(
         for (const [blockIndex, block] of blocks.entries()) {
           if (
             (block.kind === "table" || block.kind === "image-row") &&
-            block.before > 1
+            // Word merges adjacent tables without an intervening paragraph,
+            // even when their widths/indents differ. Keep independent grids.
+            (block.before > 1 || children.at(-1) instanceof Table)
           )
             children.push(
               new WordParagraph({
@@ -893,11 +1211,11 @@ export async function exportDocx(
               block,
               columnWidth,
               columnLeft,
-              index > 0 && blockIndex === 0
+              index > 0 && blockIndex === 0 && !separateColumnBreak
             )
           );
         }
-        columnLeft += columnWidth + group.gap;
+        columnLeft += columnWidth + (group.gaps?.[index] ?? group.gap);
       });
       const last = sections[sections.length - 1];
       const singleContinuation =
@@ -958,7 +1276,10 @@ export async function exportDocx(
                             group.widths?.[index] ??
                               (width - group.gap * (columns - 1)) / columns
                           ),
-                          space: index < columns - 1 ? positive(group.gap) : 0,
+                          space:
+                            index < columns - 1
+                              ? positive(group.gaps?.[index] ?? group.gap)
+                              : 0,
                         })
                     )
                   : undefined,
