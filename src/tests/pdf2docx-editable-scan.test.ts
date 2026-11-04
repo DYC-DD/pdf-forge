@@ -1,4 +1,4 @@
-import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { createCanvas, GlobalFonts, loadImage } from "@napi-rs/canvas";
 import JSZip from "jszip";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -12,6 +12,11 @@ import { deskewScan, scanSkew } from "../features/pdf2docx/lib/scanDeskew";
 import { scanGraphics } from "../features/pdf2docx/lib/scanGraphics";
 import { scanRules } from "../features/pdf2docx/lib/scanRules";
 import type { RawPage, TextSpan } from "../features/pdf2docx/types";
+
+// Linux runners do not always resolve Arial to an installed fallback font.
+const scanTestFont = GlobalFonts.has("Liberation Sans")
+  ? '"Liberation Sans"'
+  : "Arial";
 
 function canvas(width = 600, height = 800) {
   const result = createCanvas(width, height);
@@ -46,7 +51,7 @@ function fixture() {
     y: number,
     extra: Partial<TextSpan> = {}
   ) => {
-    context.font = "12px Arial";
+    context.font = `12px ${scanTestFont}`;
     context.fillStyle = extra.color ? `#${extra.color}` : "black";
     context.fillText(value, x, y + 12);
     page.spans.push({

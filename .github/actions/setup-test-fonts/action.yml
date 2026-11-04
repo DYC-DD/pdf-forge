@@ -19,7 +19,7 @@ runs:
           throw new Error('Liberation Sans is unavailable to canvas tests');
         }
         const context = createCanvas(200, 50).getContext('2d');
-        context.font = '12px Arial';
+        context.font = '12px "Liberation Sans"';
         context.fillText('Canvas font check', 0, 20);
         if (!context.getImageData(0, 0, 200, 50).data.some((value, index) => index % 4 === 3 && value)) {
           throw new Error('Canvas could not render text');
