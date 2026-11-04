@@ -1,3 +1,4 @@
+import { svgTransform, withoutOrientation } from "./imageMetadata";
 import { displayedSize, type ImageInfo } from "./imageSource";
 
 export function checkImageCancelled(signal?: AbortSignal) {
@@ -92,10 +93,27 @@ export async function rasterImage(
   signal?: AbortSignal,
   maxEdge?: number
 ) {
-  const decoded = await decodeImage(file, signal);
+  checkImageCancelled(signal);
+  // Browser decoders disagree on WebP EXIF. Decode un-oriented pixels, then
+  // apply the same transform used by PDF and raster exports exactly once.
+  const manualOrientation = info.format === "webp";
+  const source =
+    manualOrientation && info.orientation !== 1
+      ? new File(
+          [
+            withoutOrientation(
+              new Uint8Array(await file.arrayBuffer()),
+              "webp"
+            ),
+          ],
+          file.name,
+          { type: "image/webp" }
+        )
+      : file;
+  const decoded = await decodeImage(source, signal);
   let canvas: ReturnType<typeof makeImageCanvas> | undefined;
   try {
-    const natural = displayedSize(info);
+    const natural = manualOrientation ? info : displayedSize(info);
     if (decoded.width !== natural.width || decoded.height !== natural.height)
       throw new Error("圖片方向或尺寸無法正確辨識，請重新儲存圖片後重試。");
     const size = displayedSize(info, rotation);
@@ -114,10 +132,14 @@ export async function rasterImage(
       context.fillRect(0, 0, canvas.width, canvas.height);
     }
     context.scale(scale, scale);
-    if (rotation === 90) context.translate(size.width, 0);
-    else if (rotation === 180) context.translate(size.width, size.height);
-    else if (rotation === 270) context.translate(0, size.height);
-    context.rotate((rotation * Math.PI) / 180);
+    if (manualOrientation)
+      context.transform(...svgTransform(info, rotation).matrix);
+    else {
+      if (rotation === 90) context.translate(size.width, 0);
+      else if (rotation === 180) context.translate(size.width, size.height);
+      else if (rotation === 270) context.translate(0, size.height);
+      context.rotate((rotation * Math.PI) / 180);
+    }
     context.drawImage(decoded.image, 0, 0);
     checkImageCancelled(signal);
     const blob = await canvasBlob(canvas, type);

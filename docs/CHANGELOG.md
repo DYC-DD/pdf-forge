@@ -4,8 +4,11 @@ This changelog follows the [Keep a Changelog](https://keepachangelog.com/zh-TW/1
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-04
+
 ### Added
 
+- 圖片轉換新增靜態 WEBP 輸入，支援與 JPG／PNG 混合排序及轉換為 PDF、JPG、PNG、SVG 或 WEBP；保留原始解析度、透明度、色彩描述檔及 EXIF 方向，動態 WEBP 會顯示不支援提示。
 - PDF2docx 新增 90°／−90° 表格文字重建，以 Word 原生儲存格文字方向保留可編輯內容，支援合併儲存格。
 - 公開 PDF 回歸樣本擴充至 55 份、141 個選取頁面，涵蓋表單、雙向文字、公式、資訊圖、程式碼、條碼、清單、特殊紙張及文字外觀；記錄來源、SHA-256 與個別內容和版面要求。
 - 實際渲染檢查新增文字錨點、標題順序，以及勾選框和文字背景的相對位置核對；Word 驗證另檢查輸出的 PDF 與指定表格數，內容門檻失敗時保留診斷產物。
