@@ -1,5 +1,6 @@
 import jpegDecodeWasm from "@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm?url";
 import jpegEncodeWasm from "@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm?url";
+import webpDecodeWasm from "@jsquash/webp/codec/dec/webp_dec.wasm?url";
 import webpEncodeWasm from "@jsquash/webp/codec/enc/webp_enc.wasm?url";
 
 import { checkImageCancelled } from "./imageCanvas";
@@ -18,6 +19,26 @@ let jpegEncoder:
   | undefined;
 let webpEncoder:
   Promise<import("@jsquash/webp/codec/enc/webp_enc.js").WebPModule> | undefined;
+let webpDecoder:
+  Promise<import("@jsquash/webp/codec/dec/webp_dec.js").WebPModule> | undefined;
+
+export async function decodeWebp(bytes: Uint8Array, signal?: AbortSignal) {
+  checkImageCancelled(signal);
+  webpDecoder ??= import("@jsquash/webp/codec/dec/webp_dec.js")
+    .then(async ({ default: factory }) =>
+      factory({ wasmBinary: await wasmBinary(webpDecodeWasm) })
+    )
+    .catch((error) => {
+      webpDecoder = undefined;
+      throw error;
+    });
+  const decoder = await webpDecoder;
+  checkImageCancelled(signal);
+  const image = decoder.decode(new Uint8Array(bytes));
+  if (!image) throw new Error("WEBP 圖片無法解碼，請重新儲存後再試。");
+  checkImageCancelled(signal);
+  return image;
+}
 
 export async function decodeJpeg(bytes: Uint8Array, signal?: AbortSignal) {
   checkImageCancelled(signal);

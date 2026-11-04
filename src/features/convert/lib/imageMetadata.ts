@@ -1,6 +1,7 @@
 import { unzlibSync, zlibSync } from "fflate";
 
 import { imageTransform, type ImageInfo } from "./imageSource";
+import { webpBytes, webpChunks } from "./webpContainer";
 
 const text = new TextDecoder("ascii");
 const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -196,6 +197,17 @@ export function withoutOrientation(
   bytes: Uint8Array,
   format: ImageInfo["format"]
 ) {
+  if (format === "webp")
+    return webpBytes(
+      webpChunks(bytes)
+        .filter(({ type }) => type !== "EXIF")
+        .map((chunk) => {
+          if (chunk.type !== "VP8X") return chunk;
+          const data = new Uint8Array(chunk.data);
+          data[0] &= ~0x08;
+          return { ...chunk, data };
+        })
+    );
   if (format === "png")
     return pngBytes(pngChunks(bytes).filter(({ type }) => type !== "eXIf"));
   const exif = jpegSegments(bytes).filter(
@@ -209,6 +221,15 @@ export function withoutOrientation(
     at = end;
   }
   return joinBytes([...parts, bytes.subarray(at)]);
+}
+
+export function webpProfile(bytes: Uint8Array) {
+  const data = webpChunks(bytes).find(({ type }) => type === "ICCP")?.data;
+  if (!data) return undefined;
+  const profile = validProfile(data);
+  if (profileSpace(profile) !== "RGB ")
+    throw new Error("WEBP 色彩描述檔與圖片色彩通道不一致，請重新儲存後再試。");
+  return profile;
 }
 
 export function svgTransform(info: ImageInfo, rotation: number) {
@@ -225,7 +246,7 @@ export function svgTransform(info: ImageInfo, rotation: number) {
       d,
       c * info.height + e,
       size.height - d * info.height - f,
-    ],
+    ] as const,
   };
 }
 

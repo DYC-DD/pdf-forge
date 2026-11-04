@@ -14,6 +14,8 @@ import { PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { compressImage } from "../features/compress/lib/compressImage";
+import { detectCompressionSource } from "../features/compress/lib/compressionSource";
 import {
   convertImages,
   type ImageOutputFormat,
@@ -26,6 +28,9 @@ import {
   pngBytes,
   pngChunks,
   profileChunk,
+  webpProfile,
+  webpWithProfile,
+  withoutOrientation,
 } from "../features/convert/lib/imageMetadata";
 import { decodePngPixels, rgba8 } from "../features/convert/lib/imagePixels";
 import {
@@ -34,7 +39,9 @@ import {
   displayedSize,
   IMAGE_INPUT_LIMITS,
   inspectImageBytes,
+  sourceType,
 } from "../features/convert/lib/imageSource";
+import { webpBytes, webpChunks } from "../features/convert/lib/webpContainer";
 
 const encodings: { type: string; quality: number }[] = [];
 const closed: ReturnType<typeof vi.fn>[] = [];
@@ -62,7 +69,7 @@ beforeEach(() => {
       const filename = url.split("/").pop()!.split("?")[0];
       const path = filename.startsWith("mozjpeg_")
         ? `@jsquash/jpeg/codec/${filename.includes("_dec") ? "dec" : "enc"}/${filename}`
-        : `@jsquash/webp/codec/enc/${filename}`;
+        : `@jsquash/webp/codec/${filename.includes("_dec") ? "dec" : "enc"}/${filename}`;
       return new Response(await readFile(require.resolve(path)));
     })
   );
@@ -357,6 +364,373 @@ describe("image outputs", () => {
       }
     }
   );
+});
+
+describe("WebP inputs", () => {
+  const samples = new Uint8Array([
+    123, 45, 67, 0, 8, 99, 201, 1, 19, 202, 173, 128, 222, 111, 7, 255, 20, 40,
+    60, 255, 255, 0, 0, 255,
+  ]);
+  async function losslessWebp() {
+    const png = new File(
+      [
+        new Uint8Array(
+          encodePng({ width: 3, height: 2, channels: 4, data: samples })
+        ),
+      ],
+      "source.png"
+    );
+    const { blob } = await convertImages([{ file: png, rotation: 0 }], {
+      format: "webp",
+      outputName: "source",
+    });
+    return new File([blob], "source.webp", { type: "image/webp" });
+  }
+  async function orientedWebp(orientation: number, prefix = false) {
+    const bytes = new Uint8Array(await (await losslessWebp()).arrayBuffer());
+    const exif = new Uint8Array(prefix ? 32 : 26);
+    if (prefix) exif.set(new TextEncoder().encode("Exif\0\0"));
+    const view = new DataView(exif.buffer, prefix ? 6 : 0);
+    view.setUint16(0, 0x4949);
+    view.setUint16(2, 42, true);
+    view.setUint32(4, 8, true);
+    view.setUint16(8, 1, true);
+    view.setUint16(10, 0x112, true);
+    view.setUint16(12, 3, true);
+    view.setUint32(14, 1, true);
+    view.setUint16(18, orientation, true);
+    const extended = new Uint8Array(10);
+    extended[0] = 0x18; // Alpha and EXIF.
+    extended[4] = 2;
+    extended[7] = 1;
+    return new File(
+      [
+        webpBytes([
+          { type: "VP8X", data: extended },
+          ...webpChunks(bytes),
+          { type: "EXIF", data: exif },
+        ]),
+      ],
+      "oriented.webp",
+      { type: "image/webp" }
+    );
+  }
+
+  it("recognizes WebP by content in a mixed image batch regardless of its MIME or extension", async () => {
+    const original = await losslessWebp();
+    const file = new File([original], "wrong.jpg", { type: "application/pdf" });
+    expect(
+      sourceType(new Uint8Array(await file.slice(0, 12).arrayBuffer()))
+    ).toBe("webp");
+    expect(await detectSources([file, picture(), picture("jpg")])).toBe(
+      "images"
+    );
+    expect(inspectImageBytes(new Uint8Array(await file.arrayBuffer()))).toEqual(
+      {
+        format: "webp",
+        width: 3,
+        height: 2,
+        orientation: 1,
+      }
+    );
+    await expect(
+      detectSources([file, new File(["%PDF-1.7"], "a.pdf")])
+    ).rejects.toThrow("分開");
+    await expect(
+      detectSources([new File(["RIFFxxxxWAVE"], "fake.webp")])
+    ).rejects.toThrow("格式不支援");
+  });
+
+  it.each([false, true])(
+    "decodes native lossy WebP with transparency %s",
+    async (transparent) => {
+      const canvas = createCanvas(80, 40);
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = transparent ? "rgba(200, 100, 50, 0.5)" : "#c86432";
+      ctx.fillRect(0, 0, 80, 40);
+      const bytes = new Uint8Array(canvas.toBuffer("image/webp", 90));
+      const file = new File([bytes], "lossy.webp", { type: "image/webp" });
+      expect(webpChunks(bytes).some(({ type }) => type === "VP8 ")).toBe(true);
+      expect(inspectImageBytes(bytes)).toMatchObject({
+        format: "webp",
+        width: 80,
+        height: 40,
+      });
+      const result = await convertImages([{ file, rotation: 0 }], {
+        format: "png",
+        outputName: "decoded",
+      });
+      const actual = decodePng(new Uint8Array(await result.blob.arrayBuffer()));
+      const reference = await rawWebp(file);
+      expect([...actual.data]).toEqual([...reference.data]);
+      expect(actual.data[3]).toBe(transparent ? 127 : 255);
+    }
+  );
+
+  it.each([0, 90, 180, 270])(
+    "preserves every RGBA sample when converting lossless WebP to PNG at rotation %s",
+    async (rotation) => {
+      const file = await losslessWebp();
+      const result = await convertImages([{ file, rotation }], {
+        format: "png",
+        outputName: "rotated",
+      });
+      const image = decodePng(new Uint8Array(await result.blob.arrayBuffer()));
+      expect([image.width, image.height]).toEqual(
+        rotation % 180 ? [2, 3] : [3, 2]
+      );
+      const order =
+        rotation === 90
+          ? [3, 0, 4, 1, 5, 2]
+          : rotation === 180
+            ? [5, 4, 3, 2, 1, 0]
+            : rotation === 270
+              ? [2, 5, 1, 4, 0, 3]
+              : [0, 1, 2, 3, 4, 5];
+      expect([...image.data]).toEqual(
+        order.flatMap((pixel) => [
+          ...samples.subarray(pixel * 4, pixel * 4 + 4),
+        ])
+      );
+      expect(createImageBitmap).not.toHaveBeenCalled();
+    }
+  );
+
+  it("copies untouched WebP bytes with the correct MIME and embeds them in SVG", async () => {
+    const file = await losslessWebp();
+    const original = new Uint8Array(await file.arrayBuffer());
+    const copy = await convertImages([{ file, rotation: 0 }], {
+      format: "webp",
+      outputName: "copy",
+    });
+    expect(copy.blob.type).toBe("image/webp");
+    expect(new Uint8Array(await copy.blob.arrayBuffer())).toEqual(original);
+    const svg = await convertImages([{ file, rotation: 90 }], {
+      format: "svg",
+      outputName: "embedded",
+    });
+    const text = await svg.blob.text();
+    expect(text).toContain("data:image/webp;base64,");
+    expect(text).toContain('viewBox="0 0 2 3"');
+    expect(
+      new Uint8Array(Buffer.from(text.match(/base64,([^\"]+)/)![1], "base64"))
+    ).toEqual(original);
+  });
+
+  it("exports WebP as JPG with transparent areas flattened onto white", async () => {
+    const file = await losslessWebp();
+    const result = await convertImages([{ file, rotation: 0 }], {
+      format: "jpg",
+      outputName: "white",
+    });
+    const { image, ctx } = await decode(result.blob);
+    expect(result.blob.type).toBe("image/jpeg");
+    expect([image.width, image.height]).toEqual([3, 2]);
+    const white = ctx.getImageData(0, 0, 1, 1).data;
+    expect([...white].every((value) => value >= 250)).toBe(true);
+  });
+
+  it("preserves WebP RGB and alpha samples in a mixed JPG/PNG/WebP PDF", async () => {
+    const file = await losslessWebp();
+    const result = await convertImages(
+      [
+        { file: picture("jpg"), rotation: 0 },
+        { file: picture(), rotation: 0 },
+        { file, rotation: 90 },
+      ],
+      { format: "pdf", outputName: "mixed" }
+    );
+    const pdf = await PDFDocument.load(await result.blob.arrayBuffer());
+    expect(
+      pdf.getPages().map((page) => [page.getWidth(), page.getHeight()])
+    ).toEqual([
+      [19.2, 9.6],
+      [19.2, 9.6],
+      [0.48, 0.72],
+    ]);
+    const images = pdf.context
+      .enumerateIndirectObjects()
+      .map(([, object]) => object)
+      .filter(
+        (object): object is PDFRawStream =>
+          object instanceof PDFRawStream &&
+          object.dict.get(PDFName.of("Subtype"))?.toString() === "/Image" &&
+          object.dict.get(PDFName.of("Width"))?.toString() === "3"
+      );
+    const color = images.find((image) => image.dict.has(PDFName.of("SMask")))!;
+    const alpha = images.find((image) => image !== color)!;
+    expect([...unzlibSync(color.getContents())]).toEqual(
+      [...samples].filter((_, i) => i % 4 !== 3)
+    );
+    expect([...unzlibSync(alpha.getContents())]).toEqual([
+      0, 1, 128, 255, 255, 255,
+    ]);
+  });
+
+  it.each([false, true])(
+    "applies WebP EXIF orientation once, including Exif prefix %s",
+    async (prefix) => {
+      const file = await orientedWebp(6, prefix);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const info = inspectImageBytes(bytes);
+      expect(info.orientation).toBe(6);
+      const png = await convertImages([{ file, rotation: 0 }], {
+        format: "png",
+        outputName: "oriented",
+      });
+      const image = decodePng(new Uint8Array(await png.blob.arrayBuffer()));
+      expect([image.width, image.height]).toEqual([2, 3]);
+      expect([...image.data]).toEqual(
+        [3, 0, 4, 1, 5, 2].flatMap((pixel) => [
+          ...samples.subarray(pixel * 4, pixel * 4 + 4),
+        ])
+      );
+      const thumbnail = await rasterImage(file, info, 0, "image/png");
+      const thumb = decodePng(new Uint8Array(await thumbnail.arrayBuffer()));
+      expect([thumb.width, thumb.height]).toEqual([2, 3]);
+      expect([...thumb.data].filter((_, index) => index % 4 === 3)).toEqual([
+        255, 0, 255, 1, 255, 128,
+      ]);
+      const normalized = withoutOrientation(bytes, "webp");
+      expect(inspectImageBytes(normalized).orientation).toBe(1);
+      expect(
+        webpChunks(normalized).find(({ type }) => type === "VP8X")!.data[0] &
+          0x08
+      ).toBe(0);
+      expect((await rawWebp(new Blob([normalized]))).data).toEqual(
+        new Uint8ClampedArray(samples)
+      );
+      const svg = await convertImages([{ file, rotation: 90 }], {
+        format: "svg",
+        outputName: "oriented",
+      });
+      const text = await svg.blob.text();
+      const embedded = new Uint8Array(
+        Buffer.from(text.match(/base64,([^\"]+)/)![1], "base64")
+      );
+      expect(inspectImageBytes(embedded).orientation).toBe(1);
+      expect(text).toContain('viewBox="0 0 3 2"');
+    }
+  );
+
+  it("carries WebP ICC profiles into PNG, JPG, rotated WebP and PDF", async () => {
+    const profile = new Uint8Array(132);
+    new DataView(profile.buffer).setUint32(0, profile.length);
+    profile.set(new TextEncoder().encode("RGB "), 16);
+    profile.set(new TextEncoder().encode("acsp"), 36);
+    const bytes = webpWithProfile(
+      new Uint8Array(await (await losslessWebp()).arrayBuffer()),
+      3,
+      2,
+      profile
+    );
+    const file = new File([bytes], "profile.webp", { type: "image/webp" });
+    expect(webpProfile(bytes)).toEqual(profile);
+    for (const format of ["png", "jpg", "webp", "pdf"] as const) {
+      const result = await convertImages([{ file, rotation: 90 }], {
+        format,
+        outputName: "profile",
+      });
+      const output = new Uint8Array(await result.blob.arrayBuffer());
+      if (format === "png")
+        expect(decodePng(output).iccEmbeddedProfile?.profile).toEqual(profile);
+      else if (format === "jpg") expect(jpegProfile(output)).toEqual(profile);
+      else if (format === "webp") expect(webpProfile(output)).toEqual(profile);
+      else {
+        const pdf = await PDFDocument.load(output);
+        expect(
+          pdf.context
+            .enumerateIndirectObjects()
+            .some(
+              ([, object]) =>
+                object instanceof PDFRawStream &&
+                object.dict.get(PDFName.of("N"))?.toString() === "3" &&
+                Buffer.from(unzlibSync(object.getContents())).equals(
+                  Buffer.from(profile)
+                )
+            )
+        ).toBe(true);
+      }
+    }
+    const invalidProfile = new Uint8Array(profile);
+    invalidProfile.set(new TextEncoder().encode("CMYK"), 16);
+    const invalid = new File(
+      [
+        webpWithProfile(
+          new Uint8Array(await (await losslessWebp()).arrayBuffer()),
+          3,
+          2,
+          invalidProfile
+        ),
+      ],
+      "invalid.webp"
+    );
+    await expect(
+      convertImages([{ file: invalid, rotation: 0 }], {
+        format: "pdf",
+        outputName: "bad",
+      })
+    ).rejects.toThrow("色彩通道不一致");
+  });
+
+  it("rejects animated WebP via either the animation flag or animation chunks", async () => {
+    const bytes = new Uint8Array(await (await orientedWebp(1)).arrayBuffer());
+    for (const kind of ["flag", "ANIM", "ANMF"]) {
+      const chunks = webpChunks(bytes).map(({ type, data }) => ({
+        type,
+        data: new Uint8Array(data),
+      }));
+      if (kind === "flag") chunks[0].data[0] |= 0x02;
+      else chunks.push({ type: kind, data: new Uint8Array(6) });
+      const file = new File([webpBytes(chunks)], "animated.webp");
+      await expect(
+        convertImages([{ file, rotation: 0 }], {
+          format: "pdf",
+          outputName: "animated",
+        })
+      ).rejects.toThrow("靜態 WEBP");
+    }
+  });
+
+  it("rejects truncation, corrupt chunk lengths, forged dimensions and excessive pixel counts before decoding", async () => {
+    const bytes = new Uint8Array(await (await losslessWebp()).arrayBuffer());
+    expect(() =>
+      inspectImageBytes(bytes.subarray(0, bytes.length - 1))
+    ).toThrow("不完整");
+    const corrupt = new Uint8Array(bytes);
+    new DataView(corrupt.buffer).setUint32(16, 0xffffffff, true);
+    expect(() => inspectImageBytes(corrupt)).toThrow("損壞");
+    const forged = new Uint8Array(await (await orientedWebp(1)).arrayBuffer());
+    forged[24] = 20;
+    expect(() => inspectImageBytes(forged)).toThrow("尺寸不一致");
+    const huge = new Uint8Array(bytes);
+    new DataView(huge.buffer).setUint32(21, 0x0fffffff, true); // 16,384 × 16,384.
+    expect(() => inspectImageBytes(huge)).toThrow("尺寸超過上限");
+    const broken = new File(
+      [
+        webpBytes([
+          { type: "VP8L", data: new Uint8Array([0x2f, 2, 0x40, 0, 0]) },
+        ]),
+      ],
+      "broken.webp"
+    );
+    await expect(
+      convertImages([{ file: broken, rotation: 0 }], {
+        format: "pdf",
+        outputName: "broken",
+      })
+    ).rejects.toThrow("WEBP 圖片無法解碼");
+  });
+
+  it("keeps the compression feature limited to JPG/PNG", async () => {
+    const file = await losslessWebp();
+    await expect(detectCompressionSource([file])).rejects.toThrow(
+      "請加入 PDF、JPG 或 PNG"
+    );
+    await expect(compressImage(file, "low")).rejects.toThrow(
+      "圖片壓縮目前僅支援 JPG 或 PNG"
+    );
+  });
 });
 
 describe("images to PDF", () => {
