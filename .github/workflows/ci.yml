@@ -29,10 +29,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install fonts for canvas tests
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-dejavu-core fonts-liberation
-          fc-cache -f
+        uses: ./.github/actions/setup-test-fonts
       - name: Run tests
         run: npm test
       - name: Build site
