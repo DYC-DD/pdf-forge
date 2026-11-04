@@ -3,6 +3,11 @@
   "version": "1.2.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24.22.1 <25",
+    "npm": ">=11.21.1 <12"
+  },
+  "packageManager": "npm@11.21.1",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/copy-tool-pages.mjs",

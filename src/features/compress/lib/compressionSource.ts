@@ -11,7 +11,7 @@ export async function detectCompressionSource(
   files: readonly File[]
 ): Promise<CompressionSource> {
   if (files.length !== 1) throw new Error("一次只能加入一個檔案。");
-  const kind = await detectSources(files);
+  const kind = await detectSources(files, { allowWebp: false });
   const file = files[0];
   if (kind === "pdf")
     return {

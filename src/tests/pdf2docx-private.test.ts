@@ -9,8 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { analyzePdf } from "../features/pdf2docx/lib/analyzePdf";
 import { exportDocx } from "../features/pdf2docx/lib/exportDocx";
+import { paragraphText } from "../features/pdf2docx/lib/paragraphs";
 import type { RawPage } from "../features/pdf2docx/types";
 import { openPdf } from "../shared/pdf/preview";
+import { decodeXmlText, docxEditableText } from "./helpers/pdf2docx-docx-text";
 
 const observed = vi.hoisted(() => ({ pages: [] as RawPage[] }));
 vi.mock("../features/pdf2docx/lib/layout", async (importOriginal) => {
@@ -91,11 +93,24 @@ const samples: {
   id: string;
   path: string;
   sha256?: string;
+  sourcePageCount?: number;
   pages?: number[];
   minimumEditableCharacters?: number;
   minimumTables?: number;
+  maximumOcrPages?: number;
+  minimumRotatedCells?: number;
+  minimumLargestTableColumns?: number;
+  minimumLargestTableRows?: number;
   expectedText?: string[];
+  unexpectedText?: string[];
   minimumPreservedRegions?: number;
+  requiredReviewCodes?: string[];
+  requiredNumberingColors?: string[];
+  requiredBoldText?: string[];
+  requiredItalicText?: string[];
+  expectedColumns?: { page: number; text: string[][] }[];
+  minimumRaisedRuns?: number;
+  minimumGraphicRegions?: number;
 }[] = manifest ? JSON.parse(await readFile(resolve(manifest), "utf8")) : [];
 
 beforeEach(async () => {
@@ -138,11 +153,24 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       id,
       path,
       sha256,
+      sourcePageCount,
       pages,
       minimumEditableCharacters = 0,
       minimumTables = 0,
+      maximumOcrPages = Infinity,
+      minimumRotatedCells = 0,
+      minimumLargestTableColumns = 0,
+      minimumLargestTableRows = 0,
       expectedText = [],
+      unexpectedText = [],
       minimumPreservedRegions = 0,
+      requiredReviewCodes = [],
+      requiredNumberingColors = [],
+      requiredBoldText = [],
+      requiredItalicText = [],
+      expectedColumns = [],
+      minimumRaisedRuns = 0,
+      minimumGraphicRegions = 0,
     }) => {
       expect(id).toMatch(/^[a-z0-9-]+$/);
       const bytes = await readFile(path);
@@ -156,6 +184,10 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       let selection: number[];
       try {
         const pdf = await task.promise;
+        if (sourcePageCount !== undefined)
+          expect(pdf.numPages, "source page count changed").toBe(
+            sourcePageCount
+          );
         selection =
           pages ?? Array.from({ length: pdf.numPages }, (_, i) => i + 1);
       } finally {
@@ -171,20 +203,68 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
         model.issues.filter((issue) => issue.severity === "error")
       ).toEqual([]);
       expect(model.pages.map((page) => page.number)).toEqual(selection);
-      expect(model.stats.characters).toBeGreaterThanOrEqual(
-        minimumEditableCharacters
-      );
-      expect(model.stats.tables).toBeGreaterThanOrEqual(minimumTables);
+      for (const code of requiredReviewCodes)
+        expect(
+          model.issues.some(
+            (issue) => issue.code === code && issue.severity === "review"
+          ),
+          `Missing review notice: ${code}`
+        ).toBe(true);
+      for (const check of expectedColumns) {
+        const page = model.pages.find((page) => page.number === check.page);
+        const groups =
+          page?.groups.filter(
+            (group) => group.columns.length === check.text.length
+          ) ?? [];
+        const normalize = (text: string) =>
+          text.normalize("NFKC").replace(/\s/gu, "");
+        expect(
+          groups.some((group) =>
+            check.text.every((snippets, index) => {
+              const text = normalize(
+                group.columns[index]
+                  .filter((block) => block.kind === "paragraph")
+                  .map(paragraphText)
+                  .join("")
+              );
+              return snippets.every((snippet) =>
+                text.includes(normalize(snippet))
+              );
+            })
+          ),
+          `Missing independent columns on source page ${check.page}`
+        ).toBe(true);
+      }
+      const tables = model.pages
+        .flatMap((p) => p.groups.flatMap((g) => g.columns.flat()))
+        .filter((b) => b.kind === "table");
+      expect(
+        tables.flatMap((t) => t.cells).filter((c) => c.rotation).length
+      ).toBeGreaterThanOrEqual(minimumRotatedCells);
+      expect(
+        Math.max(0, ...tables.map((t) => t.columns.length))
+      ).toBeGreaterThanOrEqual(minimumLargestTableColumns);
+      expect(
+        Math.max(0, ...tables.map((table) => table.rows.length))
+      ).toBeGreaterThanOrEqual(minimumLargestTableRows);
       const preservedRegions = observed.pages
         .flatMap((page) => page.figures)
         .filter((figure) => figure.role === "scan-region").length;
       expect(preservedRegions).toBeGreaterThanOrEqual(minimumPreservedRegions);
+      expect(
+        observed.pages
+          .flatMap((page) => page.figures)
+          .filter((figure) => figure.role === "graphic-region").length
+      ).toBeGreaterThanOrEqual(minimumGraphicRegions);
       const blob = await exportDocx(model, { preservePageBreaks: true });
       const zip = await JSZip.loadAsync(await blob.arrayBuffer());
       const xml = await zip.file("word/document.xml")!.async("string");
       expect(xml).not.toContain("w:txbxContent");
       expect(xml).not.toContain("\uFFFD");
       expect(xml).not.toContain("w:vanish");
+      expect(
+        (xml.match(/<w:position w:val="[1-9][\d.]*(?:pt)?"/gu) ?? []).length
+      ).toBeGreaterThanOrEqual(minimumRaisedRuns);
       const parts = await Promise.all(
         Object.values(zip.files)
           .filter((entry) =>
@@ -193,22 +273,13 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
           .map((entry) => entry.async("string"))
       );
       // Editable fractions live in m:t; repeated page labels live in footers.
-      const text = [
-        ...parts
-          .join("")
-          .matchAll(/<(?:w|m):t(?:\s[^>]*)?>(.*?)<\/(?:w|m):t>/gs),
-      ]
-        .map((match) => match[1])
+      const numbering =
+        (await zip.file("word/numbering.xml")?.async("string")) ?? "";
+      const text = parts
+        .map((part) => docxEditableText(part, numbering))
         .join("")
-        .replace(/&amp;/gu, "&")
-        .replace(/&lt;/gu, "<")
-        .replace(/&gt;/gu, ">")
         .normalize("NFKC")
         .replace(/\s/gu, "");
-      expect(text.length).toBeGreaterThanOrEqual(minimumEditableCharacters);
-      expect((xml.match(/<w:tbl>/gu) ?? []).length).toBeGreaterThanOrEqual(
-        minimumTables
-      );
       if (output) {
         await mkdir(output, { recursive: true });
         await writeFile(
@@ -252,10 +323,64 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
           )
         );
       }
+      // Preserve diagnostic artifacts even when a new corpus sample fails quality gates.
+      for (const color of requiredNumberingColors) {
+        expect(color).toMatch(/^[0-9A-F]{6}$/u);
+        expect(numbering, `Missing native marker color ${color}`).toContain(
+          `<w:color w:val="${color}"/>`
+        );
+      }
+      const boldRuns = [...xml.matchAll(/<w:r>[\s\S]*?<\/w:r>/gu)]
+        .map(([run]) => run)
+        .filter((run) => /<w:b(?:\s+w:val="(?:1|true)")?\s*\/>/u.test(run))
+        .map((run) =>
+          [...run.matchAll(/<w:t(?:\s[^>]*)?>(.*?)<\/w:t>/gs)]
+            .map((m) => decodeXmlText(m[1]))
+            .join("")
+            .normalize("NFKC")
+            .replace(/\s/gu, "")
+        );
+      for (const snippet of requiredBoldText)
+        expect(
+          boldRuns.some((text) =>
+            text.includes(snippet.normalize("NFKC").replace(/\s/gu, ""))
+          ),
+          `Missing native bold text in ${id}: ${snippet}`
+        ).toBe(true);
+      const italicRuns = [...xml.matchAll(/<w:r>[\s\S]*?<\/w:r>/gu)]
+        .map(([run]) => run)
+        .filter((run) => /<w:i(?:\s+w:val="(?:1|true)")?\s*\/>/u.test(run))
+        .map((run) =>
+          [...run.matchAll(/<w:t(?:\s[^>]*)?>(.*?)<\/w:t>/gs)]
+            .map((m) => decodeXmlText(m[1]))
+            .join("")
+            .normalize("NFKC")
+            .replace(/\s/gu, "")
+        );
+      for (const snippet of requiredItalicText)
+        expect(
+          italicRuns.some((text) =>
+            text.includes(snippet.normalize("NFKC").replace(/\s/gu, ""))
+          ),
+          `Missing native italic text in ${id}: ${snippet}`
+        ).toBe(true);
+      expect(model.stats.characters).toBeGreaterThanOrEqual(
+        minimumEditableCharacters
+      );
+      expect(model.stats.tables).toBeGreaterThanOrEqual(minimumTables);
+      expect(model.stats.ocrPages).toBeLessThanOrEqual(maximumOcrPages);
+      expect(text.length).toBeGreaterThanOrEqual(minimumEditableCharacters);
+      expect((xml.match(/<w:tbl>/gu) ?? []).length).toBeGreaterThanOrEqual(
+        minimumTables
+      );
       // Human-transcribed source snippets are a separate accuracy gate; an
       // editable character count cannot prove that those characters are right.
       for (const snippet of expectedText)
         expect(text, `Source text mismatch in ${id}: ${snippet}`).toContain(
+          snippet.normalize("NFKC").replace(/\s/gu, "")
+        );
+      for (const snippet of unexpectedText)
+        expect(text, `Incorrect OCR text in ${id}: ${snippet}`).not.toContain(
           snippet.normalize("NFKC").replace(/\s/gu, "")
         );
     },
