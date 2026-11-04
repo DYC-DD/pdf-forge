@@ -108,7 +108,11 @@ function measuredFlowBottom(page: PageModel): number {
 }
 
 function marginEvidence(page: PageModel): MarginEvidence {
-  const blocks = page.groups.flatMap((group) => group.columns.flat());
+  const blocks = [
+    ...page.groups.flatMap((group) => group.columns.flat()),
+    ...(page.dropCaps ?? []),
+    ...(page.sideHeadings ?? []),
+  ];
   const text = blocks
     .filter(
       (block): block is Paragraph =>
@@ -124,7 +128,11 @@ function marginEvidence(page: PageModel): MarginEvidence {
     );
   const tables = blocks.filter((block) => block.kind === "table");
   const anchors = [...text, ...tables];
-  if (!anchors.length) return { reliableWidth: false };
+  // A poster can consist entirely of headings and centered labels. Their
+  // horizontal alignment does not establish a writing width, but their top
+  // and bottom coordinates still constrain the physical page margins.
+  if (!anchors.length && !blocks.some((block) => block.kind === "paragraph"))
+    return { reliableWidth: false };
   const lefts = [
     ...anchors,
     ...blocks.filter(
@@ -137,7 +145,9 @@ function marginEvidence(page: PageModel): MarginEvidence {
     .map((block) => block.x)
     .sort((a, b) => a - b);
   // Prefer body starts over indented lists, quotes, and isolated decorations.
-  const left = Math.max(0, lefts[Math.floor((lefts.length - 1) * 0.05)]);
+  const left = lefts.length
+    ? Math.max(0, lefts[Math.floor((lefts.length - 1) * 0.05)])
+    : undefined;
   const wide = anchors.filter(
     (block) =>
       block.width >= page.width * 0.5 &&
@@ -223,6 +233,26 @@ function chooseMargins(
   if (best.cost <= 1.5 || !evidence.some((entry) => entry.reliableWidth)) {
     const margins = { ...MARGIN_PRESETS[best.preset] };
     let adjusted = false;
+    // A native table cannot move independently of its page-anchored cell
+    // artwork. Keep narrow source edges rather than clamping table indentation.
+    for (const edge of ["left", "right"] as const) {
+      const safe = Math.min(
+        ...pages.flatMap((page) =>
+          page.groups.flatMap((group) =>
+            group.columns
+              .flat()
+              .filter((block) => block.kind === "table")
+              .map((table) =>
+                edge === "left" ? table.x : page.width - right(table)
+              )
+          )
+        )
+      );
+      if (safe < margins[edge]) {
+        margins[edge] = Math.max(0, Math.floor(safe));
+        adjusted = true;
+      }
+    }
     for (const edge of ["top", "bottom"] as const) {
       const values = evidence.flatMap((entry) =>
         entry[edge] === undefined ? [] : [entry[edge]!]
@@ -468,6 +498,20 @@ export function applyPageSetup(
         }),
       };
     });
+    if (page.dropCaps)
+      output.dropCaps = page.dropCaps.map(
+        (cap) => map(cap, cap.x, cap.x * sx, cap.width * sx) as Paragraph
+      );
+    if (page.sideHeadings)
+      output.sideHeadings = page.sideHeadings.map(
+        (heading) =>
+          map(
+            heading,
+            heading.x,
+            heading.x * sx,
+            heading.width * sx
+          ) as Paragraph
+      );
     if (page.footer)
       output.footer = {
         ...(map(

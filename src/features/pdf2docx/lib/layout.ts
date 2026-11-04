@@ -8,6 +8,7 @@ import type {
   Paragraph,
   RawPage,
 } from "../types";
+import { findDropCaps } from "./dropCaps";
 import { bottom, bounds, median, right } from "./geometry";
 import { classifyPage, recurringFooterIds } from "./pageObjects";
 import {
@@ -17,6 +18,7 @@ import {
   withPageNumber,
   type TextLine,
 } from "./paragraphs";
+import { findSideHeading } from "./sideHeadings";
 
 type Node = TextLine | Exclude<FlowBlock, Paragraph>;
 function groupImages(nodes: Node[]): Node[] {
@@ -123,7 +125,13 @@ function flow(nodes: Node[], region: Box, bodySize: number): FlowBlock[] {
   const arranged = attachWrappedImages(output);
   for (const [index, block] of arranged.entries()) {
     const next = arranged[index + 1];
-    if (block.kind !== "paragraph" || !next || next.y <= block.y) continue;
+    if (
+      block.kind !== "paragraph" ||
+      block.sourceTextAngle !== undefined ||
+      !next ||
+      next.y <= block.y
+    )
+      continue;
     // A standalone source line has no measured leading. The default 1.25 em
     // must not accumulate when tightly set form rows are only one em apart.
     const count = block.lineCount ?? 1;
@@ -135,12 +143,14 @@ function flow(nodes: Node[], region: Box, bodySize: number): FlowBlock[] {
   let cursor = region.y;
   for (const block of arranged) {
     block.before = Math.max(0, block.y - cursor);
+    // A block that starts inside the preceding line must flow after it in
+    // Word. Carry that displacement forward instead of adding the same blank
+    // gap again before the following block.
     cursor = Math.max(
-      cursor,
-      block.kind === "paragraph"
-        ? block.y +
-            Math.max(block.height, (block.lineCount ?? 1) * block.lineHeight)
-        : bottom(block),
+      Math.max(cursor, block.y) +
+        (block.kind === "paragraph"
+          ? Math.max(block.height, (block.lineCount ?? 1) * block.lineHeight)
+          : block.height),
       ...(block.kind === "paragraph"
         ? (block.floatingImages?.map(bottom) ?? [])
         : [])
@@ -595,8 +605,12 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
       )
     );
     overlays.push(...tableSiblings);
+    const capitals = findDropCaps(text, bodySize);
+    const dropCaps = capitals.map((cap) =>
+      makeParagraph(buildLines([cap]), cap, bodySize)
+    );
     const nodes: Node[] = [
-      ...buildLines(text),
+      ...buildLines(text.filter((span) => !capitals.includes(span))),
       ...tables,
       ...rules,
       ...figures
@@ -607,7 +621,7 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
           before: 0,
         })),
     ];
-    const content = bounds(nodes);
+    const content = bounds([...nodes, ...dropCaps]);
     const margins = nodes.length
       ? {
           left: Math.max(0, Math.min(content.x, page.width * 0.3)),
@@ -650,8 +664,20 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
     )
       ? [{ columns: [flow(nodes, region, bodySize)], gap: 0 }]
       : pageGroups(nodes, region, bodySize);
+    const sideHeading = findSideHeading(text, bodySize, page.width);
+    const first =
+      groups[0]?.columns.length === 1 ? groups[0].columns[0][0] : undefined;
+    if (
+      sideHeading &&
+      first?.kind === "paragraph" &&
+      first.lineCount === 1 &&
+      first.ids.length === sideHeading.spans.length &&
+      sideHeading.spans.every((span) => first.ids.includes(span.id))
+    )
+      first.sideHeading = true;
     const represented = new Set<string>([
       ...footerIds,
+      ...dropCaps.flatMap((cap) => cap.ids),
       ...page.spans
         .filter(
           (span) =>
@@ -662,6 +688,7 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
         )
         .map((span) => span.id),
     ]);
+    stats.paragraphs += dropCaps.length;
     stats.images += overlays.length;
     stats.rules += rules.length;
     if (footerLine) stats.paragraphs++;
@@ -708,6 +735,7 @@ export function analyzeLayout(rawPages: RawPage[]): DocumentModel {
       height: page.height,
       margins,
       groups,
+      ...(dropCaps.length ? { dropCaps } : {}),
       source: page.source,
       characters,
       overlays: overlays.map((figure) => ({

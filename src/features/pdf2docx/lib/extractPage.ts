@@ -2,6 +2,7 @@ import { OPS, type PDFPageProxy } from "pdfjs-dist";
 
 import type { Box, Issue, RawPage, Rule, TextSpan } from "../types";
 import { diagramGraphics } from "./diagramGraphics";
+import { encodingRegions, uncertainEncoding } from "./encodingRegions";
 import { framedGraphics } from "./framedGraphics";
 import {
   bottom,
@@ -17,9 +18,12 @@ import { deskewScan } from "./scanDeskew";
 import { retainUncertainScan } from "./scanFallback";
 import { detectTables } from "./tables";
 import { applyTextAppearance, pdfFontName } from "./textAppearance";
+import { textBackgrounds } from "./textBackgrounds";
 
 type Matrix = [number, number, number, number, number, number];
 type ImagePlacement = Box & {
+  formControl?: boolean;
+  textBackgroundFor?: string[];
   overlay?: boolean;
   blendMode?: string;
   textOperations?: number[];
@@ -88,6 +92,7 @@ export async function extractPage(
   const text = await page.getTextContent();
   checkAbort(signal);
   const angles = new Map<string, number>();
+  const lineEnds = new Set<string>();
   for (const item of text.items) {
     if (!("str" in item) || !item.str) continue;
     if (raw.spans.length >= DOCX_LIMITS.spansPerPage)
@@ -97,14 +102,14 @@ export async function extractPage(
     const style = text.styles[item.fontName];
     const matrix = multiply(viewport.transform, item.transform);
     const size = Math.hypot(matrix[2], matrix[3]);
-    const name = (
-      page.commonObjs.has(item.fontName)
-        ? page.commonObjs.get(item.fontName)?.name
-        : ""
-    ) as string | undefined;
+    const pdfFont = page.commonObjs.has(item.fontName)
+      ? page.commonObjs.get(item.fontName)
+      : undefined;
+    const name = pdfFont?.name as string | undefined;
     const font = pdfFontName(name || style?.fontFamily || "sans-serif");
     if (
       Math.abs(matrix[1]) > size * 0.15 ||
+      matrix[0] < 0 ||
       item.dir === "ttb" ||
       item.dir === "rtl"
     )
@@ -126,23 +131,47 @@ export async function extractPage(
       baseline: matrix[5],
       size,
       font,
-      bold: /bold|black|heavy|semibold|demi|Nimbus.*-Medi/iu.test(font),
-      italic: /italic|oblique|ital$|slant/iu.test(font),
+      // PostScript style suffixes use Bd/Blk as well as full weight names.
+      // Require a suffix boundary and known modifiers; BdOu is an outline
+      // face, not permission to replace its hollow glyphs with filled bold.
+      bold: /bold|black|heavy|semibold|demi|Nimbus.*-Medi|(?:^|[-,])(?:Bd|Blk)(?:Cn|Cond|Ext)?(?:It|Obl)?$/iu.test(
+        font
+      ),
+      // The same PostScript suffix convention applies to italic/oblique.
+      // Do not confuse letters inside a family name with a style suffix.
+      italic:
+        /italic|oblique|ital$|slant|(?:^|[-,])(?:Bd|Blk)?(?:Cn|Cond|Ext)?(?:It|Obl)$/iu.test(
+          font
+        ),
       source: "pdf",
       fontScale: Math.round(
         (Math.hypot(matrix[0], matrix[1]) / Math.max(0.01, size)) * 100
       ),
     };
     raw.spans.push(span);
+    if (
+      item.hasEOL &&
+      item.dir === "ltr" &&
+      Math.abs(matrix[1]) < 0.01 &&
+      matrix[0] > 0 &&
+      pdfFont?.vertical === false &&
+      pdfFont.fontMatrix?.every(
+        (value: number, i: number) => value === (i === 0 || i === 3 ? 0.001 : 0)
+      )
+    )
+      lineEnds.add(span.id);
     const rotation = (Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI;
+    if (item.dir === "ltr" && Math.abs(rotation) > 1 && Math.abs(rotation) < 80)
+      span.oblique = { angle: rotation, baselineX: matrix[4] };
     if (Math.abs(Math.abs(rotation) - 90) < 1)
       span.rotation = rotation < 0 ? -90 : 90;
     angles.set(
       span.id,
       Math.abs((Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI)
     );
-    // A rotated bounding box needs all four corners, not a horizontal width.
-    if (Math.abs(matrix[1]) > size * 0.15) {
+    // An inverted line can have zero vertical advance, but still extends
+    // left and below its origin. Transform all corners for that case too.
+    if (Math.abs(matrix[1]) > size * 0.15 || matrix[0] < 0) {
       const ux = matrix[0] / Math.hypot(matrix[0], matrix[1]),
         uy = matrix[1] / Math.hypot(matrix[0], matrix[1]);
       Object.assign(
@@ -172,7 +201,7 @@ export async function extractPage(
     )
       previous.spaceAfter = true;
   }
-  applyTextAppearance(raw.spans, operators);
+  applyTextAppearance(raw.spans, operators, lineEnds);
   const regular = raw.spans.filter(
     (span) => (angles.get(span.id) ?? 0) < 10 && span.text.trim()
   );
@@ -193,11 +222,7 @@ export async function extractPage(
   decorative.forEach((span) => {
     span.decorative = true;
   });
-  if (
-    raw.spans.some((span) =>
-      /[\uFFFD\u0000-\u0008\uE000-\uF8FF\p{Cn}]/u.test(span.text)
-    )
-  )
+  if (raw.spans.some((span) => uncertainEncoding.test(span.text)))
     issue(
       "encoding",
       "文字層含無法確認的字元，需要重新辨識並核對原稿。",
@@ -397,12 +422,16 @@ export async function extractPage(
       let previous = { x: 0, y: 0 },
         first = previous;
       const paths: Rule[] = [];
+      const subpaths: { rules: Rule[]; curved: boolean }[] = [];
+      let subpath = { rules: [] as Rule[], curved: false };
       let curved = false;
       for (let cursor = 0; cursor < data.length;) {
         const command = data[cursor++];
-        if (command === 0)
+        if (command === 0) {
+          subpath = { rules: [], curved: false };
+          subpaths.push(subpath);
           first = previous = point(transform, data[cursor++], data[cursor++]);
-        else if (command === 1) {
+        } else if (command === 1) {
           const next = point(transform, data[cursor++], data[cursor++]);
           paths.push({
             x1: previous.x,
@@ -410,6 +439,7 @@ export async function extractPage(
             x2: next.x,
             y2: next.y,
           });
+          subpath.rules.push(paths[paths.length - 1]);
           previous = next;
         } else if (command === 4) {
           paths.push({
@@ -418,6 +448,7 @@ export async function extractPage(
             x2: first.x,
             y2: first.y,
           });
+          subpath.rules.push(paths[paths.length - 1]);
           previous = first;
         } else if (command === 2 || command === 3) {
           const count = command === 2 ? 6 : 4;
@@ -428,6 +459,7 @@ export async function extractPage(
           );
           cursor += count;
           curved = true;
+          subpath.curved = true;
         } else {
           issue("path-format", "部分向量路徑無法解析，請核對圖形。");
           break;
@@ -438,8 +470,51 @@ export async function extractPage(
           "vector-art",
           "含曲線或向量插圖；此開發版本尚未完整還原這類圖形，請核對原稿。"
         );
+      // Coastlines consist of thousands of tiny diagonal edges. An absolute
+      // axis tolerance alone mistakes almost every edge for a table border.
+      // Keep each non-rectilinear subpath as artwork; separate subpaths
+      // in the same paint operation can still contribute real table rules.
+      const artworkRules = new Set(
+        subpaths
+          .filter(
+            (path) =>
+              !path.curved &&
+              path.rules.some((rule) => {
+                const dx = Math.abs(rule.x2 - rule.x1);
+                const dy = Math.abs(rule.y2 - rule.y1);
+                return (
+                  Math.min(dx, dy) > Math.min(1.5, Math.max(dx, dy) * 0.02)
+                );
+              })
+          )
+          .flatMap((path) => path.rules)
+      );
       const paint = args[0];
       const extent = args[2] as number[] | undefined;
+      // A colored rectangle starting at a glyph baseline can mark its
+      // descender area. Keep its exact painted band instead of replacing it
+      // with a text-colored Word underline just because it is <= 3 pt tall.
+      const baselineBand = (box: Box) =>
+        (paint === OPS.fill || paint === OPS.eoFill) &&
+        !curved &&
+        paths.length === 4 &&
+        box.height > 0 &&
+        box.height <= 3 &&
+        box.width > box.height * 4 &&
+        raw.spans.some(
+          (span) =>
+            span.source === "pdf" &&
+            !span.hidden &&
+            !span.invisible &&
+            !span.rotation &&
+            !span.oblique &&
+            span.text.trim() &&
+            paintState.fill !== (span.color ?? "000000") &&
+            box.height >= span.size * 0.15 &&
+            Math.abs(box.y - span.baseline) <= 0.5 &&
+            Math.abs(box.x - span.x) <= 0.5 &&
+            Math.abs(right(box) - right(span)) <= 0.5
+        );
       if (extent?.length === 4 && paint !== OPS.endPath) {
         const box = transformedBox(transform, {
           x: extent[0],
@@ -449,6 +524,7 @@ export async function extractPage(
         });
         const artwork =
           curved ||
+          artworkRules.size > 0 ||
           paths.some(
             (rule) =>
               Math.abs(rule.x1 - rule.x2) > 1.5 &&
@@ -464,7 +540,8 @@ export async function extractPage(
         ].includes(paint);
         if (
           (artwork ||
-            (filled && Math.min(box.width, box.height) > 3) ||
+            (filled &&
+              (Math.min(box.width, box.height) > 3 || baselineBand(box))) ||
             box.y > raw.height * 0.92) &&
           !(
             filled &&
@@ -472,7 +549,15 @@ export async function extractPage(
             box.width * box.height > raw.width * raw.height * 0.9
           )
         )
-          vectorCandidates.push({ box, index, artwork });
+          vectorCandidates.push({
+            // Transparent clearance keeps a solitary thin band above the
+            // image-crop minimum without changing the painted geometry.
+            box: baselineBand(box)
+              ? { ...box, y: box.y - 1.5, height: box.height + 3 }
+              : box,
+            index,
+            artwork,
+          });
       }
       if (
         paint === OPS.stroke ||
@@ -482,9 +567,9 @@ export async function extractPage(
         paint === OPS.closeFillStroke ||
         paint === OPS.closeEOFillStroke
       ) {
-        paths.forEach((rule) =>
-          addRule({ x: rule.x1, y: rule.y1 }, { x: rule.x2, y: rule.y2 })
-        );
+        for (const rule of paths)
+          if (extent?.length !== 4 || !artworkRules.has(rule))
+            addRule({ x: rule.x1, y: rule.y1 }, { x: rule.x2, y: rule.y2 });
       }
       if (
         [
@@ -505,6 +590,7 @@ export async function extractPage(
           ])
         );
         if (
+          !baselineBand(box) &&
           Math.min(box.width, box.height) <= 3 &&
           Math.max(box.width, box.height) > Math.min(box.width, box.height) * 4
         )
@@ -575,10 +661,32 @@ export async function extractPage(
     bodySize,
     raw.fills
   );
+  const encodedCells = encodingRegions(raw, tables);
+  imageBoxes.push(
+    ...encodedCells.map((box) => ({ ...box, fullContent: true, overlay: true }))
+  );
+  const labels = imageBoxes.some(
+    (box) => box.width * box.height > raw.width * raw.height * 0.35
+  )
+    ? []
+    : textBackgrounds(raw, vectorCandidates, tables);
+  imageBoxes.push(
+    ...labels.map((label) => ({
+      x: label.x,
+      y: label.y,
+      width: label.width,
+      height: label.height,
+      vectorOperations: [label.index],
+      overlay: true,
+      behindText: true,
+      textBackgroundFor: label.ids,
+    }))
+  );
   const vectors = vectorCandidates.filter(
     (candidate) =>
-      candidate.artwork ||
-      !tables.some((table) => containsCenter(table, candidate.box))
+      !labels.some((label) => label.index === candidate.index) &&
+      (candidate.artwork ||
+        !tables.some((table) => containsCenter(table, candidate.box)))
   );
   const charts = framedGraphics(
     raw,
@@ -644,7 +752,11 @@ export async function extractPage(
           .slice(cell.row, cell.row + cell.rowSpan)
           .reduce((a, b) => a + b, 0),
       };
-      if (box.width * box.height > raw.width * raw.height * 0.05) continue;
+      if (
+        box.width * box.height > raw.width * raw.height * 0.05 ||
+        encodedCells.some((region) => containsBox(region, box, 1))
+      )
+        continue;
       const labels = raw.spans.filter(
         (span) => !span.hidden && containsCenter(box, span)
       );
@@ -685,7 +797,7 @@ export async function extractPage(
   }
   const remainingVectors = vectors.filter(
     (v) =>
-      ![...charts, ...illustratedCells].some((box) =>
+      ![...charts, ...illustratedCells, ...encodedCells].some((box) =>
         containsBox(box, v.box, 2)
       )
   );
@@ -716,7 +828,12 @@ export async function extractPage(
       height: Math.abs(y2 - y1),
     });
     if (box.width > 0 && box.height > 0)
-      imageBoxes.push({ ...box, fullContent: true, overlay: true });
+      imageBoxes.push({
+        ...box,
+        fullContent: true,
+        overlay: true,
+        formControl: true,
+      });
   }
   return {
     raw,
@@ -1190,6 +1307,8 @@ export async function captureFigures(
               ? "graphic-region"
               : undefined,
           inFooter: box.inFooter,
+          formControl: box.formControl,
+          textBackgroundFor: box.textBackgroundFor,
           overlay:
             box.overlay ||
             (!box.fullContent &&

@@ -7,9 +7,12 @@ import JSZip from "jszip";
 import {
   BlendMode,
   clip,
+  closePath,
   degrees,
   endPath,
   fill,
+  lineTo,
+  moveTo,
   PDFDocument,
   popGraphicsState,
   pushGraphicsState,
@@ -17,6 +20,7 @@ import {
   rgb,
   setTextRenderingMode,
   StandardFonts,
+  stroke,
   TextRenderingMode,
   translate,
 } from "pdf-lib";
@@ -580,12 +584,82 @@ describe("PDF2docx with real PDF.js input", () => {
         expect(model.stats.images).toBeGreaterThanOrEqual(1);
         expect(model.pages[0].overlays).toEqual(
           expect.arrayContaining([
-            expect.objectContaining({ overlay: true, width: 12, height: 12 }),
+            expect.objectContaining({
+              overlay: true,
+              width: 12,
+              height: 12,
+            }),
+            expect.objectContaining({
+              formControl: true,
+              x: 39.5,
+              y: 87.5,
+              width: 13,
+              height: 13,
+            }),
           ])
         );
       }
     }
   );
+
+  it("keeps white label text editable and anchors only its opaque background", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    page.drawRectangle({
+      x: 36,
+      y: 400,
+      width: 36,
+      height: 12,
+      color: rgb(0, 0, 0),
+    });
+    page.drawText("Part I", { x: 41, y: 402, size: 10, color: rgb(1, 1, 1) });
+    page.drawText("Editable section title", { x: 80, y: 402, size: 10 });
+    page.drawText(
+      "Normal editable prose below the section label stays outside the background.",
+      { x: 36, y: 380, size: 10 }
+    );
+    const model = await analyzePdf(
+      new File([new Uint8Array(await pdf.save())], "label.pdf"),
+      undefined,
+      { ocr: "off" }
+    );
+    const background = model.pages[0].overlays!.find(
+      (i) => i.textBackgroundFor?.length
+    )!;
+    expect(background).toMatchObject({
+      width: 36,
+      height: 12,
+      behindText: true,
+    });
+    const png = await loadImage(background.data);
+    const canvas = createCanvas(png.width, png.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(png, 0, 0);
+    const pixels = ctx.getImageData(0, 0, png.width, png.height).data;
+    let dark = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (
+        pixels[i] < 20 &&
+        pixels[i + 1] < 20 &&
+        pixels[i + 2] < 20 &&
+        pixels[i + 3] > 240
+      )
+        dark++;
+    expect(dark / (png.width * png.height)).toBeGreaterThan(0.95);
+    const blob = await exportDocx(model, { preservePageBreaks: true });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const xml = await zip.file("word/document.xml")!.async("string");
+    const paragraph = [...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)]
+      .map((m) => m[0])
+      .find((p) => p.includes("Part I"))!;
+    expect(paragraph).toContain('w:color w:val="FFFFFF"');
+    expect(paragraph).toContain('behindDoc="1"');
+    expect(paragraph).toContain('<wp:positionV relativeFrom="paragraph">');
+    expect(xml).toContain("Editable section title");
+    expect(xml).toContain("Normal editable prose");
+    expect(model.stats.ocrPages).toBe(0);
+    expect(model.pages[0].overlays).toContain(background);
+  });
 
   it("detects visible form values missing from the PDF text layer", async () => {
     const pdf = await PDFDocument.create(),
@@ -1152,3 +1226,538 @@ it("keeps chart axes and numeric labels together while body text and cell grids 
   expect(xml).not.toContain(">240</w:t>");
   expect(xml).not.toContain(">360</w:t>");
 });
+
+it("captures an unreadable cell from source pixels while exporting the surrounding native table", async () => {
+  const pdf = await PDFDocument.create();
+  const sheet = pdf.addPage([600, 800]);
+  for (const x of [40, 200, 420])
+    sheet.drawLine({ start: { x, y: 500 }, end: { x, y: 600 }, thickness: 1 });
+  for (const y of [500, 550, 600])
+    sheet.drawLine({ start: { x: 40, y }, end: { x: 420, y }, thickness: 1 });
+  sheet.drawText("Visible source glyphs", { x: 50, y: 570, size: 12 });
+  sheet.drawText("Native neighboring cell", { x: 210, y: 570, size: 12 });
+  sheet.drawText("Native lower cell", { x: 50, y: 520, size: 12 });
+  sheet.drawText("Another native cell", { x: 210, y: 520, size: 12 });
+  sheet.drawText(
+    "Body text outside the table remains editable and is not sent through OCR.",
+    { x: 40, y: 450, size: 12 }
+  );
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "cell-mapping.pdf")
+  );
+  try {
+    const source = await (await task.promise).getPage(1);
+    const content = await source.getTextContent();
+    const item = content.items.find(
+      (i) => "str" in i && i.str === "Visible source glyphs"
+    );
+    if (!item || !("str" in item)) throw new Error("Missing fixture text");
+    item.str = "Unmapped \uFFFD";
+    vi.spyOn(source, "getTextContent").mockResolvedValue(content);
+    const { raw, imageBoxes } = await extractPage(source);
+    expect(raw.issues.some((i) => i.code === "encoding")).toBe(false);
+    expect(
+      raw.issues.some(
+        (i) => i.code === "encoding-region" && i.severity === "review"
+      )
+    ).toBe(true);
+    expect(
+      raw.spans.find((s) => s.text === "Unmapped \uFFFD")?.rasterized
+    ).toBe(true);
+    await captureFigures(source, raw, imageBoxes);
+    expect(raw.figures).toHaveLength(1);
+    const figure = raw.figures[0];
+    expect(figure).toMatchObject({
+      x: 40,
+      y: 200,
+      width: 160,
+      height: 50,
+      overlay: true,
+    });
+    const decoded = await loadImage(figure.data);
+    const canvas = createCanvas(decoded.width, decoded.height);
+    const context = canvas.getContext("2d");
+    context.drawImage(decoded, 0, 0);
+    const scale = canvas.width / figure.width;
+    // Read the inner ink, excluding the grid: missing mappings must not become blank crops.
+    const pixels = context.getImageData(
+      5 * scale,
+      5 * scale,
+      150 * scale,
+      40 * scale
+    ).data;
+    let ink = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i] < 100 && pixels[i + 1] < 100 && pixels[i + 2] < 100) ink++;
+    expect(ink).toBeGreaterThan(100);
+    const { analyzeLayout } = await import("../features/pdf2docx/lib/layout");
+    const model = analyzeLayout([raw]);
+    expect(model.stats.tables).toBe(1);
+    const zip = await JSZip.loadAsync(
+      await (
+        await exportDocx(model, { preservePageBreaks: true })
+      ).arrayBuffer()
+    );
+    const xml = await zip.file("word/document.xml")!.async("string");
+    expect(xml).toContain("Native neighboring cell");
+    expect(xml).toContain("Body text outside");
+    expect(xml).not.toContain("Unmapped");
+    expect(xml).not.toContain("\uFFFD");
+  } finally {
+    await task.destroy();
+  }
+});
+
+it.each([false, true])(
+  "keeps dense map outlines as artwork and independent grid subpaths editable (closed=%s)",
+  async (closed) => {
+    const pdf = await PDFDocument.create();
+    const sheet = pdf.addPage([400, 500]);
+    const coastline = [moveTo(30, 300)];
+    for (let i = 1; i <= DOCX_LIMITS.rulesPerPage + 10; i++)
+      coastline.push(lineTo(30 + i * 0.1, 300 + (i % 2) * 0.5));
+    coastline.push(lineTo(230, 380), lineTo(30, 380));
+    if (closed) coastline.push(closePath());
+    // A single paint contains the map and a real table; filtering the whole
+    // operator would silently discard these independent grid subpaths.
+    sheet.pushOperators(
+      ...coastline,
+      rectangle(30, 80, 200, 100),
+      moveTo(130, 80),
+      lineTo(130, 180),
+      moveTo(30, 130),
+      lineTo(230, 130),
+      stroke()
+    );
+    for (const [text, x, y] of [
+      ["A", 40, 150],
+      ["B", 140, 150],
+      ["C", 40, 100],
+      ["D", 140, 100],
+    ] as const)
+      sheet.drawText(text, { x, y, size: 12 });
+    sheet.drawText("Editable map caption", { x: 30, y: 270, size: 12 });
+    const task = await openPdf(
+      new File([new Uint8Array(await pdf.save())], "coastline.pdf")
+    );
+    try {
+      const source = await (await task.promise).getPage(1);
+      const { raw, imageBoxes } = await extractPage(source);
+      expect(raw.rules.length).toBeLessThan(12);
+      expect(raw.spans.every((span) => !span.rasterized)).toBe(true);
+      await captureFigures(source, raw, imageBoxes);
+      expect(raw.figures.length).toBeGreaterThan(0);
+      const figure = raw.figures[0];
+      const picture = await loadImage(figure.data!);
+      const canvas = createCanvas(picture.width, picture.height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(picture, 0, 0);
+      const pixels = ctx.getImageData(0, 0, picture.width, picture.height).data;
+      let ink = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        if (pixels[i + 3] > 0 && pixels[i] < 100) ink++;
+      expect(ink).toBeGreaterThan(100);
+      const { analyzeLayout } = await import("../features/pdf2docx/lib/layout");
+      const model = analyzeLayout([raw]);
+      expect(model.stats.tables).toBe(1);
+      expect(model.stats.ocrPages).toBe(0);
+      const zip = await JSZip.loadAsync(
+        await (
+          await exportDocx(model, { preservePageBreaks: true })
+        ).arrayBuffer()
+      );
+      const xml = await zip.file("word/document.xml")!.async("string");
+      for (const text of ["A", "B", "C", "D", "Editable map caption"])
+        expect(xml).toContain(`>${text}</w:t>`);
+    } finally {
+      await task.destroy();
+    }
+  }
+);
+
+it("still rejects more than the supported number of independent table rules", async () => {
+  const pdf = await PDFDocument.create();
+  const sheet = pdf.addPage([400, 500]);
+  for (let i = 0; i <= DOCX_LIMITS.rulesPerPage; i++)
+    sheet.drawLine({
+      start: { x: 30, y: 20 + i * 0.1 },
+      end: { x: 300, y: 20 + i * 0.1 },
+      thickness: 0.05,
+    });
+  const task = await openPdf(
+    new File([new Uint8Array(await pdf.save())], "many-rules.pdf")
+  );
+  try {
+    const source = await (await task.promise).getPage(1);
+    await expect(extractPage(source)).rejects.toThrow("線條過多");
+  } finally {
+    await task.destroy();
+  }
+});
+
+it("retains a visibly painted soft hyphen through extraction and editable DOCX export", async () => {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const page = pdf.addPage([400, 300]);
+  page.drawText("A visibly hyphenated para\u00ad", {
+    x: 30,
+    y: 240,
+    font,
+    size: 12,
+    color: rgb(0, 0.5, 0),
+  });
+  page.drawText("graph continues on the next line.", {
+    x: 30,
+    y: 225,
+    font,
+    size: 12,
+    color: rgb(0, 0.5, 0),
+  });
+  const file = new File(
+    [new Uint8Array(await pdf.save())],
+    "painted-hyphen.pdf"
+  );
+  const task = await openPdf(file);
+  try {
+    const source = await (await task.promise).getPage(1);
+    const { raw } = await extractPage(source);
+    const line = raw.spans.find((s) => s.text.startsWith("A visibly"));
+    expect(line?.text).toBe("A visibly hyphenated para-");
+    expect(line?.width).toBeCloseTo(
+      // drawText emits a single unkerned Tj; measure the painted advances.
+      Array.from("A visibly hyphenated para-").reduce(
+        (sum, char) => sum + font.widthOfTextAtSize(char, 12),
+        0
+      ),
+      2
+    );
+    expect(line?.color).toBe("008000");
+  } finally {
+    await task.destroy();
+  }
+  const model = await analyzePdf(file);
+  expect(model.stats.ocrPages).toBe(0);
+  const blob = await exportDocx(model, { preservePageBreaks: true });
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const xml = await zip.file("word/document.xml")!.async("string");
+  expect(xml).toContain("A visibly hyphenated para-");
+  expect(xml).toContain("graph continues on the next line.");
+  expect(xml).not.toContain("<w:drawing");
+});
+
+it.each([0, 180, -180, 179.9, -179.9])(
+  "keeps the source bounds of near-horizontal text at %s degrees",
+  async (angle) => {
+    const pdf = await PDFDocument.create(),
+      font = await pdf.embedFont(StandardFonts.Helvetica),
+      page = pdf.addPage([400, 300]);
+    const text = "INVERTED",
+      size = 16;
+    // drawText emits an unkerned Tj string; sum the actual glyph advances.
+    const width = [...text].reduce(
+      (total, char) => total + font.widthOfTextAtSize(char, size),
+      0
+    );
+    page.drawText(text, { x: 260, y: 150, size, font, rotate: degrees(angle) });
+    const task = await openPdf(
+      new File([new Uint8Array(await pdf.save())], "inverted.pdf")
+    );
+    try {
+      const source = await (await task.promise).getPage(1);
+      const content = await source.getTextContent();
+      const item = content.items.find((entry) => "str" in entry)!;
+      const ascent =
+        content.styles[(item as { fontName: string }).fontName].ascent;
+      const { raw } = await extractPage(source);
+      expect(raw.spans).toHaveLength(1);
+      const span = raw.spans[0];
+      expect(span.text).toBe(text);
+      expect(span.baseline).toBeCloseTo(150, 2);
+      expect(span.size).toBeCloseTo(size, 2);
+      expect(Math.abs(span.width - width)).toBeLessThan(0.04);
+      expect(Math.abs(span.height - size)).toBeLessThan(0.2);
+      expect(Math.abs(span.x - (angle ? 260 - width : 260))).toBeLessThan(0.04);
+      if (angle) {
+        // Inversion exchanges the ascender/descender sides of the baseline.
+        // Near-180 rotations add at most width * sin(0.1 degrees).
+        expect(Math.abs(span.y - (150 - size * (1 - ascent)))).toBeLessThan(
+          0.2
+        );
+        expect(span.x + span.width).toBeLessThan(260.04);
+        expect(raw.issues).toContainEqual(
+          expect.objectContaining({ code: "text-direction" })
+        );
+      } else {
+        expect(span.y).toBeLessThan(150);
+        expect(
+          raw.issues.some((issue) => issue.code === "text-direction")
+        ).toBe(false);
+      }
+    } finally {
+      await task.destroy();
+    }
+  }
+);
+
+it("preserves oblique line reading order when a longer line has a higher bounding box", async () => {
+  const pdf = await PDFDocument.create(),
+    page = pdf.addPage([500, 700]);
+  const texts = [
+    "First short.",
+    "Second significantly longer sentence.",
+    "Third short.",
+  ];
+  texts.forEach((text, index) =>
+    page.drawText(text, {
+      x: 50 + index * 10,
+      y: 600 - index * 20 * Math.cos(Math.PI / 6),
+      size: 12,
+      rotate: degrees(30),
+    })
+  );
+  const model = await analyzePdf(
+    new File([new Uint8Array(await pdf.save())], "oblique.pdf"),
+    [1],
+    { ocr: "off", language: "eng" }
+  );
+  const body = model.pages[0].groups
+    .flatMap((group) => group.columns.flat())
+    .filter((block) => block.kind === "paragraph")
+    .map(paragraphText)
+    .join(" ");
+  expect(body.replace(/\s/gu, "")).toBe(texts.join("").replace(/\s/gu, ""));
+  expect(model.stats.images).toBe(0);
+  const zip = await JSZip.loadAsync(
+    await (await exportDocx(model, { preservePageBreaks: true })).arrayBuffer()
+  );
+  const xml = await zip.file("word/document.xml")!.async("string");
+  expect(xml.indexOf(texts[0])).toBeLessThan(xml.indexOf(texts[1]));
+  expect(xml.indexOf(texts[1])).toBeLessThan(xml.indexOf(texts[2]));
+  expect(xml).not.toContain("<w:drawing");
+});
+
+it.each([
+  ["HelveticaNeueLTStd-Bd", true],
+  ["HelveticaNeueLTStd-BlkCn", true],
+  ["HelveticaNeueLTStd-Blk", true],
+  ["HelveticaNeueLTStd-BdIt", true],
+  ["Example-BdCond", true],
+  ["Example-Bold", true],
+  ["HelveticaNeueLTStd-Roman", false],
+  ["HelveticaNeueLTStd-BdOu", false],
+  ["AbdulSans-Regular", false],
+  ["Example-BdCaption", false],
+])(
+  "retains native weight for %s without changing text or geometry",
+  async (name, bold) => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    pdf
+      .addPage([300, 400])
+      .drawText("Caption", { x: 30, y: 350, size: 14, font });
+    const task = await openPdf(
+      new File([new Uint8Array(await pdf.save())], "weight.pdf")
+    );
+    try {
+      const page = await (await task.promise).getPage(1);
+      await page.getOperatorList();
+      const content = await page.getTextContent();
+      const item = content.items.find((i) => "str" in i && i.str === "Caption");
+      if (!item || !("str" in item)) throw new Error("Missing source text");
+      const metadata = page.commonObjs.get(item.fontName);
+      vi.spyOn(metadata, "name", "get").mockReturnValue(name);
+      const { raw } = await extractPage(page);
+      const span = raw.spans.find((s) => s.text === "Caption")!;
+      expect(span).toMatchObject({
+        text: "Caption",
+        font: name,
+        bold,
+        x: 30,
+        size: 14,
+        baseline: 50,
+      });
+      expect(span.width).toBeCloseTo(item.width, 4);
+      const { analyzeLayout } = await import("../features/pdf2docx/lib/layout");
+      const blob = await exportDocx(analyzeLayout([raw]), {
+        preservePageBreaks: true,
+      });
+      const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+      const xml = await zip.file("word/document.xml")!.async("string");
+      const run = [...xml.matchAll(/<w:r>[\s\S]*?<\/w:r>/gu)].find(([r]) =>
+        r.includes(">Caption</w:t>")
+      )?.[0];
+      expect(run).toBeDefined();
+      expect(run!.includes("<w:b/>")).toBe(bold);
+      expect(xml).not.toContain("<w:drawing");
+    } finally {
+      await task.destroy();
+    }
+  }
+);
+
+it.each([
+  ["HelveticaNeueLTStd-It", true],
+  ["HelveticaNeueLTStd-BdIt", true],
+  ["Example-BlkCnIt", true],
+  ["Example-Obl", true],
+  ["Example-CnIt", true],
+  ["Example-Italic", true],
+  ["HelveticaNeueLTStd-Roman", false],
+  ["Habit-Regular", false],
+  ["Example-ItCaption", false],
+  ["HelveticaNeueLTStd-BdOu", false],
+])(
+  "retains native italic for %s without changing text or geometry",
+  async (name, italic) => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    pdf
+      .addPage([300, 400])
+      .drawText("Caption", { x: 30, y: 350, size: 14, font });
+    const task = await openPdf(
+      new File([new Uint8Array(await pdf.save())], "italic.pdf")
+    );
+    try {
+      const page = await (await task.promise).getPage(1);
+      await page.getOperatorList();
+      const content = await page.getTextContent();
+      const item = content.items.find((i) => "str" in i && i.str === "Caption");
+      if (!item || !("str" in item)) throw new Error("Missing source text");
+      const metadata = page.commonObjs.get(item.fontName);
+      vi.spyOn(metadata, "name", "get").mockReturnValue(name);
+      const { raw } = await extractPage(page);
+      const span = raw.spans.find((s) => s.text === "Caption")!;
+      expect(span).toMatchObject({
+        text: "Caption",
+        font: name,
+        italic,
+        x: 30,
+        size: 14,
+        baseline: 50,
+      });
+      expect(span.rotation).toBeUndefined();
+      expect(span.oblique).toBeUndefined();
+      expect(span.width).toBeCloseTo(item.width, 4);
+      const { analyzeLayout } = await import("../features/pdf2docx/lib/layout");
+      const blob = await exportDocx(analyzeLayout([raw]), {
+        preservePageBreaks: true,
+      });
+      const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+      const xml = await zip.file("word/document.xml")!.async("string");
+      const run = [...xml.matchAll(/<w:r>[\s\S]*?<\/w:r>/gu)].find(([r]) =>
+        r.includes(">Caption</w:t>")
+      )?.[0];
+      expect(run).toBeDefined();
+      expect(run!.includes("<w:i/>")).toBe(italic);
+      expect(xml).not.toContain("<w:drawing");
+    } finally {
+      await task.destroy();
+    }
+  }
+);
+
+it.each([
+  "pink",
+  "blue",
+  "same-ink",
+  "matching-color",
+  "thin",
+  "below-baseline",
+  "offset",
+  "too-wide",
+  "stroke",
+])(
+  "preserves baseline color bands without confusing %s with an underline",
+  async (kind) => {
+    const pdf = await PDFDocument.create(),
+      page = pdf.addPage([300, 300]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const text = "ABCdefghij",
+      width = font.widthOfTextAtSize(text, 10);
+    const color =
+      kind === "blue"
+        ? rgb(0.2, 0.4, 1)
+        : kind === "same-ink"
+          ? rgb(0, 0, 0)
+          : rgb(1, 0.8, 0.8);
+    const height = kind === "thin" ? 0.5 : 2;
+    const x = kind === "offset" ? 48 : 50;
+    const y = 100 - height - (kind === "below-baseline" ? 1.5 : 0);
+    if (kind === "stroke")
+      page.drawLine({
+        start: { x: 50, y: 99 },
+        end: { x: 50 + width, y: 99 },
+        thickness: 2,
+        color,
+      });
+    else
+      page.drawRectangle({
+        x,
+        y,
+        width: width + (kind === "too-wide" ? 3 : 0),
+        height,
+        color,
+        borderWidth: 0,
+      });
+    page.drawText(text, {
+      x: 50,
+      y: 100,
+      size: 10,
+      font,
+      color: kind === "matching-color" ? color : rgb(0, 0, 0),
+    });
+    const task = await openPdf(
+      new File([new Uint8Array(await pdf.save())], "band.pdf")
+    );
+    try {
+      const source = await (await task.promise).getPage(1);
+      const { raw, imageBoxes } = await extractPage(source);
+      const band = ["pink", "blue"].includes(kind);
+      expect(raw.rules.length === 0).toBe(band);
+      const label = raw.spans.find((s) => s.text === text)!;
+      expect(label).toMatchObject({ x: 50, baseline: 200, size: 10 });
+      expect(label.width).toBeCloseTo(width);
+      if (band) {
+        expect(raw.fills).toHaveLength(1);
+        expect(raw.fills![0]).toMatchObject({
+          y: 200,
+          height: 2,
+          color: kind === "pink" ? "FFCCCC" : "3366FF",
+        });
+        await captureFigures(source, raw, imageBoxes);
+        expect(raw.figures).toHaveLength(1);
+        const figure = raw.figures[0];
+        expect(figure.height).toBeLessThan(10);
+        const decoded = await loadImage(figure.data),
+          canvas = createCanvas(decoded.width, decoded.height);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(decoded, 0, 0);
+        const pixel = Array.from(
+          ctx.getImageData(
+            Math.floor(canvas.width / 2),
+            Math.floor(canvas.height / 2),
+            1,
+            1
+          ).data
+        );
+        expect(pixel).toEqual(
+          kind === "pink" ? [255, 204, 204, 255] : [51, 102, 255, 255]
+        );
+        const { analyzeLayout } =
+          await import("../features/pdf2docx/lib/layout");
+        const model = analyzeLayout([raw]);
+        expect(model.stats.characters).toBe(10);
+        const zip = await JSZip.loadAsync(
+          await (
+            await exportDocx(model, { preservePageBreaks: true })
+          ).arrayBuffer()
+        );
+        const xml = await zip.file("word/document.xml")!.async("string");
+        expect(xml).toContain(text);
+        expect(xml).not.toContain("<w:u ");
+      }
+    } finally {
+      await task.destroy();
+    }
+  }
+);

@@ -1,4 +1,5 @@
 import type { Box, Paragraph, TextRun, TextSpan } from "../types";
+import { fontName } from "./fontMetrics";
 import { bottom, bounds, median, right } from "./geometry";
 
 export type TextLine = Box & {
@@ -22,6 +23,9 @@ function sameScriptRow(a: TextSpan, b: TextSpan): boolean {
   const shift = Math.abs(small.baseline - large.baseline);
   return (
     small.size <= large.size * 0.82 &&
+    // A long neighboring title is not a script on a large word. Standalone
+    // symbols (e.g. tall braces) retain their existing expression grouping.
+    (!/\p{L}/u.test(large.text) || small.width <= large.size * 2) &&
     shift >= large.size * 0.18 &&
     shift <= large.size * 0.65 &&
     Math.min(bottom(a), bottom(b)) - Math.max(a.y, b.y) >= small.height * 0.3 &&
@@ -130,6 +134,64 @@ export function joinSeparator(previous: string, next: string): string {
   return " ";
 }
 
+// Project a native slanted baseline onto its own downward reading axis.
+// The top of its axis-aligned box depends on text length, not row order.
+function readingBaseline(span: TextSpan): number {
+  if (!span.oblique) return span.baseline;
+  const angle = (span.oblique.angle * Math.PI) / 180;
+  return (
+    -Math.sin(angle) * span.oblique.baselineX + Math.cos(angle) * span.baseline
+  );
+}
+
+function lineReadingBaseline(line: TextLine): number {
+  return line.spans.every((span) => span.oblique)
+    ? median(line.spans.map(readingBaseline))
+    : line.baseline;
+}
+
+function orderObliqueLines(lines: TextLine[]): TextLine[] {
+  const ordered = [...lines].sort((a, b) => a.y - b.y || a.x - b.x);
+  const sameFrame = (a: TextLine, b: TextLine) => {
+    const first = a.spans[0];
+    return (
+      first.oblique &&
+      [...a.spans, ...b.spans].every(
+        (span) =>
+          span.source === "pdf" &&
+          span.oblique &&
+          Math.abs(span.oblique.angle - first.oblique!.angle) < 0.1 &&
+          span.font === first.font &&
+          Math.abs(span.size - first.size) < 0.1
+      )
+    );
+  };
+  for (let start = 0; start < ordered.length;) {
+    let end = start + 1;
+    while (end < ordered.length && sameFrame(ordered[start], ordered[end]))
+      end++;
+    if (end - start > 1) {
+      const baseline = lineReadingBaseline;
+      const run = ordered
+        .slice(start, end)
+        .sort((a, b) => baseline(a) - baseline(b));
+      // Only a compact, consistently spaced run establishes a reading frame.
+      // Large gaps or overlapping projected rows do not establish such a run.
+      if (
+        run.every(
+          (line, index) =>
+            !index ||
+            (baseline(line) - baseline(run[index - 1]) >= line.size * 0.55 &&
+              baseline(line) - baseline(run[index - 1]) <= line.size * 2)
+        )
+      )
+        ordered.splice(start, run.length, ...run);
+    }
+    start = end;
+  }
+  return ordered;
+}
+
 export function buildLines(
   spans: TextSpan[],
   joinWideGaps = false
@@ -140,6 +202,28 @@ export function buildLines(
   )) {
     const row = rows.slice(-4).find((candidate) => {
       const reference = candidate.reduce((a, b) => (b.size > a.size ? b : a));
+      if (
+        (reference.oblique || span.oblique) &&
+        (!reference.oblique ||
+          !span.oblique ||
+          Math.abs(reference.oblique.angle - span.oblique.angle) >= 0.1)
+      )
+        return false;
+      // Native labels may have small baseline jitter. Use the row's typical
+      // baseline, not the first (topmost) label, without widening tolerance.
+      // Keep mixed-size scripts, font changes and OCR on their own rules.
+      const baseline =
+        span.source === "pdf" &&
+        span.font === reference.font &&
+        Math.abs(span.size - reference.size) < 0.01 &&
+        candidate.every(
+          (entry) =>
+            entry.source === "pdf" &&
+            entry.font === reference.font &&
+            Math.abs(entry.size - reference.size) < 0.01
+        )
+          ? median(candidate.map(readingBaseline))
+          : readingBaseline(reference);
       return (
         candidate.some(
           (entry) => entry.lineId && entry.lineId === span.lineId
@@ -148,7 +232,7 @@ export function buildLines(
           !span.blockId ||
           reference.blockId === span.blockId ||
           (reference.source === "ocr" && span.source === "ocr")) &&
-          (Math.abs(reference.baseline - span.baseline) <=
+          (Math.abs(baseline - readingBaseline(span)) <=
             Math.max(1.5, Math.min(reference.size, span.size) * 0.28) ||
             candidate.some(
               (entry) => sameOcrRow(entry, span) || sameScriptRow(entry, span)
@@ -189,10 +273,10 @@ export function buildLines(
     }
     add(group);
   }
-  return lines.sort((a, b) => a.y - b.y || a.x - b.x);
+  return orderObliqueLines(lines);
 }
 
-export function lineRuns(line: TextLine): TextRun[] {
+export function lineRuns(line: TextLine, positionedFields = false): TextRun[] {
   const runs: TextRun[] = [];
   let runStart = 0;
   for (const [index, span] of line.spans.entries()) {
@@ -203,9 +287,31 @@ export function lineRuns(line: TextLine): TextRun[] {
         ? Math.round((line.baseline - span.baseline) * 2) / 2
         : undefined;
     const previousSpan = line.spans[index - 1];
+    // A bare leading integer can be a manually positioned label rather than
+    // an automatic list marker. Its native gap is often smaller than a column
+    // gutter; collapsing it to one space shifts the following title left.
+    // Keep only well-separated horizontal labels on the same baseline. Math,
+    // OCR and mixed-direction text retain their existing handling.
+    const leadingLabelGap =
+      index === 1 &&
+      /^\d{1,3}$/u.test(previousSpan.text.trim()) &&
+      /^\p{Script=Latin}/u.test(span.text.trimStart()) &&
+      !/[\p{Sm}\p{Script=Arabic}\p{Script=Hebrew}]/u.test(span.text) &&
+      [previousSpan, span].every(
+        (item) =>
+          item.source === "pdf" &&
+          !item.rotation &&
+          !item.oblique &&
+          !item.fraction
+      ) &&
+      Math.abs(previousSpan.size - span.size) < 0.1 &&
+      Math.abs(previousSpan.baseline - span.baseline) < 0.5 &&
+      span.x - right(previousSpan) >= span.size;
     const tabBefore =
       previousSpan &&
-      span.x - right(previousSpan) > Math.max(18, span.size * 2.5)
+      (positionedFields ||
+        leadingLabelGap ||
+        span.x - right(previousSpan) > Math.max(18, span.size * 2.5))
         ? span.x
         : undefined;
     let text = span.text;
@@ -263,6 +369,48 @@ export function lineRuns(line: TextLine): TextRun[] {
   return runs;
 }
 
+// Repeated native rows establish field positions even when their gaps are
+// smaller than a normal column gutter. Require one consistent alignment edge
+// (left, center or right) per column across at least three complete rows.
+function hasAlignedFields(lines: TextLine[]): boolean {
+  if (lines.length < 3 || lines[0].spans.length < 3) return false;
+  const first = lines[0];
+  if (
+    !lines.every(
+      (line, row) =>
+        line.spans.length === first.spans.length &&
+        (!row ||
+          (line.baseline > lines[row - 1].baseline &&
+            line.baseline - lines[row - 1].baseline <= line.size * 2)) &&
+        line.spans.every(
+          (span, column) =>
+            span.source === "pdf" &&
+            !span.rotation &&
+            !span.oblique &&
+            !span.fraction &&
+            !!span.text.trim() &&
+            !/[\p{Sm}\p{Script=Arabic}\p{Script=Hebrew}]/u.test(span.text) &&
+            Math.abs(span.baseline - line.baseline) < 0.5 &&
+            Math.abs(span.size - line.size) < 0.1 &&
+            (!column || span.x - right(line.spans[column - 1]) >= line.size)
+        )
+    )
+  )
+    return false;
+  return first.spans.every((reference, column) =>
+    [0, 0.5, 1].some((edge) =>
+      lines.every((line) => {
+        const span = line.spans[column];
+        return (
+          Math.abs(
+            span.x + span.width * edge - reference.x - reference.width * edge
+          ) < 0.5
+        );
+      })
+    )
+  );
+}
+
 export function makeParagraph(
   lines: TextLine[],
   region: Box,
@@ -275,8 +423,21 @@ export function makeParagraph(
   const size = median(lines.map((line) => line.size));
   const runs: TextRun[] = [];
   const source = first.spans[0].source;
+  // A single continuation indent cannot represent nested code. Retain line
+  // starts for source-layout export; reflow still uses the normal paragraph.
+  const continuationLefts = lines.slice(1).map((line) => line.x);
+  const positionedLines =
+    lines.length > 2 &&
+    Math.max(...continuationLefts) - Math.min(...continuationLefts) > 0.5 &&
+    lines.every((line) =>
+      line.spans.every(
+        (span) => span.source === "pdf" && fontName(span.font) === "Courier New"
+      )
+    );
+  const positionedFields = hasAlignedFields(lines);
   for (const [lineIndex, line] of lines.entries()) {
-    const next = lineRuns(line);
+    const next = lineRuns(line, positionedFields);
+    if (positionedLines && next.length) next[0].sourceLineX = line.x;
     if (runs.length && next.length) {
       const breakBefore =
         lineIndex > 0 &&
@@ -303,6 +464,28 @@ export function makeParagraph(
   }
   const text = runs.map((run) => run.text).join("");
   const isList = listPattern.test(text) || chineseList.test(text);
+  const firstSpans = first.spans.filter((span) => span.text.trim());
+  const [label, body] = firstSpans;
+  const labelPrefix = /^[（(]?\d{1,3}[.)、）]\s+/u.exec(runs[0]?.text ?? "");
+  // Only separate native spans provide evidence for the original label gap.
+  // A merged run retains that gap in its measured width, not in its spaces.
+  const listMarkerWidth =
+    lines.length === 1 &&
+    isList &&
+    label &&
+    body &&
+    /^[（(]?\d{1,3}[.)、）]$/u.test(label.text.trim()) &&
+    firstSpans.every(
+      (span) => span.source === "pdf" && fontName(span.font) === "Courier New"
+    ) &&
+    labelPrefix &&
+    runs[0].text.length > labelPrefix[0].length &&
+    runs[0].width !== undefined &&
+    body.x > right(label) &&
+    body.x - label.x < runs[0].width
+      ? body.x - label.x
+      : undefined;
+
   const allBold = lines.every((line) => line.spans.every((span) => span.bold));
   const heading =
     !isList &&
@@ -319,11 +502,21 @@ export function makeParagraph(
         Math.abs(line.x + line.width / 2 - (region.x + region.width / 2)) <
         Math.max(3, size * 0.5)
     );
-  const rightAligned = lines.every(
-    (line) =>
-      line.x >= region.x - 1 &&
-      Math.abs(right(line) - right(region)) < Math.max(3, size * 0.5)
-  );
+  // Explicit text fields need their first source indent. Keep mathematical
+  // rows unchanged: their displaced symbols/equation numbers require a
+  // separate layout and can wrap differently when the indent changes.
+  const positionedTextFields =
+    runs.some((run) => run.tabBefore !== undefined) &&
+    !runs.some(
+      (run) => run.fraction || run.baselineShift || /\p{Sm}/u.test(run.text)
+    );
+  const rightAligned =
+    !positionedTextFields &&
+    lines.every(
+      (line) =>
+        line.x >= region.x - 1 &&
+        Math.abs(right(line) - right(region)) < Math.max(3, size * 0.5)
+    );
   const justify =
     lines.length >= 3 &&
     lines.slice(0, -1).every((line) => line.width > region.width * 0.85);
@@ -338,6 +531,16 @@ export function makeParagraph(
   return {
     ...box,
     kind: "paragraph",
+    ...(first.spans[0].oblique &&
+    lines.every((line) =>
+      line.spans.every(
+        (span) =>
+          span.oblique &&
+          Math.abs(span.oblique.angle - first.spans[0].oblique!.angle) < 0.1
+      )
+    )
+      ? { sourceTextAngle: first.spans[0].oblique.angle }
+      : {}),
     role: isList ? "list" : heading ? "heading" : "body",
     runs,
     ids: lines.flatMap((line) =>
@@ -350,7 +553,10 @@ export function makeParagraph(
         ? median(
             lines
               .slice(1)
-              .map((line, index) => line.baseline - lines[index].baseline)
+              .map(
+                (line, index) =>
+                  lineReadingBaseline(line) - lineReadingBaseline(lines[index])
+              )
           )
         : Math.max(
             size * 1.25,
@@ -362,6 +568,7 @@ export function makeParagraph(
           ),
     indent: align === "center" || align === "right" ? 0 : left - region.x,
     firstIndent: first.x - left,
+    listMarkerWidth,
     lastLineWidth: last.width,
     source,
     lineCount: lines.length,
@@ -392,7 +599,7 @@ export function groupParagraphs(
       .map((run) => run.text)
       .join("");
     if (previous) {
-      const gap = line.baseline - previous.baseline;
+      const gap = lineReadingBaseline(line) - lineReadingBaseline(previous);
       const reference = median(current.map((entry) => entry.size));
       const previousText = lineRuns(previous)
         .map((run) => run.text)

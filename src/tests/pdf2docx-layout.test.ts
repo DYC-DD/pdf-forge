@@ -86,6 +86,62 @@ async function xml(
 
 describe("PDF2docx paragraph reconstruction", () => {
   const region = { x: 50, y: 50, width: 500, height: 700 };
+  it("does not absorb a long neighboring title into a larger form number", () => {
+    const spans = [
+      span("Form", 36, 43.9, 16, { size: 7, height: 7, baseline: 50.56 }),
+      span("W-8ECI", 56.23, 31.12, 63, {
+        size: 20,
+        height: 20,
+        baseline: 50.56,
+      }),
+      span("Certificate of Foreign Person's Claim", 150.6, 33.02, 300, {
+        baseline: 44.23,
+      }),
+      span(
+        "Connected With the Conduct of a Trade or Business",
+        127.9,
+        45.02,
+        360,
+        { baseline: 56.23 }
+      ),
+    ];
+    const lines = buildLines(spans, true);
+    expect(lines.map((l) => l.spans.map((s) => s.text).join(" "))).toEqual([
+      "Form W-8ECI",
+      "Certificate of Foreign Person's Claim",
+      "Connected With the Conduct of a Trade or Business",
+    ]);
+    expect(spans.every((s) => !s.rasterized)).toBe(true);
+  });
+  it("retains wide expressions beside tall standalone delimiters", () => {
+    expect(
+      buildLines(
+        [
+          span("{", 40, 80, 8, { size: 24, height: 24, baseline: 102 }),
+          span("A wide expression inside a brace", 49, 95, 230, {
+            size: 12,
+            height: 12,
+            baseline: 108,
+          }),
+        ],
+        true
+      )
+    ).toHaveLength(1);
+  });
+  it.each([96, 104])(
+    "retains compact script markers at baseline %s",
+    (baseline) => {
+      const lines = buildLines([
+        span("Body", 40, 90, 40, { baseline: 100 }),
+        span("12", 81, baseline - 6, 8, { size: 7, height: 7, baseline }),
+      ]);
+      expect(lines).toHaveLength(1);
+      const paragraph = groupParagraphs(lines, region, 12)[0];
+      expect(
+        paragraph.runs.find((r) => r.text.includes("12"))?.baselineShift
+      ).toBe(100 - baseline);
+    }
+  );
   it("joins wrapped lines into an editable paragraph and keeps inline styles", async () => {
     const spans = [
       span("This paragraph has", 50, 50, 110),
@@ -458,3 +514,187 @@ describe("PDF2docx geometry and reading order", () => {
     ).rejects.toThrow("沒有可輸出");
   });
 });
+it.each([0, 0.5, 8])(
+  "keeps independent adjacent table grids separated with %s pt source gap",
+  async (gap) => {
+    const raw = page(
+      [
+        span("Left", 52, 52, 30),
+        span("Right", 122, 52, 30),
+        span("Lower", 52, 82, 30),
+        span("Last", 122, 82, 30),
+      ],
+      [50, 80, 110]
+        .map((y) => ({ x1: 50, x2: 190, y1: y, y2: y }))
+        .concat([50, 120, 190].map((x) => ({ x1: x, x2: x, y1: 50, y2: 110 })))
+    );
+    const model = analyzeLayout([raw]);
+    const table = blocks(model).find((b) => b.kind === "table")!;
+    expect(table).toBeDefined();
+    table.before = 0;
+    const second = structuredClone(table);
+    second.x = 300;
+    second.before = gap;
+    model.pages[0].groups = [{ columns: [[table, second]], gap: 0 }];
+    const original = structuredClone(model);
+    const result = await xml(model, true);
+    const between = result.document.match(/<\/w:tbl>(.*?)<w:tbl>/u)?.[1];
+    expect(between).toBeDefined();
+    expect(between!.match(/<w:p[ >]/gu)).toHaveLength(1);
+    expect(between).toContain(`w:before="${Math.round(gap * 20)}"`);
+    expect(between).toContain('w:line="1" w:lineRule="exact"');
+    expect(between).toContain("<w:keepNext");
+    expect(between).not.toMatch(/<w:t[ >]|w:vanish|w:drawing/u);
+    expect(result.document.match(/<w:tbl>/gu)).toHaveLength(2);
+    expect(model).toEqual(original);
+  }
+);
+
+it("uses an existing body paragraph to separate independent table grids", async () => {
+  const model = analyzeLayout([
+    page(
+      [
+        span("Left", 52, 52, 30),
+        span("Right", 122, 52, 30),
+        span("Lower", 52, 82, 30),
+        span("Last", 122, 82, 30),
+        span("Between tables", 50, 140, 100),
+      ],
+      [50, 80, 110]
+        .map((y) => ({ x1: 50, x2: 190, y1: y, y2: y }))
+        .concat([50, 120, 190].map((x) => ({ x1: x, x2: x, y1: 50, y2: 110 })))
+    ),
+  ]);
+  const table = blocks(model).find((b) => b.kind === "table")!;
+  const paragraph = blocks(model).find((b) => b.kind === "paragraph")!;
+  const second = structuredClone(table);
+  table.before = 0;
+  paragraph.before = 0;
+  second.before = 0;
+  model.pages[0].groups = [{ columns: [[table, paragraph, second]], gap: 0 }];
+  const result = await xml(model, true);
+  const between = result.document.match(/<\/w:tbl>(.*?)<w:tbl>/u)?.[1];
+  expect(between!.match(/<w:p[ >]/gu)).toHaveLength(1);
+  expect(between).toContain("Between tables");
+});
+
+it.each([
+  { secondY: 49, expectedGap: 22.5 },
+  { secondY: 60, expectedGap: 17.5 },
+])(
+  "does not repeat displaced line whitespace at y=$secondY",
+  async ({ secondY, expectedGap }) => {
+    const raw = page([
+      span("Large label", 50, 30, 100, { size: 20, height: 20, baseline: 45 }),
+      span("Small label", 50, secondY, 60, {
+        size: 10,
+        height: 10,
+        baseline: secondY + 10,
+      }),
+      span("Caption after blank space", 50, 90, 180, {
+        size: 12,
+        height: 12,
+        baseline: 100,
+      }),
+    ]);
+    const original = structuredClone(raw);
+    const model = analyzeLayout([raw]);
+    const paragraphs = blocks(model).filter((b) => b.kind === "paragraph");
+    expect(paragraphs).toHaveLength(3);
+    expect(paragraphs.map((p) => paragraphText(p))).toEqual([
+      "Large label",
+      "Small label",
+      "Caption after blank space",
+    ]);
+    expect(paragraphs.map((p) => p.y)).toEqual([30, secondY, 90]);
+    expect(paragraphs.map((p) => p.runs[0].size)).toEqual([20, 10, 12]);
+    expect(paragraphs.map((p) => p.lineHeight)).toEqual([25, 12.5, 15]);
+    expect(paragraphs[2].before).toBeCloseTo(expectedGap);
+    const result = await xml(model, true);
+    const caption = result.document
+      .match(/<w:p[ >][\s\S]*?<\/w:p>/gu)
+      ?.find((p) => p.includes("Caption after blank space"));
+    expect(caption).toContain(`w:before="${expectedGap * 20}"`);
+    expect(caption).toContain('w:line="300"');
+    expect(result.document).not.toMatch(/w:vanish|w:drawing/u);
+    expect(raw).toEqual(original);
+  }
+);
+
+it.each([0, 0.5, 8])(
+  "starts a ruled second column with exactly one column break (gap %s)",
+  async (gap) => {
+    const model = analyzeLayout([
+      page([
+        span("Left column body", 50, 50, 180),
+        span("Right column body", 310, 50, 180),
+      ]),
+    ]);
+    const ps = blocks(model).filter((b) => b.kind === "paragraph");
+    const left = ps.find((p) => paragraphText(p).includes("Left"))!;
+    const right = structuredClone(left);
+    left.runs = [
+      {
+        text: "Left column body",
+        font: "Arial",
+        size: 12,
+        bold: false,
+        italic: false,
+      },
+    ];
+    right.runs = [
+      {
+        text: "Right column body",
+        font: "Arial",
+        size: 12,
+        bold: false,
+        italic: false,
+      },
+    ];
+    right.x = 310;
+    right.before = 4;
+    model.pages[0].groups = [
+      {
+        gap: 40,
+        widths: [220, 220],
+        columns: [
+          [left],
+          [
+            {
+              kind: "rule",
+              x: 310,
+              y: 48,
+              width: 180,
+              height: 0.5,
+              thickness: 0.5,
+              color: "000000",
+              before: gap,
+            },
+            right,
+          ],
+        ],
+      },
+    ];
+    const header = structuredClone(left);
+    header.y = 20;
+    header.before = 0;
+    header.runs[0].text = "Page heading";
+    model.pages[0].groups.unshift({ columns: [[header]], gap: 0 });
+    const original = structuredClone(model);
+    const result = await xml(model, true);
+    const paras = result.document.match(/<w:p[ >][\s\S]*?<\/w:p>/gu)!;
+    const textIndex = paras.findIndex((p) => p.includes("Right column body"));
+    const ruleIndex = paras.findIndex((p) => p.includes("<w:pBdr>"));
+    const breakIndex = paras.findIndex((p) => p.includes('w:type="column"'));
+    expect(breakIndex).toBeGreaterThan(
+      paras.findIndex((p) => p.includes("Left column body"))
+    );
+    expect(breakIndex).toBe(ruleIndex - 1);
+    expect(ruleIndex).toBe(textIndex - 1);
+    expect(result.document.match(/w:type="column"/gu)).toHaveLength(1);
+    expect(paras[breakIndex]).toContain('w:line="1" w:lineRule="exact"');
+    expect(paras[ruleIndex]).toContain(`w:before="${gap * 20}"`);
+    expect(paras[textIndex]).toContain('w:before="80"');
+    expect(model).toEqual(original);
+  }
+);

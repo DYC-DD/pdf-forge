@@ -25,19 +25,34 @@ try {
         # Work only with generated QA documents in our own hidden Word instance.
         $document = $word.Documents.Open($path, $false, $true)
         try {
-            $document.ExportAsFixedFormat([IO.Path]::ChangeExtension($path, '.pdf'), 17)
+            $pdfPath = [IO.Path]::ChangeExtension($path, '.pdf')
+            $document.ExportAsFixedFormat($pdfPath, 17)
+            # Word can return without an exported file. Page statistics alone
+            # do not establish a successful rendering.
+            if (-not (Test-Path -LiteralPath $pdfPath -PathType Leaf) -or (Get-Item -LiteralPath $pdfPath).Length -eq 0) {
+                throw ('Word did not create a nonempty rendered PDF: ' + $sample.id)
+            }
             $count = $document.ComputeStatistics(2)
+            $tableCount = $document.Tables.Count
+            $expectedTables = $sample.expectedWordTables
+            $tableMatches = ($null -eq $expectedTables -or $tableCount -eq $expectedTables)
             $result = [pscustomobject]@{
                 id = $sample.id
                 sourcePages = @($sample.pages)
                 expectedPages = $expected
                 renderedPages = $count
                 matches = ($count -eq $expected)
+                renderedTables = $tableCount
+                expectedTables = $expectedTables
+                tableMatches = $tableMatches
                 wordVersion = $word.Version
                 wordBuild = $word.Build
             }
             $results += $result
             Write-Output ($sample.id + ': ' + $count + ' pages (expected ' + $expected + ')')
+            if ($null -ne $expectedTables) {
+                Write-Output ($sample.id + ': ' + $tableCount + ' Word tables (expected ' + $expectedTables + ')')
+            }
         } finally {
             $document.Close(0)
         }
@@ -46,6 +61,6 @@ try {
     $word.Quit()
 }
 $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $qaDirectory 'word-pagination.json') -Encoding utf8
-if ($results.Where({ -not $_.matches }).Count) {
-    throw 'Word pagination differs from the selected source pages. Inspect the rendered PDFs.'
+if ($results.Where({ -not $_.matches -or -not $_.tableMatches }).Count) {
+    throw 'Word pagination or table count differs from the selected source requirements. Inspect the rendered PDFs.'
 }

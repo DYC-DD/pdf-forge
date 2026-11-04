@@ -12,6 +12,7 @@ import { exportDocx } from "../features/pdf2docx/lib/exportDocx";
 import { paragraphText } from "../features/pdf2docx/lib/paragraphs";
 import type { RawPage } from "../features/pdf2docx/types";
 import { openPdf } from "../shared/pdf/preview";
+import { decodeXmlText, docxEditableText } from "./helpers/pdf2docx-docx-text";
 
 const observed = vi.hoisted(() => ({ pages: [] as RawPage[] }));
 vi.mock("../features/pdf2docx/lib/layout", async (importOriginal) => {
@@ -99,10 +100,14 @@ const samples: {
   maximumOcrPages?: number;
   minimumRotatedCells?: number;
   minimumLargestTableColumns?: number;
+  minimumLargestTableRows?: number;
   expectedText?: string[];
   unexpectedText?: string[];
   minimumPreservedRegions?: number;
   requiredReviewCodes?: string[];
+  requiredNumberingColors?: string[];
+  requiredBoldText?: string[];
+  requiredItalicText?: string[];
   expectedColumns?: { page: number; text: string[][] }[];
   minimumRaisedRuns?: number;
   minimumGraphicRegions?: number;
@@ -155,10 +160,14 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       maximumOcrPages = Infinity,
       minimumRotatedCells = 0,
       minimumLargestTableColumns = 0,
+      minimumLargestTableRows = 0,
       expectedText = [],
       unexpectedText = [],
       minimumPreservedRegions = 0,
       requiredReviewCodes = [],
+      requiredNumberingColors = [],
+      requiredBoldText = [],
+      requiredItalicText = [],
       expectedColumns = [],
       minimumRaisedRuns = 0,
       minimumGraphicRegions = 0,
@@ -194,11 +203,6 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
         model.issues.filter((issue) => issue.severity === "error")
       ).toEqual([]);
       expect(model.pages.map((page) => page.number)).toEqual(selection);
-      expect(model.stats.characters).toBeGreaterThanOrEqual(
-        minimumEditableCharacters
-      );
-      expect(model.stats.tables).toBeGreaterThanOrEqual(minimumTables);
-      expect(model.stats.ocrPages).toBeLessThanOrEqual(maximumOcrPages);
       for (const code of requiredReviewCodes)
         expect(
           model.issues.some(
@@ -240,6 +244,9 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
       expect(
         Math.max(0, ...tables.map((t) => t.columns.length))
       ).toBeGreaterThanOrEqual(minimumLargestTableColumns);
+      expect(
+        Math.max(0, ...tables.map((table) => table.rows.length))
+      ).toBeGreaterThanOrEqual(minimumLargestTableRows);
       const preservedRegions = observed.pages
         .flatMap((page) => page.figures)
         .filter((figure) => figure.role === "scan-region").length;
@@ -266,22 +273,13 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
           .map((entry) => entry.async("string"))
       );
       // Editable fractions live in m:t; repeated page labels live in footers.
-      const text = [
-        ...parts
-          .join("")
-          .matchAll(/<(?:w|m):t(?:\s[^>]*)?>(.*?)<\/(?:w|m):t>/gs),
-      ]
-        .map((match) => match[1])
+      const numbering =
+        (await zip.file("word/numbering.xml")?.async("string")) ?? "";
+      const text = parts
+        .map((part) => docxEditableText(part, numbering))
         .join("")
-        .replace(/&amp;/gu, "&")
-        .replace(/&lt;/gu, "<")
-        .replace(/&gt;/gu, ">")
         .normalize("NFKC")
         .replace(/\s/gu, "");
-      expect(text.length).toBeGreaterThanOrEqual(minimumEditableCharacters);
-      expect((xml.match(/<w:tbl>/gu) ?? []).length).toBeGreaterThanOrEqual(
-        minimumTables
-      );
       if (output) {
         await mkdir(output, { recursive: true });
         await writeFile(
@@ -325,6 +323,56 @@ describe.skipIf(!manifest)("PDF corpus (opt in, local only)", () => {
           )
         );
       }
+      // Preserve diagnostic artifacts even when a new corpus sample fails quality gates.
+      for (const color of requiredNumberingColors) {
+        expect(color).toMatch(/^[0-9A-F]{6}$/u);
+        expect(numbering, `Missing native marker color ${color}`).toContain(
+          `<w:color w:val="${color}"/>`
+        );
+      }
+      const boldRuns = [...xml.matchAll(/<w:r>[\s\S]*?<\/w:r>/gu)]
+        .map(([run]) => run)
+        .filter((run) => /<w:b(?:\s+w:val="(?:1|true)")?\s*\/>/u.test(run))
+        .map((run) =>
+          [...run.matchAll(/<w:t(?:\s[^>]*)?>(.*?)<\/w:t>/gs)]
+            .map((m) => decodeXmlText(m[1]))
+            .join("")
+            .normalize("NFKC")
+            .replace(/\s/gu, "")
+        );
+      for (const snippet of requiredBoldText)
+        expect(
+          boldRuns.some((text) =>
+            text.includes(snippet.normalize("NFKC").replace(/\s/gu, ""))
+          ),
+          `Missing native bold text in ${id}: ${snippet}`
+        ).toBe(true);
+      const italicRuns = [...xml.matchAll(/<w:r>[\s\S]*?<\/w:r>/gu)]
+        .map(([run]) => run)
+        .filter((run) => /<w:i(?:\s+w:val="(?:1|true)")?\s*\/>/u.test(run))
+        .map((run) =>
+          [...run.matchAll(/<w:t(?:\s[^>]*)?>(.*?)<\/w:t>/gs)]
+            .map((m) => decodeXmlText(m[1]))
+            .join("")
+            .normalize("NFKC")
+            .replace(/\s/gu, "")
+        );
+      for (const snippet of requiredItalicText)
+        expect(
+          italicRuns.some((text) =>
+            text.includes(snippet.normalize("NFKC").replace(/\s/gu, ""))
+          ),
+          `Missing native italic text in ${id}: ${snippet}`
+        ).toBe(true);
+      expect(model.stats.characters).toBeGreaterThanOrEqual(
+        minimumEditableCharacters
+      );
+      expect(model.stats.tables).toBeGreaterThanOrEqual(minimumTables);
+      expect(model.stats.ocrPages).toBeLessThanOrEqual(maximumOcrPages);
+      expect(text.length).toBeGreaterThanOrEqual(minimumEditableCharacters);
+      expect((xml.match(/<w:tbl>/gu) ?? []).length).toBeGreaterThanOrEqual(
+        minimumTables
+      );
       // Human-transcribed source snippets are a separate accuracy gate; an
       // editable character count cannot prove that those characters are right.
       for (const snippet of expectedText)

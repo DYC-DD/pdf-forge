@@ -22,6 +22,8 @@ export type TextSpan = Box & {
   /** OCR and the existing searchable layer disagree; preserve the source pixels. */
   sourceMismatch?: boolean;
   rotation?: -90 | 90;
+  /** Native oblique text baseline origin in viewport coordinates. */
+  oblique?: { angle: number; baselineX: number };
   paintOrder?: number;
   rasterized?: boolean;
   advances?: number[];
@@ -49,6 +51,10 @@ export type Issue = {
   severity: "info" | "review" | "error";
 };
 export type Figure = Box & {
+  /** Small PDF widget appearance that can follow its text label. */
+  formControl?: boolean;
+  /** Editable source span IDs whose rectangular background follows the text. */
+  textBackgroundFor?: string[];
   id: string;
   data: Uint8Array;
   overlay?: boolean;
@@ -85,10 +91,16 @@ export type TextRun = {
   /** Positive values raise the original-size glyph above the line baseline. */
   baselineShift?: number;
   sourceLineStart?: boolean;
+  /** Absolute start of a variably indented native monospaced source line. */
+  sourceLineX?: number;
   lineSeparator?: string;
 };
 export type Paragraph = Box & {
+  /** Upper-left title sharing a header band; promoted to an editable frame at export. */
+  sideHeading?: boolean;
   kind: "paragraph";
+  /** Source reading axis; its line spacing is not a page-vertical gap. */
+  sourceTextAngle?: number;
   role: "body" | "heading" | "list";
   runs: TextRun[];
   ids: string[];
@@ -97,11 +109,15 @@ export type Paragraph = Box & {
   lineHeight: number;
   indent: number;
   firstIndent: number;
+  /** Measured native monospaced label-to-body distance on a single list line. */
+  listMarkerWidth?: number;
   lastLineWidth: number;
   source?: "pdf" | "ocr";
   lineCount?: number;
   rightIndent?: number;
   floatingImages?: ImageBlock[];
+  controlImages?: ImageBlock[];
+  backgroundImages?: ImageBlock[];
 };
 export type TableCellModel = {
   rotation?: -90 | 90;
@@ -154,6 +170,10 @@ export type PageModel = {
   source: "pdf" | "ocr";
   characters: number;
   footer?: Paragraph;
+  /** Editable large initials positioned beside independently flowing body lines. */
+  dropCaps?: Paragraph[];
+  /** Editable side title sharing the first header band with other text. */
+  sideHeadings?: Paragraph[];
   overlays?: ImageBlock[];
   classification?: {
     source: "native" | "scan" | "image";

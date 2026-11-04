@@ -65,10 +65,33 @@ export function classifyPage(
   tables.push(...openTables.tables);
   openTables.used.forEach((id) => used.add(id));
   const unclaimed = spans.filter((span) => !used.has(span.id));
+  // A publication date can put its month and year on separate footer lines.
+  // Keep the year literal: a PAGE field would increment it after overflow.
+  const months = unclaimed.filter((span) =>
+    /^(?:January|February|March|April|May|June|July|August|September|October|November|December)$/iu.test(
+      span.text.trim()
+    )
+  );
+  const dateYears = new Set(
+    unclaimed
+      .filter(
+        (year) =>
+          /^\d{4}$/u.test(year.text.trim()) &&
+          months.some(
+            (month) =>
+              month.y + month.height <= year.y + 0.5 &&
+              year.y - month.y - month.height <= year.size &&
+              Math.min(month.x + month.width, year.x + year.width) >
+                Math.max(month.x, year.x)
+          )
+      )
+      .map((span) => span.id)
+  );
   const footerLine =
     page.source === "ocr"
       ? buildLines(unclaimed, true).find(
           (line) =>
+            !line.spans.some((span) => dateYears.has(span.id)) &&
             /^\d{1,4}$/u.test(
               line.spans
                 .map((span) => span.text)
@@ -82,6 +105,7 @@ export function classifyPage(
         )
       : buildLines(unclaimed, true).find(
           (line) =>
+            !line.spans.some((span) => dateYears.has(span.id)) &&
             line.y > page.height * 0.92 &&
             (/^\s*(?:第\s*\d{1,4}\s*頁(?:[，,]?\s*共\s*\d{1,4}\s*頁)?|page\s+\d{1,4}(?:\s+of\s+\d{1,4})?|\d{1,4}\s*[\/／]\s*\d{1,4})\s*$/iu.test(
               line.spans.map((span) => span.text).join("")

@@ -66,7 +66,65 @@
       "Employee",
       "Multiple Jobs Worksheet",
       "Deductions Worksheet"
-    ]
+    ],
+    "controlChecks": [
+      {
+        "page": 1,
+        "text": "Single",
+        "fieldName": "topmostSubform[0].Page1[0].c1_1[0]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "Married filing jointly",
+        "fieldName": "topmostSubform[0].Page1[0].c1_1[1]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "Head of household",
+        "fieldName": "topmostSubform[0].Page1[0].c1_1[2]",
+        "maxPositionError": 4
+      }
+    ],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Under penalties of perjury",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Employers",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Specific Instructions",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "General Instructions",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Two jobs.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Employee’s Withholding",
+        "maxPositionError": 6
+      }
+    ],
+    "qualityNotes": " 第17輪移除重疊流式區塊後重複計入的空白，Word恢復4頁且簽署／雇主區回到首頁；欄線、表頭與步驟區仍錯位，新增首頁簽署／雇主位置6 pt檢查，如實保持版面失敗。 第18輪修復右欄以橫線開頭時漏換欄：第二頁Specific Instructions由657.58→0.58 pt，General Instructions保持0.58 pt；首頁簽署／雇主及警告框字距等仍未完整。",
+    "requiredBoldText": [
+      "Complete Form W-4 so that your employer",
+      "Give Form W-4 to your employer."
+    ],
+    "requiredItalicText": ["www.irs.gov/FormW4", "(Keep for your records.)"]
   },
   {
     "id": "pdflib-invoice",
@@ -105,12 +163,15 @@
       "Table header (row 1)",
       "Col 1/Row 4",
       "Col 4/Row 41",
-      "Col 1/Row 50"
+      "Col 1/Row 50",
+      "ut labore et dolore magna ali-",
+      "quis nostrud exercitation ull-",
+      "Excepteur sint occaecat cupi-"
     ],
     "sha256": "fd4fd1a49c71e0c8c2663c89df0125c2411018ea7708ab7cb39eadf0a51238ad",
     "minimumEditableCharacters": 2200,
     "minimumTables": 2,
-    "qualityNotes": "兩頁原生可編輯表格；照片標籤、標誌、斜向文字與已填值欄位局部保留影像，需核對相對位置。",
+    "qualityNotes": "兩頁原生可編輯表格；照片標籤、標誌、斜向文字與已填值欄位局部保留影像，需核對相對位置。 第19輪完整繪製操作匹配的ali-連字符恢復，2287→2288字元；來源第1頁該字形水平偏移1.60 pt、垂直0.38 pt。目視確認表格格線保留；同儲存格ull／cupi等其他行尾連字符仍遺失，不把局部恢復視為整份文字完整。 第20輪支援經過連續內容與基線核對的分割片段，ull-與cupi-已恢復；現在2290字元，原稿這3個連字符均可見，最大水平偏移2.00 pt、垂直0.39 pt，照片／表格／OCR數量不變。",
     "maximumOcrPages": 0,
     "minimumGraphicRegions": 4,
     "requiredReviewCodes": ["annotation-region"]
@@ -193,5 +254,1808 @@
     "sha256": "95c2a728100a9c241fdcd32ef6837bd49372d8799bab1724b8c5f8b5efbce489",
     "requiredReviewCodes": ["scan-fallback"],
     "qualityNotes": "第 88 頁是印刷頁碼 162–163 的直排雙頁掃描；目前只保留影像、0 可編輯字元，不算可編輯轉換成功。"
+  },
+  {
+    "id": "pdflib-bidi",
+    "title": "PDFlib 雙向混排、方向控制符與鏡像標點",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/bidi_formatting.pdf",
+    "sha256": "593f37c17b61a8f070cf7227aec3098440d5a68d912f7629530ddaf31b8e74ed",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 620,
+    "minimumTables": 1,
+    "maximumOcrPages": 0,
+    "requiredReviewCodes": ["text-direction"],
+    "expectedText": [
+      "Bidi formatting topic",
+      "Raw input",
+      "Reordered and shaped output",
+      "XY",
+      "١٢٣",
+      "&LRO;",
+      "&PDF;",
+      "&RLM;",
+      "&LRM;"
+    ],
+    "qualityNotes": "人工核對三欄、七個範例列、XY/١٢٣/A 與方向控制符。原稿刻意展示錯誤順序及未整形文字；複雜標點與原稿字形仍未通過，不以頁數或字數視為完整成功。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Raw input",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-shaping",
+    "title": "PDFlib 阿拉伯文、希伯來文與印度文字整形對照表",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/starter_shaping.pdf",
+    "sha256": "2d097116e3c1fa3786cd3c343ddbfc57ca396530614f4ab6dfdbd68a04ef613d",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 750,
+    "minimumTables": 1,
+    "maximumOcrPages": 0,
+    "minimumGraphicRegions": 3,
+    "requiredReviewCodes": ["encoding-region", "text-direction"],
+    "expectedText": [
+      "Language",
+      "Arabic",
+      "Hebrew",
+      "Hindi",
+      "Sanskrit",
+      "עִבְרִית",
+      "כולם חוננו בתבונה ובמצפון",
+      "الكرامة والحقوق"
+    ],
+    "qualityNotes": "人工核對三欄、四個語言標籤、希伯來文整形列與右下三個印度文字原圖儲存格。缺碼僅局部保留影像；原稿刻意未整形的左欄、字型及複雜標點仍需核對，不宣稱所有語言版面正確。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Raw input",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "עִבְרִית",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "irs-w9",
+    "title": "IRS W-9 勾選欄、稅籍號碼格與認證表單",
+    "url": "https://www.irs.gov/pub/irs-pdf/fw9.pdf",
+    "sha256": "2d420cbb4123dcf1fb82595b2359cfbb5d81f00b9df9d359fcc7af361d093f53",
+    "sourcePageCount": 6,
+    "pages": [1, 2],
+    "minimumEditableCharacters": 11000,
+    "minimumTables": 2,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Request for Taxpayer",
+      "Taxpayer Identification Number",
+      "Certification",
+      "Purpose of Form",
+      "Individual/sole proprietor",
+      "C corporation",
+      "S corporation",
+      "Partnership",
+      "Trust/estate",
+      "LLC. Enter the tax classification",
+      "Other",
+      "Social security number",
+      "Employer identification number"
+    ],
+    "qualityNotes": "人工核對第 1 頁 3a 七類別選項、3b 勾選框、兩組九位稅籍號碼格、Part II 四項聲明、簽名與頁底雙欄。八個勾選框已跟隨儲存格文字，仍 3/2 頁；Part I/II 黑底白字標籤已跟隨文字；號碼格與正文重排尚未通過。",
+    "controlChecks": [
+      {
+        "page": 1,
+        "text": "Individual/sole proprietor",
+        "exactText": true,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[0]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "C corporation",
+        "exactText": true,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[1]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "S corporation",
+        "exactText": true,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[2]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "Partnership",
+        "exactText": true,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[3]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "Trust/estate",
+        "exactText": true,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[4]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "LLC. Enter the tax classification",
+        "exactText": false,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[5]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "Other (see instructions)",
+        "exactText": false,
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[6]",
+        "maxPositionError": 4
+      },
+      {
+        "page": 1,
+        "text": "and you are providing this form to a partnership",
+        "fieldName": "topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_2[0]",
+        "maxPositionError": 4
+      }
+    ],
+    "backgroundChecks": [
+      {
+        "page": 1,
+        "text": "Part I",
+        "exactText": true,
+        "sourceBox": {
+          "x": 36,
+          "y": 348,
+          "width": 36,
+          "height": 12
+        },
+        "maxPositionError": 3
+      },
+      {
+        "page": 1,
+        "text": "Part II",
+        "exactText": true,
+        "sourceBox": {
+          "x": 36,
+          "y": 444,
+          "width": 36,
+          "height": 12
+        },
+        "maxPositionError": 3
+      }
+    ]
+  },
+  {
+    "id": "irs-w8ben",
+    "title": "IRS W-8BEN 稅務身分表單、條約欄及聲明清單",
+    "url": "https://www.irs.gov/pub/irs-pdf/fw8ben.pdf",
+    "sha256": "b821dc1172c91b348a65675529cc792782f11fc1ae8579df92d627113203f918",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 3800,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Certificate of Foreign Status",
+      "Identification of Beneficial Owner",
+      "Claim of Tax Treaty Benefits",
+      "Certification",
+      "Country of citizenship",
+      "Foreign tax identifying number",
+      "Check if FTIN not legally required",
+      "Date of birth",
+      "Special rates and conditions",
+      "I certify that I have the capacity to sign",
+      "Print name of signer"
+    ],
+    "qualityNotes": "人工核對標題、五項 Do NOT use this form 清單、Part I 欄位 1–8 與 6b FTIN 勾選框、Part II 第 9/10 項、Part III 聲明與簽名/日期/印刷姓名。仍 2/1 頁，三個黑底白字標籤已跟隨文字；部分控制項及欄位格線仍失真，字數/片段通過不表示版面成功。",
+    "backgroundChecks": [
+      {
+        "page": 1,
+        "text": "Part I",
+        "exactText": true,
+        "sourceBox": {
+          "x": 36,
+          "y": 216,
+          "width": 36,
+          "height": 12
+        },
+        "maxPositionError": 3
+      },
+      {
+        "page": 1,
+        "text": "Part II",
+        "exactText": true,
+        "sourceBox": {
+          "x": 36,
+          "y": 420,
+          "width": 36,
+          "height": 12
+        },
+        "maxPositionError": 3
+      },
+      {
+        "page": 1,
+        "text": "Part III",
+        "exactText": true,
+        "sourceBox": {
+          "x": 36,
+          "y": 516,
+          "width": 36,
+          "height": 12
+        },
+        "maxPositionError": 3
+      }
+    ],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Mailing address",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "irs-w8eci",
+    "title": "IRS W-8ECI 外國受益人身分、收入及簽署認證表單",
+    "url": "https://www.irs.gov/pub/irs-pdf/fw8eci.pdf",
+    "sha256": "e8fd980376228d3636498889c4ace387055190226fffafcdbfc2e9c88c8b1f31",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 3900,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Certificate of Foreign",
+      "Identification of Beneficial Owner",
+      "Certification",
+      "Country of incorporation",
+      "Foreign tax identifying number",
+      "Check if FTIN not legally required",
+      "Date of birth",
+      "Print name",
+      "income tax return",
+      "I agree that I will submit a new form within 30 days",
+      "Signature of beneficial owner"
+    ],
+    "qualityNotes": "人工核對兩行表頭、四項 Do NOT Use 清單、Part I 第 1–12 欄、13 種身分類別、SSN/ITIN/EIN、8b FTIN 框、收入欄、第 12 欄、Part II 四項聲明與簽署資格及姓名/日期/頁尾。Part I 黑底白字改善；仍 2/1 頁、標題順序已修復，表頭垂直位置仍偏移、Part II 黑底及部分控制項錯位，格線/簽名分頁未通過。",
+    "backgroundChecks": [
+      {
+        "page": 1,
+        "text": "Part I",
+        "exactText": true,
+        "sourceBox": {
+          "x": 36,
+          "y": 228,
+          "width": 36,
+          "height": 12
+        },
+        "maxPositionError": 3
+      }
+    ],
+    "renderOrderChecks": [
+      {
+        "page": 1,
+        "texts": [
+          "Certificate of Foreign Person's Claim That Income Is Effectively",
+          "Connected With the Conduct of a Trade or Business in the United States"
+        ]
+      }
+    ],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Business address in the United States",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "rfc9000",
+    "title": "RFC 9000 技術規範封面、作者欄與長篇摘要",
+    "url": "https://www.rfc-editor.org/rfc/rfc9000.pdf",
+    "sha256": "24f411581702fea968f554264a629a80aa5a03a2a959733063391575256edcc7",
+    "sourcePageCount": 151,
+    "pages": [1],
+    "minimumEditableCharacters": 1478,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "QUIC: A UDP-Based Multiplexed and Secure",
+      "Transport",
+      "Abstract",
+      "flow-controlled streams",
+      "Status of This Memo",
+      "Internet Engineering Steering Group",
+      "Copyright Notice",
+      "Iyengar",
+      "Thomson",
+      "Standards Track",
+      "Page 1"
+    ],
+    "qualityNotes": "人工核對首頁左右作者欄、RFC 9000、兩行標題、Abstract、Status of This Memo、Copyright Notice、網址、頁尾作者/類別/頁碼。第八輪 Word 由 2/1 恢復 1/1 頁，頁尾作者與頁碼座標須在 6 pt 內；作者欄與字距仍有差異，頁數一致不等於外觀完全相符。字數門檻 1478 依原稿實際非空白字元訂定。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Iyengar & Thomson",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Page 1",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "nasa-solar-system",
+    "title": "NASA 太陽系橫式海報、三欄科普與開放數字表",
+    "url": "https://www.nasa.gov/wp-content/uploads/2011/05/solar_system_lithograph_set_h.pdf",
+    "sourcePageCount": 42,
+    "pages": [3, 4],
+    "minimumEditableCharacters": 6415,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Our Solar System",
+      "Mercury",
+      "Venus",
+      "Earth",
+      "Mars",
+      "Jupiter",
+      "Saturn",
+      "Uranus",
+      "Neptune",
+      "Humans have gazed at the heavens",
+      "FAST FACTS",
+      "695,500",
+      "4,498.25",
+      "ABOUT THE ILLUSTRATION",
+      "FOR MORE INFORMATION",
+      "solarsystem.nasa.gov/education/"
+    ],
+    "qualityNotes": "人工核對第 3 頁八行星標籤與照片位置、NASA 標誌、標題及網址；第 4 頁三欄閱讀順序、FAST FACTS 十列六欄數字、星號與上下標、圖說及網址。原稿第 3 頁機構名稱有重複疊印，去重後 114 字元，第 4 頁 6301 字元。Word 2/2頁；第十二輪使用同字型原生文字行的中位基準線，Uranus/Neptune偏移6.02→1.38 pt、Venus 11.84→5.84 pt、Saturn 11.95→5.94 pt，八標籤皆通過6 pt門檻。保留6415字元，段落31→30；第4頁模型不變，開放數字表仍非原生表格且字距/欄位失真，整份視覺未通過。 第十三輪修復共用Tab定位點後，35.98/67.24/92.96/141.63四個數值偏移為0.24/1.32/2.41/4.40 pt，皆通過6 pt；其餘數字欄、上下標與字距仍需改善。",
+    "sha256": "3fa05202e7c1bc067ab20a67a9c55c5c1d3ed1f3ea181fc59d9ba0a7eaf0f7da",
+    "sourceBytes": 33122663,
+    "renderChecks": [
+      {
+        "page": 3,
+        "text": "Mercury",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Venus",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Earth",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Mars",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Jupiter",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Saturn",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Uranus",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Neptune",
+        "maxPositionError": 6
+      },
+      {
+        "page": 4,
+        "text": "35.98",
+        "maxPositionError": 6
+      },
+      {
+        "page": 4,
+        "text": "67.24",
+        "maxPositionError": 6
+      },
+      {
+        "page": 4,
+        "text": "92.96",
+        "maxPositionError": 6
+      },
+      {
+        "page": 4,
+        "text": "141.63",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "uscis-i9",
+    "title": "USCIS I-9 密集填寫表單、合併儲存格及三欄證件清單",
+    "url": "https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf",
+    "sourcePageCount": 4,
+    "pages": [1, 2],
+    "minimumEditableCharacters": 6735,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Employment Eligibility Verification",
+      "Employee Information and Attestation",
+      "Employee's Email Address",
+      "USCIS A-Number",
+      "Form I-94 Admission Number",
+      "Employer Review and Verification",
+      "Additional Information",
+      "LISTS OF ACCEPTABLE DOCUMENTS",
+      "LIST A",
+      "LIST B",
+      "LIST C",
+      "NOT VALID FOR EMPLOYMENT",
+      "Acceptable Receipts",
+      "Page 1 of 4",
+      "Page 2 of 4"
+    ],
+    "qualityNotes": "人工核對第 1 頁 Section 1/2、姓名地址日期、四個身分框、三擇一號碼欄、簽名、List A/B/C 文件欄與 Additional Information；第 2 頁三欄清單、OR/AND、限制聲明及收據區。原稿非空白字元 3363+3372=6735；Word 4/2 頁，表格/分頁失敗，內容測試通過不算表單可用。",
+    "sha256": "780f348c34df694bb0b4dbbfaf9f22b99b9757b80d16a37ba89aadf069597281",
+    "sourceBytes": 524095
+  },
+  {
+    "id": "census-new-year",
+    "title": "美國人口普查局方形人口資訊圖、漸層與向量裝飾",
+    "url": "https://www.census.gov/content/dam/Census/library/visualizations/2023/comm/new-year-2024.pdf",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 165,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "New Year's Day",
+      "U.S. population",
+      "335,893,238",
+      "World population",
+      "8,019,876,189",
+      "Population estimates as of Jan. 1, 2024.",
+      "Vintage 2023 Population Estimates",
+      "International Database"
+    ],
+    "qualityNotes": "人工核對 1080×1080 pt 方形版面、2024/HAPPY NEW YEAR 裝飾字、兩項人口數字與逗號、深色漸層、白字對比及 Census 標誌/來源註記。原生文字 165 字元，向量裝飾字不計入可編輯文字。Word 1/1 頁但漸層與向量顏色遺失、白字幾乎不可讀，視覺明確未通過，不能因字數/頁數正確當作成功。",
+    "sha256": "83bb4a41d757ac95fd7bd20b89408bc3f37edfd5b96d0e861ef666b869ffa757",
+    "sourceBytes": 12331783,
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "335,893,238",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "8,019,876,189",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "ine-europe-statistics",
+    "title": "西班牙 INE 歐盟地圖、圖示與統計資訊長圖（2026）",
+    "url": "https://www.ine.es/en/infografias/infografia_dia_estadistica_europa_en.pdf",
+    "sha256": "2e57172c12bd48f854c67bd1f692eed6626931d11c45643d04f65c53f8a6bbe0",
+    "sourcePageCount": 1,
+    "sourceBytes": 5598591,
+    "pages": [1],
+    "minimumEditableCharacters": 725,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Spain in the EU 2026",
+      "505,983",
+      "49.1 million inhabitants",
+      "34,240",
+      "41,770",
+      "97.2",
+      "109.7",
+      "142,166",
+      "24.4%",
+      "1.10",
+      "42.4%",
+      "36.9%",
+      "Imports and Exports of goods",
+      "50.4%",
+      "49.6%",
+      "63.5%",
+      "36.5%",
+      "Unemployment rate",
+      "October",
+      "2026"
+    ],
+    "qualityNotes": "人工核對750×1334 pt長圖、歐洲各國地圖/國旗、面積人口、GDP/密度、五項圖示、上下標平方單位、進出口長條、失業率男女圖示及來源日期。官方同一URL已更新2026版；搜尋索引仍可能顯示2024資料，以固定SHA原稿為準。原稿非空白文字725字元；可見原稿中的thar/wight拼字保留，不以常識改字。第十輪已將非直角向量子路徑與表格線分開，保留2000條真正表格線上限；725原生字元與0 OCR通過，出版年份保持2026，不再變成動態頁碼2027。Word仍2/1頁，142,166及進出口標題錯位、日期溢頁，圖示細節與文字重疊未通過完整視覺核對。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "49.1 million inhabitants",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "142,166",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Imports and Exports of goods",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "October",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "ine-population-pyramid",
+    "title": "西班牙 INE 人口金字塔、虛線投影與分級設色地圖（2026）",
+    "url": "https://ine.es/en/infografias/infografia_poblacion_en.pdf",
+    "sha256": "bd527038a438fbb5734232513dc7967d3ffed65e84e50d96a3623a9e1169c52b",
+    "sourcePageCount": 1,
+    "sourceBytes": 927708,
+    "pages": [1],
+    "minimumEditableCharacters": 398,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "POPULATION",
+      "at 1 january 2026",
+      "49.590.099",
+      "inhabitants",
+      "Population pyramids of Spain: yesterday, today and tomorrow",
+      "1976",
+      "2026",
+      "2076",
+      "90 and more",
+      "40-45",
+      "10-15",
+      "0-4",
+      "Population density",
+      "People per km2",
+      "Less than 100",
+      "From 100 to 300",
+      "From 300 to 500",
+      "500 or more",
+      "Continuous Population Statistics - INE",
+      "National Geographic Institute of Spain",
+      "June"
+    ],
+    "qualityNotes": "人工核對原稿 A4 直式：1976 綠色實線、2026 淡藍面積、2076 紫色虛線人口金字塔，左右百分比軸、19個年齡組、人物剪影；下半頁西班牙省界分級設色地圖與加那利群島插圖、四級密度圖例、藍底白字標題及來源日期 June/2026。398 個原生非空白字元，保留原稿40-45及10-15標籤，不擅改成一般年齡分組。官方URL會更新，以固定SHA下載版為準。 第十輪398原生字元及0 OCR通過；Word2/1頁，第十一輪白字標題已回藍底，標題5.15pt與人口數2.42pt通過6pt門檻，年齡標籤/百分比軸與曲線錯位，圖例及來源日期溢頁，完整視覺核對仍未通過；Population density偏移25.01pt，June溢頁。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "49.590.099",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Population density",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "June",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "POPULATION",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "irs-w4-zht",
+    "title": "IRS W-4 繁體中文版（2026）密集中文表單、英數混排與勾選框",
+    "url": "https://www.irs.gov/pub/irs-pdf/fw4zht.pdf",
+    "sha256": "8ae91ef2967eede8c01efd63cf954fee6a7603968a037400cc9a9532f0573b92",
+    "sourcePageCount": 5,
+    "sourceBytes": 428690,
+    "pages": [1],
+    "minimumEditableCharacters": 1773,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "員工的預扣額證明",
+      "OMB No. 1545-0074",
+      "名字和中間名的第一個字母",
+      "社會安全號碼",
+      "單身或已婚分開申報",
+      "已婚聯合申報或符合資格的尚存配偶",
+      "200,000",
+      "400,000",
+      "2,200",
+      "預扣額豁免",
+      "員工簽字",
+      "僱主身份識別號碼",
+      "Form W-4 (zh-t) (2026)"
+    ],
+    "qualityNotes": "人工核對2026繁中W-4首頁：五個步驟側標、中文與英文機關名稱/網址/金額混排、三種申報身分框、兩份工作框、豁免框、細線及金額填寫格、簽字與僱主欄、頁尾。原稿1773個NFKC非空白字元，PDF總5頁，本輪僅選第1頁；資料僅作版型測試。 本輪內容門檻1773字元及0 OCR通過，但Word2/1頁，金額網格與中文敘述拆離、勾選框錯位、簽字溢頁；標題5.45pt通過6pt，簽字不在來源對應頁，維持FAIL。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "員工的預扣額證明",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "員工簽字",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "rfc8200-diagram",
+    "title": "IETF RFC 8200 等寬 ASCII 封包欄位圖與規範說明",
+    "url": "https://www.ietf.org/ietf-ftp/rfc/rfc8200.txt.pdf",
+    "sourcePageCount": 42,
+    "pages": [6],
+    "minimumEditableCharacters": 1373,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "IPv6 Header Format",
+      "Version",
+      "Traffic Class",
+      "Flow Label",
+      "Payload Length",
+      "Next Header",
+      "Hop Limit",
+      "Source Address",
+      "Destination Address",
+      "4-bit Internet Protocol version number = 6.",
+      "16-bit unsigned integer.",
+      "[Page 6]",
+      "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+"
+    ],
+    "qualityNotes": "人工核對第6頁等寬字元構成的21行IPv6表頭圖，五條+-橫界、兩個地址大格、Version/Traffic Class/Flow Label及Payload Length/Next Header/Hop Limit欄位、上下段落與[Page 6]。第十三輪修復多行共用Tab定位點時只前進一站的錯誤，兩個地址標籤偏移95.95→0.48及77.95→0.50 pt、右側豎界恢復；1373原生字元、10段、0圖片/表格/OCR、Word 1/1頁。IPv6 Header Format仍8.97 pt失敗，章節編號字型及部分欄位內字距仍不符，未視為整份完全通過。 第十六輪保留有原生分離片段證據的等寬編號字型、字級、標籤間距及正文精確寬度；章節標題8.97→1.45 pt，保留Word原生編號。",
+    "sha256": "59acf5865072899579dedca59f0beb32915336387c89027851b6eb4ccaead78f",
+    "sourceBytes": 58690,
+    "renderChecks": [
+      {
+        "page": 6,
+        "text": "IPv6 Header Format",
+        "maxPositionError": 6
+      },
+      {
+        "page": 6,
+        "text": "Source Address",
+        "maxPositionError": 6
+      },
+      {
+        "page": 6,
+        "text": "Destination Address",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "rfc8259-json",
+    "title": "IETF RFC 8259 ABNF文法與巢狀JSON程式碼",
+    "url": "https://www.ietf.org/ietf-ftp/rfc/rfc8259.txt.pdf",
+    "sourcePageCount": 16,
+    "pages": [5, 12, 13],
+    "minimumEditableCharacters": 2763,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Introduction to This Revision",
+      "JSON Grammar",
+      "JSON-text = ws value ws",
+      "begin-array",
+      "%x5B",
+      "name-separator",
+      "%x3A",
+      "value-separator",
+      "%x2C",
+      "View from 15th Floor",
+      "http://www.example.com/image/481989943",
+      "\"Animated\" : false",
+      "[116, 943, 234, 38793]",
+      "37.7668",
+      "-122.3959",
+      "37.371991",
+      "-122.026020",
+      "SAN FRANCISCO",
+      "SUNNYVALE",
+      "\"Hello world!\"",
+      "42",
+      "true",
+      "[Page 5]",
+      "[Page 12]",
+      "[Page 13]"
+    ],
+    "qualityNotes": "人工核對第5頁ABNF六種結構字元、十六進位代碼與註解欄；第12頁Image/Thumbnail巢狀縮排、引號/大括號/逗號、IDs陣列；第13頁兩筆物件陣列與獨立字串/數字/布林值，負號、小數位、空字串不可改寫。原稿非空白字元分別1262、1071、430，總2763。Word 3/3頁、2763字元、35段、0圖片/表格/OCR。已目視三頁；巢狀Image/Thumbnail及陣列括號的縮排仍被合併/移位，ABNF等號與註解不齊，章節編號字型與位置不符，整份視覺未通過。 第十四輪保留每行原生等寬起點，Image偏移24.05→0.47 pt；巢狀物件與陣列縮排恢復，ABNF/章節編號仍未通過。 第十六輪保留有原生分離片段證據的等寬編號字型、字級、標籤間距及正文精確寬度；章節標題8.97→1.45 pt，保留Word原生編號。",
+    "sha256": "36eae5d5812250c57e31cd87e591e6fd63fa2384ac4d8c53d7e0306807c75680",
+    "sourceBytes": 22750,
+    "renderChecks": [
+      {
+        "page": 5,
+        "text": "JSON Grammar",
+        "maxPositionError": 6
+      },
+      {
+        "page": 12,
+        "text": "\"Image\": {",
+        "maxPositionError": 6
+      },
+      {
+        "page": 13,
+        "text": "SUNNYVALE",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "lilypond-learning",
+    "title": "LilyPond 樂譜與程式碼教學",
+    "url": "https://lilypond.org/doc/v2.26/Documentation/learning.pdf",
+    "sourcePageCount": 211,
+    "pages": [13],
+    "sourceBytes": 1701147,
+    "sha256": "f636a6f87af3e178db2487a24cb1074bb4947dce6a8742e003668972fe34f9bd",
+    "minimumEditableCharacters": 567,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Tempo marks",
+      "metronome mark",
+      "\\tempo \"Presto\" 4 = 120",
+      "\\clef treble",
+      "\\clef alto c1",
+      "\\clef tenor c1",
+      "\\clef bass c1",
+      "g'2.",
+      "f4 e d",
+      "c4 c, r",
+      "All together"
+    ],
+    "qualityNotes": "人工核對實體第13頁（印刷頁8）：速度記號、3/4和6/8拍號、兩組五線譜、四種譜號、程式碼中的反斜線/單引號/大括號、c1不能變成cl，末段g'2.、f4 e d、c4 c, r與閉括號不可消失。PDF.js非空白596字元，其中音樂字型29個是無正確Unicode映射的符號；其餘567個為可核對的正文/程式碼/文字標記，作為可編輯字數下限。第十四輪Word1/1頁但僅430可編輯字元、整頁觸發OCR、8局部圖片；第一組譜號與部分括號/末段遺失，c1誤讀cl，未通過文字及結構驗證，不以頁數當成功。",
+    "renderChecks": [
+      {
+        "page": 13,
+        "text": "Tempo marks",
+        "maxPositionError": 6
+      },
+      {
+        "page": 13,
+        "text": "All together",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "jpl-calendar-2026",
+    "title": "NASA JPL 2026 年度日期與DOY日序表",
+    "url": "https://rapweb.jpl.nasa.gov/Calendar/Cal2026.pdf",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "sourceBytes": 104355,
+    "sha256": "d4994576acf36a26095b679cb3998cffb957ab19944980f3c64453b7ad70590f",
+    "minimumEditableCharacters": 2014,
+    "minimumTables": 12,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Resource Analysis Team",
+      "2026",
+      "January 26",
+      "February 26",
+      "March 26",
+      "April 26",
+      "May 26",
+      "June 26",
+      "July 26",
+      "August 26",
+      "September 26",
+      "October 26",
+      "November 26",
+      "December 26",
+      "362",
+      "363",
+      "364",
+      "365"
+    ],
+    "qualityNotes": "人工核對12個月份以3欄×4列排列，每月7星期欄；每格日期及小字DOY日序（1至365），右側斜體週數，1月1日位於星期四、12月31日對應365。原稿2014非空白字元。模型保留2014字元及12表格、0 OCR，但Word3/1頁，月份表格被縮成窄欄並串接下移，部分文字裁切、週數脫離，不視為成功。 第十五輪修復相鄰表格被Word合併：4張24列表恢復為12張8列表，一月表格寬約49.03→137.86 pt（原稿137.79）；窄欄裁字改善，3/1頁與月份垂直堆疊仍失敗。expectedWordTables由Word實際表格數驗證，不以XML張數替代。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Resource Analysis Team",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "January 26",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "December 26",
+        "maxPositionError": 6
+      }
+    ],
+    "expectedWordTables": 12
+  },
+  {
+    "id": "pdflib-toc",
+    "title": "PDFlib 兩種可點擊目錄、點狀導引線與頁碼",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/insert_toc.pdf",
+    "sourcePageCount": 10,
+    "pages": [2, 3],
+    "sourceBytes": 20934,
+    "sha256": "32ed4bcf9c6f567468212dd669b571e23fa947b8003444dd3dd1eb24ef191729",
+    "minimumEditableCharacters": 1695,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Table of Contents I",
+      "Table of Contents II",
+      "for a Document of 10 Pages.",
+      "Chapter 1",
+      "Chapter 2",
+      "Chapter 3",
+      "Chapter 4",
+      "Chapter 5",
+      "Index I",
+      "Index II",
+      "Click on TOC entry to jump to page"
+    ],
+    "qualityNotes": "人工核對原稿第2及3頁兩種目錄：第一頁標題、第二頁兩行標題，五個Chapter與兩個Index條目、每行點狀導引線、右端頁碼1–7及底部提示。每頁7個條目通向章節；第2頁標題及頁碼分別含連結共14個Link，第3頁共7個Link。原稿777+918=1695非空白字元（含導引點）。模型保留1695字元、7段、0圖片/表格/OCR、Word2頁；來源連結須另驗證，不把純文字保留當成可點擊目錄成功。 DOCX無hyperlink，來源跳頁連結未保留；點狀導引線字距及標題字距仍與原稿不同。 本測試僅選目錄頁，未包含章節目標頁，未驗證完整互動目錄；三個定位錨點2.37、1.05、2.68 pt通過6 pt。",
+    "renderChecks": [
+      {
+        "page": 2,
+        "text": "Table of Contents I",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Chapter 1",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Index II",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-barcode",
+    "title": "PDFlib Code 39條碼字型與人類可讀文字",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/barcode_font.pdf",
+    "sourcePageCount": 1,
+    "pages": [1],
+    "sourceBytes": 11104,
+    "sha256": "1728f7980c00ce2e04dca70094292190f569473fe9d13548a00fc4498464ae0a",
+    "minimumEditableCharacters": 61,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "*ABC123*",
+      "which will be returned by the",
+      "barcode reader as ABC123"
+    ],
+    "qualityNotes": "人工核對上方一維條碼、中段可讀字串*ABC123*及下方兩行說明；條碼應對應ABC123，不能用文字字元取代條紋。PDF文字抽取含兩次*ABC123*共61非空白字元，模型保留61字元、4段、0圖片/OCR。Word將條碼替代成一般字型的*ABC123*並溢成2頁，條碼圖形與1頁版面失敗，不能因文字相同就認定可掃描；未做解碼器驗證。 第17輪Word恢復1頁，兩行圖說偏移5.38／5.40 pt通過6 pt；條碼仍是普通字母，圖形／可掃描性未通過。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "which will be returned by the",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "barcode reader as ABC123",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-page-sizes",
+    "title": "PDFlib mixed page sizes and orientations",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/page_sizes.pdf",
+    "sha256": "faba517346b49b77239e4b4228763fca3d8e352969105add30910cc805fb191e",
+    "sourcePageCount": 5,
+    "pages": [1, 2, 3, 4, 5],
+    "minimumEditableCharacters": 130,
+    "maximumOcrPages": 1,
+    "expectedText": [
+      "A4 format in Portrait orientation.",
+      "A4 format in Landscape orientation.",
+      "Letter format in Portrait orientation.",
+      "Letter format in Landscape orientation."
+    ],
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "A4 format in Portrait orientation.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "A4 format in Landscape orientation.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Letter format in Portrait orientation.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 4,
+        "text": "Letter format in Landscape orientation.",
+        "maxPositionError": 6
+      }
+    ],
+    "qualityNotes": "Official mixed A4 and Letter portrait/landscape pages plus a 745 x 493 pt full-bleed photograph. Manually verify all four orientation labels, five physical sizes, page order, photo aspect ratio and lack of margins/cropping. The fifth page contains only a photograph and no editable source text; OCR fallback preserves its appearance but does not constitute a successful scan-to-editable-text case.",
+    "sourceBytes": 45740
+  },
+  {
+    "id": "pdflib-keep-lines",
+    "title": "PDFlib coloured paragraphs across paired text frames",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/keep_lines_together.pdf",
+    "sha256": "db955fac0d68eb5de5314cfbd9a9de03efae3a75acfc6043fce425da84487342",
+    "sourcePageCount": 1,
+    "sourceBytes": 19341,
+    "pages": [1],
+    "minimumEditableCharacters": 1461,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Fit Textflow without considering",
+      "Fit Textflow using",
+      "Long Distance Glider:",
+      "Giant Wing:",
+      "Cone Head Rocket:",
+      "Super Dart:",
+      "German Bi-Plane:",
+      "An unbelievable sailplane! It is ama-",
+      "zingly robust and can even do aero-"
+    ],
+    "qualityNotes": "人工核對左右各五個文字框、紅綠橙青藍五段、兩個雙行標題；左欄段落跨框，右欄每段保持在單框；保留兩次五種紙飛機名稱及末行desk.，以及原稿ama／aero後的斷字連字符。來源1461非空白字元（含4個軟連字符），模型僅1457字元，缺少原稿ama／aero行尾的4個軟連字符，嚴格字數條件失敗、0圖片/OCR、Word1頁；垂直框線及部分底線遺失、字距與軟連字符外觀不同，整份視覺未通過。 第19輪恢復全部4個可見連字符及原稿字寬；1461字元、Word1頁，四個連字符的水平／垂直偏移均不超過2.45 pt。垂直框線與字距仍未通過。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Long Distance Glider:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Cone Head Rocket:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "German Bi-Plane:",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-drop-caps",
+    "title": "PDFlib initial drop cap with wrapped justified text",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/drop_caps.pdf",
+    "sha256": "32e9e5b7235d721b628130d68dfd3b67447833eb5318ab17b11f410464b81d16",
+    "sourceBytes": 11104,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 533,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "ur Paper Planes are the ideal way of",
+      "They are exclusively folded with-",
+      "out using any adhesive.",
+      "ground."
+    ],
+    "qualityNotes": "人工核對大型O下沉三行，後續ur接成Our，前三行繞排，第四行恢復左界；16行正文、行尾with-斷字與末行ground.。原稿533非空白字元（含1個可見軟連字符）；首字位置與閱讀順序須獨立檢查，不能用字數或頁數代表成功。 第19輪532→533字元、0圖片/OCR、Word1頁；with-恢復但首字O與前三行順序錯位，正文向下偏移約48 pt，整頁外觀未通過。 第21輪首字改為原生可編輯定位文字，正文順序恢復；首字4.97 pt、前三行1.17／0.97／0.97 pt、恢復左界0.98 pt及末行0.92 pt均通過6 pt；原533字元／字級保留、無圖片，字距與字型外觀仍不同。 DOCX XML中的O在正文之前；Word匯出PDF的繪製流仍把浮動O放到最後，不能宣稱所有閱讀器擷取順序已修復。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "O",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "ur Paper Planes are the ideal way of",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "passing the time. We offer revolutionary",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "new developments of the traditional",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "common paper planes. If your lesson,",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "ground.",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-align-decimals",
+    "title": "PDFlib decimal-aligned numeric tables with multiline values",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/align_decimals.pdf",
+    "sha256": "5cea12fc9c819078950f09ffaa13f050efd3b2ff1094b057aabf07ece15c502e",
+    "sourceBytes": 10504,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 259,
+    "maximumOcrPages": 0,
+    "minimumTables": 1,
+    "expectedWordTables": 1,
+    "expectedText": [
+      "Decimal alignment with Textlines in table cells",
+      "Decimal alignment with Textflows in table cells",
+      "3.04",
+      "30.02",
+      "404.13",
+      "5,326.84",
+      "66,508.55",
+      "798,010.26",
+      "9,310,011.97",
+      "2.34",
+      "2.69",
+      "25.02",
+      "32.74",
+      "342.63",
+      "459.51",
+      "4,524.84",
+      "6,084.68",
+      "56,506.05",
+      "76,005.85",
+      "678,007.26",
+      "912,007.02",
+      "7,910,008.47",
+      "10,640,008.19"
+    ],
+    "qualityNotes": "人工核對一個連續2欄×16列的黑白網格；上下各有跨欄表頭，前7列各1個金額、後7列各2個金額共21個，小數點應在各區段同一垂直線。千分位逗號、小數點後兩位與末值10,640,008.19須保留。來源259非空白字元，要求完整16列與2欄、1頁及定位。初次未看圖時誤以為兩張分離彩色表；原稿目視是共用邊界的單一16列黑白網格，已更正測試規格並新增16列結構要求，非以轉換輸出決定門檻。 Word保留259字元、1張16列表及兩個跨欄表頭；21個小數點最大水平偏移0.53 pt、垂直2.09 pt，上下區段的對齊散布0.22／0.34 pt；文字字距仍與原稿不同。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "9,310,011.97",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "10,640,008.19",
+        "maxPositionError": 6
+      }
+    ],
+    "minimumLargestTableRows": 16,
+    "minimumLargestTableColumns": 2
+  },
+  {
+    "id": "pdflib-rotated-text",
+    "title": "PDFlib rotated text lines and 30-degree textflow",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/rotated_text.pdf",
+    "sha256": "a5d7d0b408923c5707f89c64bd845ea0881e9aa9f45f9f4a90777cc2dfea80b0",
+    "sourceBytes": 17001,
+    "sourcePageCount": 2,
+    "pages": [1],
+    "minimumEditableCharacters": 411,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "The famous rocket looper",
+      "To fold the famous",
+      "Fold it lenghtwise in",
+      "border of the plane.",
+      "rocket looper proceed as follows: Take a DIN A4 sheet. Fold it lenghtwise in the middle.",
+      "Fold the points C and D that the upper corners meet with the central fold as well.",
+      "Fold the plane in the middle. Fold the wings down that they"
+    ],
+    "qualityNotes": "人工核對第1頁：四次The famous rocket looper分別90°、-90°、180°與30°方向，下方30°正文完整保留折紙步驟與原稿拼字lenghtwise。來源第1頁411非空白字元；字數、方向、位置與是否被局部圖片替代需分開檢查。選取第1頁，未將第2頁視為已驗證。 第21輪原稿及Word已目視：411可編輯字元、0圖片/OCR、1頁，但四種方向均攤平成水平，兩個標題被壓窄，倒置標題貼右緣，斜排正文出現錯序；末行位置偏移341.58 pt，原6 pt門檻保留失敗。 第22輪修正180°文字範圍：原稿水平300.00–508.05 pt，Word原508.55–592.51 pt、現300.30–508.05 pt，左右邊界最大誤差208.55→0.30 pt。411字元與順序不變、0圖片/OCR；僅恢復水平位置／寬度，旋轉方向、垂直位置及斜排正文錯序仍失敗，末行341.58 pt未變。 第23輪以斜行自身閱讀軸排序及計算行距，DOCX與Word PDF的411字元完整順序均與原稿一致，三組實際行序檢查由FAIL轉PASS；字元多重集合不變、0圖片/OCR、1頁。末行341.58→321.58 pt仍超過6 pt；旋轉外觀、絕對位置與字距仍未通過，不將行序改善視為版面完成。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "border of the plane.",
+        "maxPositionError": 6
+      }
+    ],
+    "requiredReviewCodes": ["text-direction"],
+    "renderOrderChecks": [
+      {
+        "page": 1,
+        "texts": [
+          "as follows:",
+          "Take a DIN A4 sheet.",
+          "Fold it lenghtwise in"
+        ]
+      },
+      {
+        "page": 1,
+        "texts": [
+          "Fold the points C and",
+          "D that the upper",
+          "corners meet with the",
+          "central fold as well."
+        ]
+      },
+      {
+        "page": 1,
+        "texts": [
+          "Fold the plane in the",
+          "middle. Fold the",
+          "wings down that they"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "pdflib-vertical-align",
+    "title": "PDFlib table cell vertical alignment comparison",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/vertical_text_alignment.pdf",
+    "sha256": "4fa4fbbe241a5a26a51e9674842072704391d2672bdd4e7f0bb27b989350af7e",
+    "sourceBytes": 10122,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 244,
+    "maximumOcrPages": 0,
+    "minimumTables": 2,
+    "minimumLargestTableColumns": 2,
+    "minimumLargestTableRows": 3,
+    "expectedWordTables": 2,
+    "expectedText": [
+      "Our Paper Planes",
+      "Offset print paper 220g/sqm",
+      "It is amazingly robust and",
+      "is best suited to gliding."
+    ],
+    "qualityNotes": "人工核對第1頁兩張分離的2欄×3列表格，上表Benefit垂直置中，下表Benefit靠上；兩份標題、Material與220g/sqm、完整三行說明及空白右上格。來源244非空白字元，需另外檢查行高、格線、上下對齊及位置。 第22輪Word實際1頁、244字元、2張各3列2欄原生表、0圖片/OCR；上下對齊與格線已目視，字距仍不同。四組標籤各2處以top-to-bottom明確配對，最大偏移3.22／1.30／0.42／1.30 pt，均通過原6 pt；初次依左右排序造成上下標題誤配148.73 pt，保留原日誌，不把驗證器修正視為版面修復。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Our Paper Planes",
+        "occurrences": 2,
+        "maxPositionError": 6,
+        "order": "top-to-bottom"
+      },
+      {
+        "page": 1,
+        "text": "Material",
+        "occurrences": 2,
+        "maxPositionError": 6,
+        "order": "top-to-bottom"
+      },
+      {
+        "page": 1,
+        "text": "Benefit",
+        "occurrences": 2,
+        "maxPositionError": 6,
+        "order": "top-to-bottom"
+      },
+      {
+        "page": 1,
+        "text": "Offset print paper 220g/sqm",
+        "occurrences": 2,
+        "maxPositionError": 6,
+        "order": "top-to-bottom"
+      }
+    ]
+  },
+  {
+    "id": "pdflib-bulleted",
+    "title": "PDFlib blue bullet and numeric list comparison",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/bulleted_list.pdf",
+    "sha256": "87bee07a0826b4f167041e46f6ac8680064d6a3e3f5d42fd28e3101ff374824a",
+    "sourceBytes": 19236,
+    "sourcePageCount": 2,
+    "pages": [1, 2],
+    "minimumEditableCharacters": 1068,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Page 1: Bulleted list",
+      "Page 2: Numbered list",
+      "Long Distance Glider",
+      "Giant Wing",
+      "Cone Head Rocket",
+      "Super Dart",
+      "the lift required for loops."
+    ],
+    "qualityNotes": "人工核對兩頁各四項相同產品介紹：第1頁藍色圓點，第2頁藍色1–4編號；四個標題、正文續行左界、完整段落、藍色頁標題及末行the lift required for loops.。來源每頁534非空白字元、合計1068；不以總字數代表清單符號、縮排或版面通過。 第23輪Word2頁，每頁534字元、合計1068、0圖片/OCR；兩頁原稿與Word已逐頁目視。第1頁三錨點0.65／0.70／3.83 pt通過，但藍色圓點變黑、續行與字距仍不同。第2頁藍色1–4保留，標題文字與編號間隔過窄，兩個標題定位11.77 pt失敗、末行0.70 pt通過；保留原6 pt門檻。 第24輪四個自動圓點恢復來源擷取色0072A6，Word實際RGB(0,.447,.651)，文字及逐字座標不變；CMYK原稿與Word RGB渲染不宣稱像素一致。第2頁11.77 pt及續行縮排差異仍未通過。 第25輪第2頁原生裸數字後的空隙保留為定位點，Long Distance Glider／Super Dart偏移11.77→0.75／0.70 pt；四個標題均目視恢復與正文左界一致，1068字元／2頁／顏色不變。字距及第1頁續行仍不同。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Long Distance Glider",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Super Dart",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "the lift required for loops.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Long Distance Glider",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Super Dart",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "the lift required for loops.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Giant Wing",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Cone Head Rocket",
+        "maxPositionError": 6
+      }
+    ],
+    "requiredNumberingColors": ["0072A6"]
+  },
+  {
+    "id": "pdflib-numbered",
+    "title": "PDFlib Roman left/right alignment and decimal list",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/numbered_list.pdf",
+    "sha256": "372e8df4d9b6c7f3687b1c05d8b4096dd4175438c421f6db943baeae65ccef8e",
+    "sourceBytes": 21064,
+    "sourcePageCount": 3,
+    "pages": [1, 2, 3],
+    "minimumEditableCharacters": 1689,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Page 1: Numbered list with the numbers left-aligned",
+      "Page 2: Numbered list with the numbers right-aligned",
+      "Page 3: Numbered list using macros of inline options",
+      "Long Distance Glider",
+      "Giant Wing",
+      "Cone Head Rocket",
+      "Super Dart",
+      "get the lift required for loops."
+    ],
+    "qualityNotes": "人工核對第1頁藍色I–IV左對齊、第2頁I–IV右對齊、第3頁黑色1.–4.；每頁四項完整介紹、編號與正文間隔、續行左界、藍色頁標題及末行。原稿前兩頁含yourmessages及But it best suited等來源文字，不能自行改字；非空白字數562／563／564，合計1689。 第24輪Word3頁、1689字元、0圖片/OCR；逐頁目視保留前兩頁羅馬數字左右對齊及第三頁黑色數字。九個錨點均小於6 pt，最大3.83 pt；字型、字距與部分續行縮排仍不同。初次誤將第三頁數字預期為藍色，核對原稿後改為明確黑色要求，原先失敗日誌保留。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Long Distance Glider",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Super Dart",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "get the lift required for loops.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Long Distance Glider",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Super Dart",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "get the lift required for loops.",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Long Distance Glider",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "Super Dart",
+        "maxPositionError": 6
+      },
+      {
+        "page": 3,
+        "text": "the lift required for loops.",
+        "maxPositionError": 6
+      }
+    ],
+    "requiredNumberingColors": ["000000"]
+  },
+  {
+    "id": "pdflib-tabstops",
+    "title": "PDFlib mixed-alignment tabbed five-column invoice",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/tabstops_in_text.pdf",
+    "sha256": "e93ad35ef9f70de3af070374273215a870d88bac24fe8173d168d96f98d031a9",
+    "sourceBytes": 11337,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 112,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "ITEM",
+      "DESCRIPTION",
+      "QUANTITY",
+      "PRICE",
+      "AMOUNT",
+      "Super Kite",
+      "Turbo Flyer",
+      "Giga Trash",
+      "20.00",
+      "40.00",
+      "200.00",
+      "180.00",
+      "TOTAL",
+      "420.00"
+    ],
+    "qualityNotes": "人工核對橫向單頁、五欄ITEM/DESCRIPTION/QUANTITY/PRICE/AMOUNT、三項商品、置中數量2/5/1、右對齊價格20.00/40.00/180.00與金額40.00/200.00/180.00、末行TOTAL及420.00、淡色外框與無內格線。來源112非空白字元；原稿以定位點分欄，不以強制表格化或總字數視為版面成功。 第25輪Word1頁、112字元、0圖片/OCR；商品與TOTAL/420.00五處定位≤0.90 pt，DESCRIPTION表頭偏移16.04 pt仍失敗，淡色左右外框遺失。原稿／Word已目視，不能以字數與頁數視為版面完成。 第26輪由連續資料列的共同左/中/右界保留表頭欄距，DESCRIPTION偏移16.04→0.93 pt；112字元、1頁、0圖片/OCR及資料列不變。左右外框與字距仍不同。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "DESCRIPTION",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Super Kite",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Turbo Flyer",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Giga Trash",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "TOTAL",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "420.00",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "ITEM",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "QUANTITY",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "PRICE",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "AMOUNT",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-schedule",
+    "title": "PDFlib two-page color-coded meeting-room schedule",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/table_schedule.pdf",
+    "sha256": "1e0e6f47b08631dfea87a5a98978942d99d310329eb0b23571cba73d3d6bf1b8",
+    "sourceBytes": 20165,
+    "sourcePageCount": 2,
+    "pages": [1, 2],
+    "minimumEditableCharacters": 824,
+    "maximumOcrPages": 0,
+    "minimumTables": 2,
+    "minimumLargestTableColumns": 31,
+    "minimumLargestTableRows": 12,
+    "minimumRotatedCells": 8,
+    "expectedWordTables": 2,
+    "expectedText": [
+      "Booking Schedule",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Company Meeting",
+      "Technical Workgroup",
+      "QM Meeting",
+      "Admin Training",
+      "Continued",
+      "22.00"
+    ],
+    "qualityNotes": "人工核對橫向兩頁、重複三層表頭、時間加6天各5間共31欄、首表11列與續表12列、5.00–13.00及13.00–22.00、四種彩色預訂、8個直向活動標籤、跨頁延續事件與-- Continued --。來源417+407=824非空白字元；需保持每個活動所屬日期/房間/時間，不以文字及頁數符合代替結構正確。 第26輪Word2頁、824字元、2張31欄原生表（11/12列）、8個原生直向儲存格、0圖片/OCR。兩頁逐頁目視，事件顏色/日期/房間/時間與跨頁延續保留；七個頁標題/日標籤定位最大1.18 pt。字距、直向標籤字型及Continued破折號間距仍不同。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Booking Schedule",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Monday",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Wednesday",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Saturday",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Monday",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Wednesday",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Saturday",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "irs-w4p",
+    "title": "IRS W-4P 2026 pension withholding form first page",
+    "url": "https://www.irs.gov/pub/irs-pdf/fw4p.pdf",
+    "sha256": "48f3f39792561252fa7665e0f9751cd0fccf3bd46f1331a33c4f589e8491d441",
+    "sourceBytes": 129893,
+    "sourcePageCount": 4,
+    "pages": [1],
+    "minimumEditableCharacters": 4043,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "W-4P",
+      "Withholding Certificate",
+      "for Periodic Pension or Annuity Payments",
+      "No withholding",
+      "Your signature",
+      "2,200",
+      "Cat. No. 10225T"
+    ],
+    "qualityNotes": "人工核對2026首頁、左右大字表頭與兩行主標、五步驟、長側欄標籤、Step2三項金額、Step3四個金額格、Step4三項調整、No withholding勾選框及簽名/日期。來源4043非空白字元，要求可編輯文字不減少；不以頁數符合代替欄位與簽署位置正確。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Withholding Certificate",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Your signature",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "No withholding",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "irs-w4s",
+    "title": "IRS W-4S 2026 detachable sick-pay withholding form, worksheet and four tax-rate panels",
+    "url": "https://www.irs.gov/pub/irs-pdf/fw4s.pdf",
+    "sha256": "cb84c19ab09cc42aaa0170b409506cb6d10217f3c562a2081f45f3c0a7ad253e",
+    "sourceBytes": 91283,
+    "sourcePageCount": 2,
+    "pages": [1, 2],
+    "minimumEditableCharacters": 9878,
+    "maximumOcrPages": 0,
+    "minimumTables": 1,
+    "expectedText": [
+      "Request for Federal Income Tax",
+      "Withholding From Sick Pay",
+      "Separate here and give the top part",
+      "2026 Tax Rate Tables",
+      "Married Individuals Filing Joint Returns",
+      "Married Individuals Filing Separate Returns",
+      "Heads of Households",
+      "640,600",
+      "192,979.25",
+      "Cat. No. 10226E"
+    ],
+    "qualityNotes": "人工核對兩頁：首頁可撕式扣繳申請與簽字／日期、保留的1–10試算表及下方雙欄說明；第二頁上方雙欄扣除額說明、四組各七級稅率與底部雙欄告知。來源4824+5054=9878個NFKC非空白字元；粗體標題、行內強調與原生表格均需保留，不以字元數代替版面通過。 逐字核對原稿後使用Separate Returns與640,600，初稿將兩處人工轉錄錯誤列為失敗，已修正測試資料而非降低門檻。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Request for Federal Income Tax",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "General Instructions",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "2026 Tax Rate Tables",
+        "maxPositionError": 6
+      }
+    ],
+    "requiredBoldText": [
+      "Separate here and give the top part",
+      "For Paperwork Reduction Act Notice, see page 2."
+    ],
+    "requiredItalicText": [
+      "Amount to be withheld",
+      "Certain individuals not eligible for standard deduction."
+    ]
+  },
+  {
+    "id": "pdflib-font-metrics",
+    "title": "PDFlib font metrics diagram with four baseline-relative highlights",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/font_metrics_info.pdf",
+    "sha256": "2644eafe2e58dbd28fa2c9e70e8a29171e20a67b34a43b5471247895e5433983",
+    "sourceBytes": 10198,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 146,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "capheight for font size 10: 7.14",
+      "ascender for font size 10: 10.68",
+      "descender for font size 10: -2.92",
+      "xheight for font size 10: 5.4",
+      "ABCdefghij"
+    ],
+    "qualityNotes": "人工核對300×200 pt小尺寸示意圖：四行左側名稱與數值7.14、10.68、-2.92、5.4；四個右側ABCdefghij分別有capheight、ascender、descender及xheight粉紅底塊。descender必須位於基線下方，其餘標示範圍不同；146非空白字元及四處位置須保留，不以文字存在代表底色位置正確。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "capheight for font size 10: 7.14",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "ascender for font size 10: 10.68",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "descender for font size 10: -2.92",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "xheight for font size 10: 5.4",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "ABCdefghij",
+        "occurrences": 4,
+        "order": "top-to-bottom",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-character-references",
+    "title": "PDFlib literal character references and Unicode output in paired columns",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/character_references.pdf",
+    "sha256": "844cfe89da2f7ab4b034ffb14190e51c15bb98e48a9189d1c8aa787e0befb770",
+    "sourceBytes": 9408,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 58,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Input",
+      "Output",
+      "500 &euro;",
+      "500 &#x20AC;",
+      "&.zcaron;",
+      "&#x017E;",
+      "500 €",
+      "ž"
+    ],
+    "qualityNotes": "人工核對方形頁面雙欄Input／Output：四列輸入為500 &euro;、500 &#x20AC;、&.zcaron;、&#x017E;，輸出依序500 €、500 €、ž、ž。左側必須保留字面參照字串而不能再次解碼；右側歐元及帶caron的z各兩次，58個NFKC非空白字元、0 OCR；左右逐列對應及原始文字定位另行驗證。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Input",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Output",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "500 &euro;",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "500 &#x20AC;",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "&.zcaron;",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "&#x017E;",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "500 €",
+        "occurrences": 2,
+        "order": "top-to-bottom",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "ž",
+        "occurrences": 2,
+        "order": "top-to-bottom",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-fitbox-alignment",
+    "title": "PDFlib seven text boxes with top bottom center and justified vertical alignment",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/vertical_alignment_in_fitbox.pdf",
+    "sha256": "e966269ce7470a57d51c59f6403f25839e24f0cd7574fe7a00a616836bcabfb7",
+    "sourceBytes": 13108,
+    "sourcePageCount": 2,
+    "pages": [1, 2],
+    "minimumEditableCharacters": 2085,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Case 1: Fit Textflow with default settings",
+      "Case 2: firstlinedist=capheight",
+      "Case 3: verticalalign=bottom",
+      "Case 4: verticalalign=bottom lastlinedist=descender",
+      "Case 5:",
+      "Case 6: verticalalign=justify linespreadlimit=200%",
+      "Case 7:",
+      "Our paper planes are the ideal way of",
+      "our models are folded from one paper"
+    ],
+    "qualityNotes": "人工核對兩頁七個黑框：首頁四框比較預設、capheight頂距、靠下、descender底距；次頁三框比較置中、拉開行距及上下邊界。各框含同一段九行飛機介紹，右側Case 1–7說明須保持配對；原稿Case 5說明本身超出右邊界，不能誤稱為轉換新增裁切。來源1131+954=2085個NFKC非空白字元，須保持可編輯文字、框與各行位置，不能只看兩頁與字元數。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Case 1:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Case 2:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Case 3:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Case 4:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Case 5:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Case 6:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Case 7:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Our paper planes are the ideal way of",
+        "occurrences": 4,
+        "order": "top-to-bottom",
+        "maxPositionError": 6
+      },
+      {
+        "page": 2,
+        "text": "Our paper planes are the ideal way of",
+        "occurrences": 3,
+        "order": "top-to-bottom",
+        "maxPositionError": 6
+      }
+    ]
+  },
+  {
+    "id": "pdflib-underlined-text",
+    "title": "PDFlib default custom and colored underlines in single lines and textflow",
+    "url": "https://www.pdflib.com/fileadmin/cookbooks/PDFlib/results/underlined_text.pdf",
+    "sha256": "de0fe9b8ac3f48a8b38f9bd205a03050a741596c2392d92db5306d02b60a18cd",
+    "sourceBytes": 11876,
+    "sourcePageCount": 1,
+    "pages": [1],
+    "minimumEditableCharacters": 1893,
+    "maximumOcrPages": 0,
+    "expectedText": [
+      "Textline with default underline settings:",
+      "Textline with custom underline width and position:",
+      "Textflow with default underline settings:",
+      "Textflow with custom underline width and position:",
+      "Textflow with custom underlines via matchboxes:",
+      "Our paper planes are the ideal way of passing the time.",
+      "landing on the intended location",
+      "vista point in the mountains"
+    ],
+    "qualityNotes": "人工核對一頁五區：紅色標題，前兩區整行黑底線比較預設與較粗／較低位置，後三區正文選字底線比較預設、客製寬度／位置及matchboxes紅綠橙／虛線。最後一區Our paper planes為紅底線，ideal為綠色雙線，safe／landing為橙底線；三段正文各有可見revolu-行尾斷字。1893個非空白字元、0 OCR與五標題6 pt位置要求；一般底線不能因彩色基線帶修復而消失，字元／頁數通過不代表底線樣式通過。",
+    "renderChecks": [
+      {
+        "page": 1,
+        "text": "Textline with default underline settings:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Textline with custom underline width and position:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Textflow with default underline settings:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Textflow with custom underline width and position:",
+        "maxPositionError": 6
+      },
+      {
+        "page": 1,
+        "text": "Textflow with custom underlines via matchboxes:",
+        "maxPositionError": 6
+      }
+    ]
   }
 ]

@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 
 import { getDocument, Util } from "pdfjs-dist/legacy/build/pdf.mjs";
 
+import {
+  checkRenderedBackgrounds,
+  checkRenderedControls,
+} from "./pdf2docx-render-controls.mjs";
+import { textAnchors } from "./pdf2docx-text-anchors.mjs";
+
 // Accept the Word helper's <output>/<id>.pdf and render_docx.py's nested path.
 // Check actual rendered pages and optional source text anchors, not section counts.
 const manifest =
@@ -48,15 +54,22 @@ async function anchors(path, pageNumber, text) {
     const page = await (await task.promise).getPage(pageNumber);
     const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
-    return content.items
-      .filter(
-        (item) => "str" in item && normalize(item.str).includes(normalize(text))
-      )
-      .map((item) => {
-        const transform = Util.transform(viewport.transform, item.transform);
-        return { x: transform[4], y: transform[5] };
-      })
-      .sort((a, b) => a.y - b.y || a.x - b.x);
+    return textAnchors(
+      content.items
+        .filter((item) => "str" in item)
+        .map((item) => {
+          const transform = Util.transform(viewport.transform, item.transform);
+          return {
+            text: item.str,
+            x: transform[4],
+            y: transform[5],
+            width: item.width,
+            height: item.height,
+            dir: item.dir,
+          };
+        }),
+      text
+    ).sort((a, b) => a.y - b.y || a.x - b.x);
   } finally {
     await task.destroy();
   }
@@ -89,6 +102,71 @@ for (const sample of samples) {
     `${sample.id}: source ${expected}, rendered ${actual} ${actual === expected ? "PASS" : "FAIL"}`
   );
   if (actual !== expected) failed = true;
+  const selection = sample.pages
+    ? [...new Set(sample.pages)].sort((a, b) => a - b)
+    : Array.from({ length: source }, (_, i) => i + 1);
+  for (const check of await checkRenderedControls(
+    sample.path,
+    renderedPath,
+    sample.controlChecks ?? [],
+    selection,
+    assets
+  )) {
+    console.log(
+      `${sample.id}: checkbox "${check.text}" relative drift ${check.error.toFixed(2)} pt ${check.pass ? "PASS" : "FAIL"}`
+    );
+    if (!check.pass) failed = true;
+  }
+  for (const check of await checkRenderedBackgrounds(
+    sample.path,
+    renderedPath,
+    sample.backgroundChecks ?? [],
+    selection,
+    assets
+  )) {
+    console.log(
+      `${sample.id}: background "${check.text}" relative drift ${check.error.toFixed(2)} pt ${check.pass ? "PASS" : "FAIL"}`
+    );
+    if (!check.pass) failed = true;
+  }
+  // A text-presence gate cannot detect two title lines being reversed.
+  for (const check of sample.renderOrderChecks ?? []) {
+    if (
+      !Number.isInteger(check.page) ||
+      !selection.includes(check.page) ||
+      !Array.isArray(check.texts) ||
+      check.texts.length < 2 ||
+      check.texts.length > 20 ||
+      check.texts.some(
+        (text) => typeof text !== "string" || !normalize(text)
+      ) ||
+      new Set(check.texts.map(normalize)).size !== check.texts.length
+    )
+      throw new Error(`Invalid render order check: ${sample.id}`);
+    const sourceAnchors = await Promise.all(
+      check.texts.map((text) => anchors(sample.path, check.page, text))
+    );
+    const ascending = (points) =>
+      points.every(
+        (p, i) =>
+          p.length === 1 &&
+          (!i || (points[i - 1].length === 1 && p[0].y > points[i - 1][0].y))
+      );
+    if (!ascending(sourceAnchors))
+      throw new Error(`Source order missing or ambiguous: ${sample.id}`);
+    const page = selection.indexOf(check.page) + 1;
+    const renderedAnchors =
+      page <= actual
+        ? await Promise.all(
+            check.texts.map((text) => anchors(renderedPath, page, text))
+          )
+        : [];
+    const pass =
+      renderedAnchors.length === check.texts.length &&
+      ascending(renderedAnchors);
+    console.log(`${sample.id}: title line order ${pass ? "PASS" : "FAIL"}`);
+    if (!pass) failed = true;
+  }
   for (const check of sample.renderChecks ?? []) {
     if (
       !Number.isInteger(check.page) ||
@@ -98,15 +176,15 @@ for (const sample of samples) {
       !normalize(check.text) ||
       !Number.isFinite(check.maxPositionError) ||
       check.maxPositionError < 0 ||
+      (check.order !== undefined &&
+        (check.occurrences === undefined ||
+          !["left-to-right", "top-to-bottom"].includes(check.order))) ||
       (check.occurrences !== undefined &&
         (!Number.isInteger(check.occurrences) ||
           check.occurrences < 1 ||
           check.occurrences > 20))
     )
       throw new Error(`Invalid render check: ${sample.id}`);
-    const selection = sample.pages
-      ? [...new Set(sample.pages)].sort((a, b) => a - b)
-      : Array.from({ length: source }, (_, i) => i + 1);
     const renderedPage = selection.indexOf(check.page) + 1;
     if (!renderedPage || renderedPage > actual)
       throw new Error(`Render check page missing: ${sample.id}`);
@@ -114,7 +192,7 @@ for (const sample of samples) {
       anchors(sample.path, check.page, check.text),
       anchors(renderedPath, renderedPage, check.text),
     ]);
-    // Each fixture names a whole source run; do not accept a missing anchor as
+    // Fixtures name source text; do not accept a missing anchor as
     // success. The topmost matching run is deterministic for repeated prose.
     if (!original.length)
       throw new Error(`Source anchor missing: ${sample.id}: ${check.text}`);
@@ -122,8 +200,14 @@ for (const sample of samples) {
     // those anchors left-to-right, since tiny baseline rounding differs by run.
     const count = check.occurrences ?? 1;
     if (check.occurrences !== undefined) {
-      original.sort((a, b) => a.x - b.x || a.y - b.y);
-      converted.sort((a, b) => a.x - b.x || a.y - b.y);
+      // Stacked tables need an explicit vertical order: tiny x differences
+      // must not pair a heading in the upper table with the lower one.
+      const compare =
+        check.order === "top-to-bottom"
+          ? (a, b) => a.y - b.y || a.x - b.x
+          : (a, b) => a.x - b.x || a.y - b.y;
+      original.sort(compare);
+      converted.sort(compare);
       if (original.length !== count)
         throw new Error(
           `Source anchor count changed: ${sample.id}: ${check.text}`
