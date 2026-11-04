@@ -36,6 +36,8 @@ jobs:
           npm --version
       - name: Install dependencies
         run: npm ci
+      - name: Install fonts for canvas tests
+        uses: ./.github/actions/setup-test-fonts
       - name: Run tests
         run: npm test
       - name: Audit dependencies

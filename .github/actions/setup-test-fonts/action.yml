@@ -1,0 +1,27 @@
+name: Install fonts for canvas tests
+description: Install and verify the fonts used by PDF scan tests.
+runs:
+  using: composite
+  steps:
+    - name: Install system fonts
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y fontconfig fonts-dejavu-core fonts-liberation
+        fc-cache -f
+    - name: Verify canvas text rendering
+      shell: bash
+      run: |
+        node --input-type=module <<'NODE'
+        import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
+
+        if (!GlobalFonts.has('Liberation Sans')) {
+          throw new Error('Liberation Sans is unavailable to canvas tests');
+        }
+        const context = createCanvas(200, 50).getContext('2d');
+        context.font = '12px "Liberation Sans"';
+        context.fillText('Canvas font check', 0, 20);
+        if (!context.getImageData(0, 0, 200, 50).data.some((value, index) => index % 4 === 3 && value)) {
+          throw new Error('Canvas could not render text');
+        }
+        NODE
