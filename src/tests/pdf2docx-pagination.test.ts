@@ -62,6 +62,22 @@ async function output(model: DocumentModel, preservePageBreaks = true) {
 }
 
 describe("pagination regressions found in public PDFs", () => {
+  it("places the column break before the paragraph that owns top spacing", async () => {
+    const spans: TextSpan[] = [];
+    for (let i = 0; i < 4; i++) {
+      spans.push(span(`Left text ${i}`, 50, 80 + i * 14, 240));
+      spans.push(span(`Right text ${i}`, 300, 80 + i * 14, 240));
+    }
+    const { xml } = await output(analyzeLayout([page(spans)]));
+    const paragraphs = [...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(
+      (match) => match[0]
+    );
+    const index = paragraphs.findIndex((p) => p.includes("Right text 0"));
+    expect(index).toBeGreaterThan(0);
+    expect(paragraphs[index]).not.toContain('w:type="column"');
+    expect(paragraphs[index - 1]).toContain('w:type="column"');
+    expect(paragraphs[index]).toMatch(/w:before="[1-9]\d*"/);
+  });
   it("keeps a centered affiliation above columns and advances spacing after a column band", () => {
     const model = analyzeLayout([
       page([
@@ -143,6 +159,34 @@ describe("pagination regressions found in public PDFs", () => {
     expect(xml).toContain('w:hanging="960"');
     expect(xml).not.toContain("<w:br/>");
     expect(xml).not.toContain(">1. A long");
+  });
+
+  it("separates numbered form tabs from fitted glyphs and keeps the continuation row", async () => {
+    const paragraphs = groupParagraphs(
+      buildLines(
+        [
+          span("(1) Form instruction", 50, 50, 400),
+          span("Label", 74, 66, 50),
+          span("after blank", 250, 66, 180),
+        ],
+        true
+      ),
+      region,
+      12
+    );
+    const model = analyzeLayout([page([span("placeholder", 50, 50)])]);
+    model.pages[0].groups = [{ columns: [paragraphs], gap: 0 }];
+    const { xml } = await output(model);
+    expect(xml).toContain("w:numPr");
+    expect(xml).toContain("<w:br/>");
+    expect(xml).toContain('<w:tab w:val="left" w:pos="480"/>');
+    const tabRuns = [...xml.matchAll(/<w:r>.*?<\/w:r>/gs)]
+      .map((m) => m[0])
+      .filter((r) => r.includes("<w:tab/>"));
+    expect(tabRuns).toHaveLength(1);
+    expect(tabRuns[0]).not.toContain("w:fitText");
+    expect(tabRuns[0]).not.toContain("after blank");
+    expect(xml).toContain(">after blank</w:t>");
   });
 
   it("bounds distinct tab stops so dense tables cannot make Word reject the document", async () => {

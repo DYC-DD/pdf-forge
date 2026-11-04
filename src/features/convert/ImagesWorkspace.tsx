@@ -37,6 +37,7 @@ import { rasterImage } from "./lib/imageCanvas";
 import {
   conversionStem,
   detectSources,
+  IMAGE_INPUT_ACCEPT,
   imageInputsError,
   inspectImageBytes,
   type ImageItem,
@@ -432,9 +433,9 @@ export default function ImagesWorkspace({
           compact
           onFiles={(files) => void addFiles(files)}
           disabled={busy}
-          accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+          accept={IMAGE_INPUT_ACCEPT}
           label="繼續加入圖片"
-          title={adding ? "正在讀取圖片…" : "繼續加入 JPG／PNG 圖片"}
+          title={adding ? "正在讀取圖片…" : "繼續加入 JPG／PNG／WEBP 圖片"}
         />
         <div className="privacy-note">
           <PublicIcon name="lock" size={16} />

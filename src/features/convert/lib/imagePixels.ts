@@ -5,7 +5,12 @@ import {
   decodeImage,
   makeImageCanvas,
 } from "./imageCanvas";
-import { decodeJpeg, encodeJpeg, encodeLosslessWebp } from "./imageCodecs";
+import {
+  decodeJpeg,
+  decodeWebp,
+  encodeJpeg,
+  encodeLosslessWebp,
+} from "./imageCodecs";
 import {
   jpegProfile,
   jpegSegments,
@@ -17,11 +22,12 @@ import {
   profileChunk,
   profileSpace,
   svgTransform,
+  webpProfile,
   webpWithProfile,
   withoutOrientation,
   type PngChunk,
 } from "./imageMetadata";
-import type { ImageInfo } from "./imageSource";
+import { IMAGE_MIME_TYPES, type ImageInfo } from "./imageSource";
 
 export type ImagePixels = {
   width: number;
@@ -120,7 +126,7 @@ async function decodeSrgb(
     [withoutOrientation(bytes, info.format)],
     `source.${info.format}`,
     {
-      type: info.format === "jpg" ? "image/jpeg" : "image/png",
+      type: IMAGE_MIME_TYPES[info.format],
     }
   );
   const decoded = await decodeImage(file, signal);
@@ -161,6 +167,25 @@ export async function decodePixels(
 ): Promise<ImagePixels> {
   checkImageCancelled(signal);
   if (info.format === "png") return decodePngPixels(bytes);
+  if (info.format === "webp") {
+    const profile = webpProfile(bytes);
+    const image = await decodeWebp(bytes, signal);
+    if (image.width !== info.width || image.height !== info.height)
+      throw new Error("WEBP 圖片尺寸無法正確辨識。");
+    return {
+      width: image.width,
+      height: image.height,
+      channels: 4,
+      depth: 8,
+      data: new Uint8Array(
+        image.data.buffer,
+        image.data.byteOffset,
+        image.data.byteLength
+      ),
+      profile,
+      colorChunks: profile ? [profileChunk(profile)] : [],
+    };
+  }
   const frame = jpegSegments(bytes).find(
     ({ marker }) =>
       marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)

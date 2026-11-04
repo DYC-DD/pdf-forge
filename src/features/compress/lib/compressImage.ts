@@ -201,6 +201,10 @@ export async function compressImage(
   const bytes = new Uint8Array(await file.arrayBuffer());
   checkImageCancelled(signal);
   const info = inspectImageBytes(bytes);
+  if (info.format === "webp")
+    throw new Error(
+      "圖片壓縮目前僅支援 JPG 或 PNG，請至「轉換 PDF」處理 WEBP。"
+    );
   const type = info.format === "jpg" ? "image/jpeg" : "image/png";
   let result: ImageCompressionResult = { blob: file, appliedMode: "low" };
   function consider(encoded: Uint8Array, appliedMode: CompressionMode) {

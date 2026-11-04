@@ -26,6 +26,7 @@ import {
   imagePageCountError,
   type ImageFormat,
 } from "./lib/convertPdfToImages";
+import { IMAGE_INPUT_ACCEPT } from "./lib/imageSource";
 
 type PdfOutputFormat = ImageFormat | "word";
 
@@ -220,7 +221,7 @@ export default function PdfConversionWorkspace({
             <p>
               {file
                 ? "選取要轉換的頁面，點眼睛圖示可放大預覽。"
-                : "加入 PDF 或 JPG／PNG，自動辨識來源格式。"}
+                : "加入 PDF 或 JPG／PNG／WEBP，自動辨識來源格式。"}
             </p>
           </div>
           {file && (
@@ -251,10 +252,10 @@ export default function PdfConversionWorkspace({
           <DropZone
             multiple
             onFiles={onFiles}
-            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            accept={`.pdf,application/pdf,${IMAGE_INPUT_ACCEPT}`}
             label="選擇 PDF 或圖片"
             title={detecting ? "正在辨識檔案…" : "拖曳 PDF 或圖片到這裡"}
-            description="點擊選擇一份 PDF，或多張 JPG／PNG 圖片"
+            description="點擊選擇一份 PDF，或多張 JPG／PNG／WEBP 圖片"
             disabled={detecting}
           />
         ) : (
