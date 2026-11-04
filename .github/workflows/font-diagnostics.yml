@@ -1,0 +1,21 @@
+name: Verify canvas font setup
+on:
+  pull_request:
+    branches: [develop]
+permissions:
+  contents: read
+jobs:
+  minimal-ubuntu:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Install tools
+        run: apt-get update && apt-get install -y ca-certificates git sudo
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - run: npm install --global "$(node --print "require('./package.json').packageManager")"
+      - run: npm ci
+      - uses: ./.github/actions/setup-test-fonts
+      - run: npm test -- src/tests/pdf2docx-editable-scan.test.ts
